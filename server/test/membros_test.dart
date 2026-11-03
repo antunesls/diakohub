@@ -246,6 +246,7 @@ void main() {
       final outroMes = mes == 12 ? 1 : mes + 1;
       await criar({'nome': 'Ana Souza', 'dia': 5, 'mes': mes, 'status': 'membro', 'telefone': '11988887777'});
       await criar({'nome': 'Bruno', 'dia': 10, 'mes': outroMes, 'status': 'visitante'});
+      await criar({'nome': 'Carla Visita', 'dia': 4, 'mes': mes, 'status': 'visitante'});
       await criar({'nome': 'Zeca', 'dia': 2, 'mes': outroMes, 'status': 'inativo'});
 
       final (_, bytes) = await chamar('GET', '/api/membros/exportar?status=membro');
@@ -256,11 +257,11 @@ void main() {
       expect(texto, contains('Ana Souza;05/${mes.toString().padLeft(2, '0')}'));
       expect(texto, isNot(contains('Bruno')));
 
-      // "Ativos" inclui membro e visitante, sem o inativo.
+      // "Ativos" inclui membro e congregado; visitante e inativo ficam de fora.
       final (_, ativosBytes) = await chamar('GET', '/api/membros/exportar?status=ativos');
       final ativos = utf8.decode(ativosBytes as List<int>);
       expect(ativos, contains('Ana Souza'));
-      expect(ativos, contains('Bruno'));
+      expect(ativos, isNot(contains('Bruno')));
       expect(ativos, isNot(contains('Zeca')));
 
       // Só os aniversariantes do mês.
@@ -268,6 +269,7 @@ void main() {
       final doMes = utf8.decode(mesBytes as List<int>);
       expect(doMes, contains('Ana Souza'));
       expect(doMes, isNot(contains('Bruno')));
+      expect(doMes, isNot(contains('Carla Visita'))); // visitante não é aniversariante da igreja
 
       // Busca (sem acento, como na tela) e quem falta autorizar (LGPD).
       await criar({'nome': 'José Araújo', 'dia': 3, 'mes': outroMes, 'consentimentoEm': '01/02/2024'});

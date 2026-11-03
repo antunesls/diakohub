@@ -155,6 +155,12 @@ void main() {
       expect(Membro.fromJson(semData.toJson()).dia, isNull);
     });
 
+    test('visitante não entra nos aniversariantes, mesmo com data e autorização', () {
+      final visita = Membro(id: 'v', nome: 'Visita', dia: 1, mes: 1, status: StatusMembro.visitante, consentimentoEm: '2026-01-10');
+      expect(podeDivulgarAniversario(visita), isFalse);
+      expect(aniversariantesDaSemana([visita], DateTime(2026, 1, 1)), isEmpty);
+    });
+
     test('só divulga quem autorizou o uso dos dados (LGPD)', () {
       final revogada = Membro.fromJson({
         'id': 'Rui', 'nome': 'Rui', 'dia': 28, 'mes': 10, 'status': 'membro',
@@ -181,7 +187,7 @@ void main() {
     test('status deriva o ativo do formato antigo', () {
       expect(Membro(id: 'a', nome: 'Ana', dia: 1, mes: 1, ativo: false).status, StatusMembro.inativo);
       expect(Membro(id: 'a', nome: 'Ana', dia: 1, mes: 1).status, StatusMembro.membro);
-      expect(StatusMembro.visitante.ativo, isTrue);
+      expect(StatusMembro.visitante.ativo, isFalse); // visitante não conta como pessoa ativa da igreja
       expect(StatusMembro.congregado.ativo, isTrue);
       expect(StatusMembro.membro.ativo, isTrue);
       expect(StatusMembro.inativo.ativo, isFalse);

@@ -271,7 +271,7 @@ int ocorrenciaNoMes(String data) => (DateTime.parse(data).day - 1) ~/ 7 + 1;
 const _funcoesPastorais = ['pastor', 'pastora', 'presbitero', 'presbitera', 'diacono', 'diaconisa', 'evangelista',
   'missionario', 'missionaria', 'bispo', 'apostolo'];
 
-/// A pessoa aparece na lista para escalar: ativa e com o ministério (ou função) da escala na ficha.
+/// A pessoa aparece na lista para escalar: membro ou congregado (visitante não) e com o ministério (ou função) da escala na ficha.
 bool podeServir(Membro m, TipoEscala tipo) {
   if (!m.ativo) return false;
   final ministerios = [for (final x in m.ministerios) semAcento(x.toLowerCase()) ?? ''];

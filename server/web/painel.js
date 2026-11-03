@@ -1132,7 +1132,7 @@ function cardMembro(m) {
   const mins = m.ministerios || [];
   const idade = idadeDe(m);
   return el('article', {
-    class: 'membro-card' + (m.ativo ? '' : ' inativo'),
+    class: 'membro-card' + (m.status === 'inativo' || m.status === 'transferido' ? ' inativo' : ''),
     onclick: (e) => { if (!e.target.closest('a, button')) abrir(); },
   },
   el('div', { class: 'foto', 'aria-hidden': 'true' },

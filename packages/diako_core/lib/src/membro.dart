@@ -9,8 +9,9 @@ enum StatusMembro {
   const StatusMembro(this.nome);
   final String nome;
 
-  /// Entra na lista de aniversariantes do telão e nas estatísticas de pessoas ativas.
-  bool get ativo => this == StatusMembro.visitante || this == StatusMembro.congregado || this == StatusMembro.membro;
+  /// Conta como pessoa da igreja: entra nos aniversariantes do telão, nas escalas e nas
+  /// estatísticas de pessoas ativas. Visitante não conta (até virar congregado ou membro).
+  bool get ativo => this == StatusMembro.congregado || this == StatusMembro.membro;
 
   /// Aceita o nome exato e a forma feminina ("congregada", "membra", "inativa"…).
   static StatusMembro? porNome(String? nome) {
@@ -63,8 +64,8 @@ class MudancaStatus {
 
 /// Pessoa cadastrada pela igreja. Os campos [nome], [dia], [mes] e [ativo] (derivado do
 /// status) são o formato antigo, usado pelo aniversariantes do telão, do mural e do app.
-/// O aniversário é opcional: quem se cadastra como visitante pode não informar (fica fora
-/// das listas de aniversariantes até completar o cadastro).
+/// O aniversário é opcional: quem se cadastra como visitante pode não informar. Visitante
+/// nunca entra nas listas de aniversariantes nem nas escalas (veja [StatusMembro.ativo]).
 class Membro {
   Membro({
     required this.id,

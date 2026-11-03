@@ -81,6 +81,8 @@ void main() {
     expect(podeServir(m(['Louvor']), TipoEscala.louvor), isTrue);
     expect(podeServir(m(['Música']), TipoEscala.louvor), isTrue);
     expect(podeServir(m(['Louvor'], ativo: false), TipoEscala.louvor), isFalse);
+    final visitante = Membro(id: 'v', nome: 'Visita', ministerios: ['Louvor'], status: StatusMembro.visitante);
+    expect(podeServir(visitante, TipoEscala.louvor), isFalse);
     expect(podeServir(m(['Infantil'], funcao: 'Presbítero'), TipoEscala.pastoral), isTrue);
     expect(podeServir(m(['Liderança']), TipoEscala.pastoral), isTrue);
     expect(podeServir(m(['Louvor'], funcao: 'Líder'), TipoEscala.pastoral), isFalse);
