@@ -119,25 +119,19 @@ void main() {
       );
     });
 
-    test('mensagem de palco vai sem tema: só texto, fundo transparente', () async {
+    test('mensagem de palco vai sem tema: só o texto', () async {
       await cliente({'status': 'ok'}).mensagemPalco('Faltam 5 minutos');
-      expect(corpo(), {
-        'text': 'Faltam 5 minutos',
-        'show': true,
-        'display_ahead': true,
-        'custom_theme': {
-          'background': {'type': 'transparent', 'id': 'transparent'},
-          'font': {'bold': true, 'size': 14, 'color': 'FFFFFF'},
-          'align': {'horizontal': 'center', 'vertical': 'middle'},
-          'effect': {'shadow_color': '000000', 'shadow_x_weight': 20, 'shadow_y_weight': 20},
-        },
-      });
+      expect(corpo(), {'text': 'Faltam 5 minutos', 'show': true, 'display_ahead': true});
     });
 
-    test('ocultar a mensagem de palco mantém o mesmo visual', () async {
+    test('leitura da Palavra no palco também vai sem tema', () async {
+      await cliente({'status': 'ok'}).leituraPalco('Jo 3:16');
+      expect(corpo(), {'text': 'Jo 3:16', 'show': true, 'display_ahead': true});
+    });
+
+    test('ocultar a mensagem de palco não manda tema', () async {
       await cliente({'status': 'ok'}).mensagemPalco('', mostrar: false);
-      expect(corpo()['show'], isFalse);
-      expect((corpo()['custom_theme'] as Map)['background'], {'type': 'transparent', 'id': 'transparent'});
+      expect(corpo(), {'text': '', 'show': false, 'display_ahead': false});
     });
   });
 
