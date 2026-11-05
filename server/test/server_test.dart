@@ -26,6 +26,7 @@ late Handler handler;
 late List<http.Request> chamadasHolyrics;
 late String token;
 bool temasIndisponiveis = false;
+int quantidadeTemas = 2;
 
 Future<Servidor> criar({DateTime? agora, LimiteTaxa? limitePedidos}) async {
   final dados = p.join(tmp.path, 'data');
@@ -46,7 +47,8 @@ Future<Servidor> criar({DateTime? agora, LimiteTaxa? limitePedidos}) async {
       if (req.url.path.endsWith('/GetThemes')) {
         if (temasIndisponiveis) return http.Response(jsonEncode({'status': 'error', 'error': 'offline'}), 200);
         return http.Response(jsonEncode({'status': 'ok', 'data': [
-          {'id': '7', 'name': 'Avisos'}, {'id': '8', 'name': 'Culto'}
+          {'id': '7', 'name': 'Avisos'}, {'id': '8', 'name': 'Culto'},
+          for (var i = 3; i <= quantidadeTemas; i++) {'id': '${100 + i}', 'name': 'Tema $i'},
         ]}), 200);
       }
       if (req.url.path.endsWith('/GetThumbnail')) {
@@ -120,6 +122,15 @@ void main() {
       await req('GET', '/api/admin/temas');
       expect((await req('GET', '/api/temas')).statusCode, 200);
       expect(chamadasHolyrics.length, 2); // cache curto no backend
+    });
+
+    test('catálogo lista todos os temas do Holyrics, não só os primeiros', () async {
+      quantidadeTemas = 120;
+      addTearDown(() => quantidadeTemas = 2);
+      final dados = await corpo(await req('GET', '/api/admin/temas?atualizar=1')) as Map;
+      final temas = dados['temas'] as List;
+      expect(temas.length, 120);
+      expect(temas.last['name'], 'Tema 120');
     });
 
     test('catálogo preserva última lista em memória quando Holyrics cai', () async {

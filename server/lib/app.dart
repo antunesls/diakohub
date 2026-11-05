@@ -154,6 +154,7 @@ class Servidor {
   final LimiteTaxa _limiteLgpd = LimiteTaxa(maximo: 20, janela: const Duration(minutes: 10));
   final LimiteTaxa _limiteVisitantes = LimiteTaxa(maximo: 5, janela: const Duration(minutes: 10));
   List<Map<String, String>> _temasCache = [];
+  static const maximoTemas = 500;
   DateTime? _temasAtualizados;
 
   /// Caminho do QR para o ShowImage do Holyrics.
@@ -2898,7 +2899,8 @@ class Servidor {
       final j = jsonDecode(r.corpo) as Map;
       if (j['status'] != 'ok' || j['data'] is! List) throw const FormatException('Temas indisponíveis');
       final temas = <Map<String, String>>[];
-      for (final t in (j['data'] as List).take(80)) {
+      // Lista inteira: o Holyrics pode ter bem mais que algumas dezenas de temas. O teto é só proteção.
+      for (final t in (j['data'] as List).take(maximoTemas)) {
         if (t is! Map || t['id'] is! String || t['name'] is! String) continue;
         final id = t['id'] as String;
         final name = t['name'] as String;

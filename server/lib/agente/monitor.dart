@@ -125,7 +125,7 @@ class MonitorAgente {
         final temas = await _holyrics('GetThemes');
         if (temas is! List) return _json(res, 503, {'erro': 'Não foi possível obter temas do Holyrics.'});
         final itens = <Map<String, String>>[];
-        for (final t in temas.take(100)) {
+        for (final t in temas.take(500)) {
           if (t is! Map || t['id'] is! String || t['name'] is! String) continue;
           itens.add({'id': t['id'] as String, 'name': t['name'] as String});
         }
