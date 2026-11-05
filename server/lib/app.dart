@@ -265,6 +265,8 @@ class Servidor {
       // Palavras (sermões) dos pregadores (rotas fixas antes das com <id>)
       ..get('/api/palavras', _listarPalavras)
       ..get('/api/palavras/hoje', _palavraDeHoje)
+      ..get('/api/palavras/prontas', _palavrasProntas)
+      ..post('/api/palavras/escolha-dia', _escolherPalavraDoDia)
       ..post('/api/palavras/analisar', _analisarPalavra)
       ..post('/api/palavras/resumo', _resumoWhatsappPalavra)
       ..post('/api/palavras/importar', _importarPalavra)
@@ -2069,10 +2071,61 @@ class Servidor {
         'palavras': [for (final p in prontas) {'id': p.id, 'titulo': p.titulo, 'minutos': p.minutos}],
       });
     }
+    // A troca feita no Modo Culto (POST /api/palavras/escolha-dia) vale para o dia, sem ?id.
+    // A escolha pode ser uma Palavra pronta de qualquer data (já usada em outro dia).
+    final salva = q['id'] == null ? (store.buscar('escolhasPalavra', data)?['palavraId'] as String?) : null;
+    final daSalva = salva == null ? null : store.buscar('palavras', salva);
+    final salvaPronta = daSalva != null && daSalva['pronta'] == true ? Palavra.fromJson(daSalva) : null;
     final escolhida = q['id'] != null
         ? prontas.where((p) => p.id == q['id']).firstOrNull
-        : prontas.where((p) => culto.isNotEmpty && p.cultoId == culto).firstOrNull ?? prontas.firstOrNull;
+        : salvaPronta ??
+            prontas.where((p) => culto.isNotEmpty && p.cultoId == culto).firstOrNull ??
+            prontas.firstOrNull;
     return _json({'palavra': escolhida == null ? null : PalavraDoCulto.de(escolhida).toJson()});
+  }
+
+  /// POST /api/palavras/escolha-dia  {data: aaaa-mm-dd, id: <Palavra pronta desse dia> | ""}
+  /// Troca a Palavra atribuída ao dia (id vazio volta à escolha automática).
+  Future<Response> _escolherPalavraDoDia(Request req) async {
+    final corpo = await _corpo(req);
+    final data = corpo['data'] as String? ?? '';
+    final id = corpo['id'] as String? ?? '';
+    final dia = DateTime.tryParse(data);
+    if (dia == null || diaIso(dia) != data) return _erro(400, 'Data inválida.');
+    if (id.isEmpty) {
+      await store.excluir('escolhasPalavra', data);
+      return _json({'data': data, 'palavraId': ''});
+    }
+    final palavra = store.buscar('palavras', id);
+    if (palavra == null || palavra['pronta'] != true) {
+      return _erro(400, 'Essa Palavra não está pronta.');
+    }
+    await store.salvar('escolhasPalavra', {'id': data, 'palavraId': id});
+    return _json({'data': data, 'palavraId': id});
+  }
+
+  /// GET /api/palavras/prontas?busca=…&data=aaaa-mm-dd — todas as Palavras prontas (sem o texto),
+  /// para o tablet listar por nome ou por dia. Mais recentes primeiro.
+  Response _palavrasProntas(Request req) {
+    final q = req.url.queryParameters;
+    final data = q['data'] ?? '';
+    final busca = q['busca'] ?? '';
+    final lista = [
+      for (final j in store.listar('palavras'))
+        if (j['pronta'] == true)
+          if (Palavra.fromJson(j) case final p
+              when (data.isEmpty || p.data == data) && palavraCorresponde(p, busca))
+            p,
+    ]..sort((a, b) {
+        final d = b.data.compareTo(a.data);
+        return d != 0 ? d : a.titulo.compareTo(b.titulo);
+      });
+    return _json({
+      'palavras': [
+        for (final p in lista)
+          {'id': p.id, 'titulo': p.titulo, 'data': p.data, 'serie': p.serie, 'autorNome': p.autorNome, 'minutos': p.minutos},
+      ],
+    });
   }
 
   // ---------- Modelos de roteiro do Modo Culto ----------

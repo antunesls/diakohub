@@ -69,11 +69,15 @@ class ModoCultoController extends ChangeNotifier {
     if (culto != null) scope.palavra.data = culto.data;
     _remontar();
     await scope.palavra.sincronizar();
-    await scope.palavra.buscarOpcoes(culto?.data ?? diaIso(_agora()));
+    await scope.palavra.buscarProntas();
   }
 
-  /// Fixa uma das Palavras prontas da data do culto escolhido (só nesta sessão).
+  /// Troca a Palavra atribuída ao dia do culto por uma das prontas dele; [id] vazio volta à
+  /// escolha automática. Grava no servidor (vale para o dia, inclusive ao reabrir o tablet);
+  /// só depois de gravar encerra o progresso, para não perder o culto se a conexão cair.
   Future<void> selecionarPalavra(String id) async {
+    final dia = culto?.data ?? diaIso(_agora());
+    await scope.api.escolherPalavraDoDia(dia, id);
     await encerrar();
     scope.palavra.id = id;
     await scope.palavra.sincronizar();

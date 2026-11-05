@@ -258,6 +258,76 @@ void main() {
       expect((await chamar('GET', '/api/palavras/hoje?data=$amanha&id=inexistente', token: telao)).$2['palavra'], isNull);
     });
 
+    test('tablet lista as Palavras prontas por nome e por dia, sem rascunhos nem texto', () async {
+      final telao = await criar('tablet-lista', Perfil.telao);
+      final pregador = await criar('pregador-lista', Perfil.pregador);
+      final ontem = diaIso(DateTime.now().subtract(const Duration(days: 1)));
+      for (final (id, titulo, data, pronta) in [
+        ('a', 'Quando a fé espera', hoje, true),
+        ('b', 'Em memória de mim', ontem, true),
+        ('c', 'Rascunho da semana', hoje, false),
+      ]) {
+        await store.salvar('palavras', {
+          'id': id, 'titulo': titulo, 'data': data, 'pronta': pronta, 'serie': 'Fé',
+          'autorId': 'x', 'autorNome': 'Pastor', 'texto': 'texto longo', 'minutos': 40,
+        });
+      }
+      final (st, todas) = await chamar('GET', '/api/palavras/prontas', token: telao);
+      expect(st, 200);
+      expect((todas['palavras'] as List).map((p) => p['id']), ['a', 'b']);
+      expect((todas['palavras'] as List).first.containsKey('texto'), isFalse);
+
+      final (_, busca) = await chamar('GET', '/api/palavras/prontas?busca=mem%C3%B3ria', token: telao);
+      expect((busca['palavras'] as List).map((p) => p['id']), ['b']);
+
+      final (_, porDia) = await chamar('GET', '/api/palavras/prontas?data=$ontem', token: telao);
+      expect((porDia['palavras'] as List).map((p) => p['id']), ['b']);
+
+      // Só quem projeta (o tablet) lista; o pregador não.
+      expect((await chamar('GET', '/api/palavras/prontas', token: pregador)).$1, 403);
+    });
+
+    test('tablet troca a Palavra do dia; vale para o dia e pode voltar à automática', () async {
+      final telao = await criar('tablet-troca', Perfil.telao);
+      final ontem = diaIso(DateTime.now().subtract(const Duration(days: 1)));
+      await store.salvar('palavras', {
+        'id': 'troca-a', 'titulo': 'Automática', 'data': hoje, 'pronta': true, 'texto': 'a', 'autorNome': 'Pastor', 'minutos': 40,
+      });
+      await store.salvar('palavras', {
+        'id': 'troca-b', 'titulo': 'Escolhida', 'data': hoje, 'pronta': true, 'texto': 'b', 'autorNome': 'Pastor', 'minutos': 30,
+      });
+      await store.salvar('palavras', {
+        'id': 'troca-rascunho', 'titulo': 'Rascunho', 'data': hoje, 'pronta': false, 'texto': 'c', 'autorNome': 'Pastor', 'minutos': 30,
+      });
+      await store.salvar('palavras', {
+        'id': 'troca-ontem', 'titulo': 'De ontem', 'data': ontem, 'pronta': true, 'texto': 'd', 'autorNome': 'Pastor', 'minutos': 30,
+      });
+
+      // Palavra de outro dia, rascunho ou inexistente: recusada.
+      // Pode ser uma Palavra já usada em outra data.
+      expect((await chamar('POST', '/api/palavras/escolha-dia', token: telao, json: {'data': hoje, 'id': 'troca-ontem'})).$1, 200);
+      final (_, deOntem) = await chamar('GET', '/api/palavras/hoje?data=$hoje', token: telao);
+      expect(deOntem['palavra']['titulo'], 'De ontem');
+      expect((await chamar('POST', '/api/palavras/escolha-dia', token: telao, json: {'data': hoje, 'id': ''})).$1, 200);
+      expect((await chamar('POST', '/api/palavras/escolha-dia', token: telao, json: {'data': hoje, 'id': 'troca-rascunho'})).$1, 400);
+      expect((await chamar('POST', '/api/palavras/escolha-dia', token: telao, json: {'data': hoje, 'id': 'nao-existe'})).$1, 400);
+      expect((await chamar('POST', '/api/palavras/escolha-dia', token: telao, json: {'data': '2026-99-99', 'id': 'troca-b'})).$1, 400);
+
+      // Troca: o tablet passa a receber a escolhida, mesmo sem ?id (como ao reabrir o Modo Culto).
+      expect((await chamar('POST', '/api/palavras/escolha-dia', token: telao, json: {'data': hoje, 'id': 'troca-b'})).$1, 200);
+      final (_, depois) = await chamar('GET', '/api/palavras/hoje?data=$hoje', token: telao);
+      expect(depois['palavra']['titulo'], 'Escolhida');
+
+      // Voltar à automática: sem escolha salva, a de antes volta.
+      expect((await chamar('POST', '/api/palavras/escolha-dia', token: telao, json: {'data': hoje, 'id': ''})).$1, 200);
+      final (_, volta) = await chamar('GET', '/api/palavras/hoje?data=$hoje', token: telao);
+      expect(volta['palavra']['titulo'], isNot('Escolhida'));
+
+      // Só quem projeta troca a Palavra do dia.
+      final pregador = await criar('pregador-troca', Perfil.pregador);
+      expect((await chamar('POST', '/api/palavras/escolha-dia', token: pregador, json: {'data': hoje, 'id': 'troca-b'})).$1, 403);
+    });
+
     test('tablet lista cultos futuros da escala em ordem sem incluir passados', () async {
       final telao = await criar('tablet-escala', Perfil.telao);
       final amanha = diaIso(DateTime.now().add(const Duration(days: 1)));

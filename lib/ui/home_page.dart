@@ -153,7 +153,7 @@ class _HomePageState extends State<HomePage> {
           if (conta.pode('visitantes')) _Secao.visitantes,
           if (conta.pode('agendaVer')) _Secao.agenda,
           if (conta.pode('escalasVer')) _Secao.escala,
-          _Secao.palavra,
+          if (conta.pode('projetar')) _Secao.palavra,
           if (conta.pode('mensagens')) _Secao.mensagens,
         };
         if (!permitidas.contains(_secao)) _secao = _Secao.recados;

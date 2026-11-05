@@ -128,7 +128,9 @@ Permissao permissaoDaRota(String metodo, String caminho) {
   // Modelos de roteiro do Modo Culto: ver com a escala; alterar confere a pastoral no handler.
   if (comeca('api/roteiros')) return Permissao.escalasVer;
   // A Palavra do dia desce para o tablet do culto; o resto é do pregador (cada um vê as suas).
-  if (caminho == 'api/palavras/hoje') return Permissao.projetar;
+  if (caminho == 'api/palavras/hoje' || caminho == 'api/palavras/prontas' || caminho == 'api/palavras/escolha-dia') {
+    return Permissao.projetar;
+  }
   if (comeca('api/palavras')) return Permissao.palavras;
   if (caminho == 'api/temas' || comeca('api/holyrics') || comeca('api/projetar')) return Permissao.projetar;
   if (comeca('api/agente-local')) return Permissao.projetar; // parear o tablet com o agente da rede local
