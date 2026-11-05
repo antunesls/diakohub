@@ -193,6 +193,10 @@ class _ModoCultoPageState extends State<ModoCultoPage> {
           width: 420,
           height: 320,
           child: ListView(children: [
+            ListTile(
+                title: const Text('Automática'),
+                subtitle: const Text('Volta à escolha automática do dia'),
+                onTap: () => Navigator.pop(ctx, '')),
             if (opcoes.isEmpty) const ListTile(title: Text('Nenhuma Palavra pronta nesta data')),
             for (final p in opcoes) ListTile(title: Text(p.titulo), onTap: () => Navigator.pop(ctx, p.id)),
           ]),

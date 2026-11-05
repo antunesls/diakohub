@@ -76,7 +76,7 @@ void main() {
 
   testWidgets('escolhe o culto de amanhã e a Palavra pronta dele', (tester) async {
     final dia = diaIso(DateTime.now().add(const Duration(days: 1)));
-    await abrir(tester, const ModoCultoPage(), antes: (s) {
+    final servidor = await abrir(tester, const ModoCultoPage(), antes: (s) {
       s.cultosExtras = [{...s.culto, 'id': 'amanha', 'data': dia, 'nome': 'Culto de amanhã', 'hora': '19:00'}];
       s.palavrasExtras = [
         Palavra(id: 'p1', titulo: 'Primeira Palavra', autorId: 'x', data: dia, pronta: true, texto: 'Primeiro texto.'),
@@ -89,6 +89,13 @@ void main() {
     await tocar(tester, find.byTooltip('Escolher Palavra'));
     await tocar(tester, find.text('Primeira Palavra').last);
     expect(find.textContaining('Primeira Palavra'), findsWidgets);
+    // A troca vai para o servidor, para o dia do culto (e não só para esta sessão).
+    expect(servidor.escolhasPalavra[dia], 'p1');
+
+    // "Automática" desfaz a troca.
+    await tocar(tester, find.byTooltip('Escolher Palavra'));
+    await tocar(tester, find.text('Automática'));
+    expect(servidor.escolhasPalavra.containsKey(dia), isFalse);
   });
 
   testWidgets('trocar de culto iniciado pede confirmação e recomeça do início', (tester) async {

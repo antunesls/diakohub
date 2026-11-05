@@ -36,6 +36,9 @@ class ServidorFalso {
   final holyrics = <String>[];
   final corpos = <Map<String, dynamic>>[];
 
+  /// Palavra escolhida no Modo Culto para cada dia (POST /api/palavras/escolha-dia).
+  final escolhasPalavra = <String, String>{};
+
   /// Ações que o Holyrics recusa, como faz quando a imagem não está na pasta dele.
   final recusar = <String>{};
 
@@ -153,8 +156,22 @@ class ServidorFalso {
                 return {'palavras': [for (final p in prontas) {'id': p.id, 'titulo': p.titulo}]};
               }
               final id = req.url.queryParameters['id'];
-              final p = id == null ? prontas.firstOrNull : prontas.where((p) => p.id == id).firstOrNull;
+              final salva = id == null ? escolhasPalavra[dia] : null;
+              final p = id == null
+                  ? (prontas.where((p) => p.id == salva).firstOrNull ?? prontas.firstOrNull)
+                  : prontas.where((p) => p.id == id).firstOrNull;
               return {'palavra': p == null ? null : PalavraDoCulto.de(p).toJson()};
+            }(),
+          '/api/palavras/escolha-dia' => () {
+              final c = Map<String, dynamic>.from(jsonDecode(req.body) as Map);
+              final dia = c['data'] as String;
+              final id = c['id'] as String;
+              if (id.isEmpty) {
+                escolhasPalavra.remove(dia);
+              } else {
+                escolhasPalavra[dia] = id;
+              }
+              return {'data': dia, 'palavraId': id};
             }(),
           '/api/estado' => {'qrHolyrics': 'DiakoNews/qr.png', 'qrMensagensHolyrics': 'DiakoNews/qr-mensagens.png', 'qrPixHolyrics': 'DiakoNews/qr-pix.png'},
           '/api/projetar/boas-vindas' => {'status': 'ok'},

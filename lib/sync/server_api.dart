@@ -116,6 +116,10 @@ class ServerApi {
         await _req('GET', '/api/palavras/hoje${q.isEmpty ? '' : '?$q'}') as Map);
   }
 
+  /// Troca a Palavra atribuída ao dia [data]; [id] vazio volta à escolha automática.
+  Future<Map<String, dynamic>> escolherPalavraDoDia(String data, String id) async => Map<String, dynamic>.from(
+      await _req('POST', '/api/palavras/escolha-dia', json: {'data': data, 'id': id}) as Map);
+
   /// Palavras prontas (sem o texto), filtradas por [busca] e/ou [data] (aaaa-mm-dd).
   Future<Map<String, dynamic>> palavrasProntas({String busca = '', String data = ''}) async {
     final q = Uri(queryParameters: {
