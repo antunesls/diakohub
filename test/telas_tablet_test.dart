@@ -108,6 +108,7 @@ void main() {
     await tocar(tester, find.byTooltip('Escolher Palavra'));
     await tocar(tester, find.text('Palavra de outro dia'));
     expect(servidor.escolhasPalavra[dia], 'p3');
+    expect(find.textContaining('Palavra de outro dia'), findsWidgets, reason: 'a Palavra escolhida tem que aparecer no Modo Culto');
   });
 
   testWidgets('trocar de culto iniciado pede confirmação e recomeça do início', (tester) async {

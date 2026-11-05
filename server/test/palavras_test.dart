@@ -308,6 +308,9 @@ void main() {
       expect((await chamar('POST', '/api/palavras/escolha-dia', token: telao, json: {'data': hoje, 'id': 'troca-ontem'})).$1, 200);
       final (_, deOntem) = await chamar('GET', '/api/palavras/hoje?data=$hoje', token: telao);
       expect(deOntem['palavra']['titulo'], 'De ontem');
+      // O tablet pede pelo id logo após a troca: a de outra data também tem que vir.
+      final (_, porId) = await chamar('GET', '/api/palavras/hoje?data=$hoje&id=troca-ontem', token: telao);
+      expect(porId['palavra']['titulo'], 'De ontem');
       expect((await chamar('POST', '/api/palavras/escolha-dia', token: telao, json: {'data': hoje, 'id': ''})).$1, 200);
       expect((await chamar('POST', '/api/palavras/escolha-dia', token: telao, json: {'data': hoje, 'id': 'troca-rascunho'})).$1, 400);
       expect((await chamar('POST', '/api/palavras/escolha-dia', token: telao, json: {'data': hoje, 'id': 'nao-existe'})).$1, 400);

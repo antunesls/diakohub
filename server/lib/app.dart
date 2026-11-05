@@ -2076,8 +2076,10 @@ class Servidor {
     final salva = q['id'] == null ? (store.buscar('escolhasPalavra', data)?['palavraId'] as String?) : null;
     final daSalva = salva == null ? null : store.buscar('palavras', salva);
     final salvaPronta = daSalva != null && daSalva['pronta'] == true ? Palavra.fromJson(daSalva) : null;
+    // Com ?id, a Palavra pedida pode ser de outra data (a troca aceita qualquer pronta).
+    final pedida = q['id'] == null ? null : store.buscar('palavras', q['id']!);
     final escolhida = q['id'] != null
-        ? prontas.where((p) => p.id == q['id']).firstOrNull
+        ? (pedida != null && pedida['pronta'] == true ? Palavra.fromJson(pedida) : null)
         : salvaPronta ??
             prontas.where((p) => culto.isNotEmpty && p.cultoId == culto).firstOrNull ??
             prontas.firstOrNull;

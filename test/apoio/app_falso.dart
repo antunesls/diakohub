@@ -160,7 +160,7 @@ class ServidorFalso {
               final salva = id == null ? escolhasPalavra[dia] : null;
               final p = id == null
                   ? (todasProntas.where((p) => p.id == salva).firstOrNull ?? prontas.firstOrNull)
-                  : prontas.where((p) => p.id == id).firstOrNull;
+                  : todasProntas.where((p) => p.id == id).firstOrNull;
               return {'palavra': p == null ? null : PalavraDoCulto.de(p).toJson()};
             }(),
           '/api/palavras/prontas' => () {
