@@ -116,6 +116,15 @@ class ServerApi {
         await _req('GET', '/api/palavras/hoje${q.isEmpty ? '' : '?$q'}') as Map);
   }
 
+  /// Palavras prontas (sem o texto), filtradas por [busca] e/ou [data] (aaaa-mm-dd).
+  Future<Map<String, dynamic>> palavrasProntas({String busca = '', String data = ''}) async {
+    final q = Uri(queryParameters: {
+      if (busca.isNotEmpty) 'busca': busca,
+      if (data.isNotEmpty) 'data': data,
+    }).query;
+    return Map<String, dynamic>.from(await _req('GET', '/api/palavras/prontas${q.isEmpty ? '' : '?$q'}') as Map);
+  }
+
   Future<Map<String, dynamic>> escalaHoje() async => Map<String, dynamic>.from(await _req('GET', '/api/escalas/hoje') as Map);
 
   /// Cultos de uma data (aaaa-mm-dd), passada ou futura, para consultar a escala.

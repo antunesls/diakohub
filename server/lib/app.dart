@@ -265,6 +265,7 @@ class Servidor {
       // Palavras (sermões) dos pregadores (rotas fixas antes das com <id>)
       ..get('/api/palavras', _listarPalavras)
       ..get('/api/palavras/hoje', _palavraDeHoje)
+      ..get('/api/palavras/prontas', _palavrasProntas)
       ..post('/api/palavras/analisar', _analisarPalavra)
       ..post('/api/palavras/resumo', _resumoWhatsappPalavra)
       ..post('/api/palavras/importar', _importarPalavra)
@@ -2073,6 +2074,30 @@ class Servidor {
         ? prontas.where((p) => p.id == q['id']).firstOrNull
         : prontas.where((p) => culto.isNotEmpty && p.cultoId == culto).firstOrNull ?? prontas.firstOrNull;
     return _json({'palavra': escolhida == null ? null : PalavraDoCulto.de(escolhida).toJson()});
+  }
+
+  /// GET /api/palavras/prontas?busca=…&data=aaaa-mm-dd — todas as Palavras prontas (sem o texto),
+  /// para o tablet listar por nome ou por dia. Mais recentes primeiro.
+  Response _palavrasProntas(Request req) {
+    final q = req.url.queryParameters;
+    final data = q['data'] ?? '';
+    final busca = q['busca'] ?? '';
+    final lista = [
+      for (final j in store.listar('palavras'))
+        if (j['pronta'] == true)
+          if (Palavra.fromJson(j) case final p
+              when (data.isEmpty || p.data == data) && palavraCorresponde(p, busca))
+            p,
+    ]..sort((a, b) {
+        final d = b.data.compareTo(a.data);
+        return d != 0 ? d : a.titulo.compareTo(b.titulo);
+      });
+    return _json({
+      'palavras': [
+        for (final p in lista)
+          {'id': p.id, 'titulo': p.titulo, 'data': p.data, 'serie': p.serie, 'autorNome': p.autorNome, 'minutos': p.minutos},
+      ],
+    });
   }
 
   // ---------- Modelos de roteiro do Modo Culto ----------

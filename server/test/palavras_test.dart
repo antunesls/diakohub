@@ -258,6 +258,35 @@ void main() {
       expect((await chamar('GET', '/api/palavras/hoje?data=$amanha&id=inexistente', token: telao)).$2['palavra'], isNull);
     });
 
+    test('tablet lista as Palavras prontas por nome e por dia, sem rascunhos nem texto', () async {
+      final telao = await criar('tablet-lista', Perfil.telao);
+      final pregador = await criar('pregador-lista', Perfil.pregador);
+      final ontem = diaIso(DateTime.now().subtract(const Duration(days: 1)));
+      for (final (id, titulo, data, pronta) in [
+        ('a', 'Quando a fé espera', hoje, true),
+        ('b', 'Em memória de mim', ontem, true),
+        ('c', 'Rascunho da semana', hoje, false),
+      ]) {
+        await store.salvar('palavras', {
+          'id': id, 'titulo': titulo, 'data': data, 'pronta': pronta, 'serie': 'Fé',
+          'autorId': 'x', 'autorNome': 'Pastor', 'texto': 'texto longo', 'minutos': 40,
+        });
+      }
+      final (st, todas) = await chamar('GET', '/api/palavras/prontas', token: telao);
+      expect(st, 200);
+      expect((todas['palavras'] as List).map((p) => p['id']), ['a', 'b']);
+      expect((todas['palavras'] as List).first.containsKey('texto'), isFalse);
+
+      final (_, busca) = await chamar('GET', '/api/palavras/prontas?busca=mem%C3%B3ria', token: telao);
+      expect((busca['palavras'] as List).map((p) => p['id']), ['b']);
+
+      final (_, porDia) = await chamar('GET', '/api/palavras/prontas?data=$ontem', token: telao);
+      expect((porDia['palavras'] as List).map((p) => p['id']), ['b']);
+
+      // Só quem projeta (o tablet) lista; o pregador não.
+      expect((await chamar('GET', '/api/palavras/prontas', token: pregador)).$1, 403);
+    });
+
     test('tablet lista cultos futuros da escala em ordem sem incluir passados', () async {
       final telao = await criar('tablet-escala', Perfil.telao);
       final amanha = diaIso(DateTime.now().add(const Duration(days: 1)));
