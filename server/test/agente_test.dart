@@ -75,7 +75,7 @@ void main() {
     test('modo local continua igual', () {
       final c = Config.lerJson('{"senhaAdmin":"123456","pastaImagensHolyrics":"X:/img"}', pastaBase: '.');
       expect(c.modoHolyrics, ModoHolyrics.local);
-      expect(c.pastaCartazes, p.join('X:/img', 'Diako'));
+      expect(c.pastaCartazes, p.normalize(p.join('X:/img', 'DiakoHub')));
       expect(c.endereco, '0.0.0.0');
     });
   });
@@ -105,7 +105,7 @@ void main() {
     tearDown(() => tmp.delete(recursive: true));
 
     test('baixa novos, troca alterados, apaga removidos e respeita a pasta', () async {
-      final pasta = p.join(tmp.path, 'Diako');
+      final pasta = p.join(tmp.path, 'DiakoHub');
       final baixados = <String>[];
       final sync = SincronizadorCartazes(pasta: pasta, baixar: (n) async {
         baixados.add(n);
@@ -237,7 +237,7 @@ void main() {
     });
 
     Map<String, String> auth() => {'Authorization': 'Bearer $token', 'Content-Type': 'application/json'};
-    String pastaIgreja(String nome) => p.join(tmp.path, 'igreja', 'imagens', 'Diako', nome);
+    String pastaIgreja(String nome) => p.join(tmp.path, 'igreja', 'imagens', 'DiakoHub', nome);
 
     test('comando do tablet chega ao Holyrics da igreja pelo agente', () async {
       final r = await http.post(Uri.parse('$base/api/holyrics/ShowQuickPresentation'),

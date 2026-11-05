@@ -297,7 +297,7 @@ void main() {
     expect(servidor.holyrics, contains('ShowImage'));
 
     // O F9 do Holyrics não esconde imagens: voltar para a oração final deixaria o QR no telão.
-    servidor.noAr = {'type': 'image', 'name': 'Diako/qr-oracao.png'};
+    servidor.noAr = {'type': 'image', 'name': 'DiakoHub/qr-oracao.png'};
     final antes = servidor.holyrics.length;
     await tocar(tester, find.text(TipoMomento.oracaoFinal.titulo).first);
     final enviados = servidor.holyrics.sublist(antes);

@@ -239,7 +239,7 @@ void main() {
 
     test('quem projetou fica no histórico', () async {
       final (_, midia) = await criar('midia', Perfil.midia);
-      await chamar('POST', '/api/holyrics/ShowImage', token: midia, json: {'file': 'Diako/retiro.jpg'});
+      await chamar('POST', '/api/holyrics/ShowImage', token: midia, json: {'file': 'DiakoHub/retiro.jpg'});
       final (_, hist) = await chamar('GET', '/api/historico', token: admin);
       expect((hist as List).first['usuario'], 'Pessoa midia');
     });

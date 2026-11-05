@@ -61,7 +61,7 @@ Future<Servidor> criar({DateTime? agora, LimiteTaxa? limitePedidos}) async {
     store: store,
     auth: auth,
     holyrics: holyrics,
-    cartazes: Cartazes(p.join(tmp.path, 'imagens', 'Diako')),
+    cartazes: Cartazes(p.join(tmp.path, 'imagens', 'DiakoHub')),
     backup: Backup(pastaDados: dados, pastaDestino: p.join(tmp.path, 'backup')),
     pastaWeb: web.path,
     urlOracao: 'http://192.168.0.10:8080/oracao',
@@ -284,7 +284,7 @@ void main() {
     test('enviar, listar, servir e excluir', () async {
       final r = await corpo(await req('POST', '/api/cartazes?nome=Retiro de Casais.jpg', bytes: png));
       expect(r['nome'], 'retiro-de-casais.png'); // a extensão segue o conteúdo real
-      expect(r['holyrics'], 'Diako/retiro-de-casais.png');
+      expect(r['holyrics'], 'DiakoHub/retiro-de-casais.png');
       final r2 = await corpo(await req('POST', '/api/cartazes?nome=Retiro de Casais.png', bytes: png));
       expect(r2['nome'], 'retiro-de-casais-2.png');
 
@@ -405,10 +405,10 @@ void main() {
           {'text': '<b>Motivos de oração (2/2)</b>\n• B'},
         ]
       });
-      await req('POST', '/api/holyrics/ShowImage', json: {'file': 'Diako/retiro.jpg'});
+      await req('POST', '/api/holyrics/ShowImage', json: {'file': 'DiakoHub/retiro.jpg'});
       await req('POST', '/api/holyrics/SetTextCP', json: {'text': '', 'show': false});
       final h = await corpo(await req('GET', '/api/historico')) as List;
-      expect(h.map((e) => e['descricao']), ['Imagem: Diako/retiro.jpg', 'Motivos de oração (1/2) (2 slides)']);
+      expect(h.map((e) => e['descricao']), ['Imagem: DiakoHub/retiro.jpg', 'Motivos de oração (1/2) (2 slides)']);
       expect(h.first['quando'], DateTime(2026, 10, 28, 10).toIso8601String());
     });
 
@@ -422,9 +422,9 @@ void main() {
     });
 
     test('mural é público e não expõe pedidos particulares nem quem enviou', () async {
-      await req('POST', '/api/recados', json: {'titulo': 'Retiro', 'imagemHolyrics': 'Diako/retiro.png'});
+      await req('POST', '/api/recados', json: {'titulo': 'Retiro', 'imagemHolyrics': 'DiakoHub/retiro.png'});
       await req('POST', '/api/cartazes?nome=retiro.png', bytes: png);
-      await req('POST', '/api/recados', json: {'titulo': 'Cartaz sumido', 'imagemHolyrics': 'Diako/nao-existe.png'});
+      await req('POST', '/api/recados', json: {'titulo': 'Cartaz sumido', 'imagemHolyrics': 'DiakoHub/nao-existe.png'});
       await req('POST', '/api/public/pedidos', json: {'motivo': 'Segredo', 'publico': false, 'enviadoPor': 'Zé'}, autenticado: false);
       final pub = await corpo(await req('POST', '/api/motivos', json: {'para': 'Bia', 'motivo': 'Saúde'}));
       expect(pub['status'], 'pendente');
@@ -443,7 +443,7 @@ void main() {
     });
 
     test('backup inclui o histórico', () async {
-      await req('POST', '/api/holyrics/ShowImage', json: {'file': 'Diako/x.png'});
+      await req('POST', '/api/holyrics/ShowImage', json: {'file': 'DiakoHub/x.png'});
       final b = await corpo(await req('POST', '/api/backup'));
       final zip = ZipDecoder().decodeBytes(File(b['arquivo'] as String).readAsBytesSync());
       expect(zip.findFile('data/historico.jsonl'), isNotNull);

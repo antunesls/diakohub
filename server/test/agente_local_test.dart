@@ -227,7 +227,7 @@ void main() {
       final api = ApiLocal(offline, endereco: InternetAddress.loopbackIPv4);
       await api.iniciar();
       final r = await http.post(Uri.parse('http://127.0.0.1:${api.porta}/holyrics/ShowImage'),
-          headers: {'Authorization': 'Bearer $token'}, body: jsonEncode({'file': 'Diako/retiro.png'}));
+          headers: {'Authorization': 'Bearer $token'}, body: jsonEncode({'file': 'DiakoHub/retiro.png'}));
       expect(jsonDecode(r.body), {'status': 'ok'});
       expect(offline.estado['historicoPendente'], 1);
       await api.parar();
@@ -238,7 +238,7 @@ void main() {
       expect(agente.estado['historicoPendente'], 1);
       unawaited(agente.rodar());
       await ate(() => agente.estado['historicoPendente'] == 0);
-      expect((await historico.listar()).single['descricao'], 'Imagem: Diako/retiro.png');
+      expect((await historico.listar()).single['descricao'], 'Imagem: DiakoHub/retiro.png');
       apiLocal = ApiLocal(agente, endereco: InternetAddress.loopbackIPv4);
       await apiLocal.iniciar();
     });

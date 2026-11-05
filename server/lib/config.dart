@@ -53,7 +53,7 @@ class Config {
   /// Atrás de um proxy reverso (Caddy): usa o X-Forwarded-For como IP do visitante.
   final bool confiarProxy;
 
-  /// Pasta de imagens da biblioteca do Holyrics. Os cartazes e o QR vão para a subpasta "Diako".
+  /// Pasta de imagens da biblioteca do Holyrics. Os cartazes e o QR vão para a subpasta "DiakoHub".
   final String pastaImagensHolyrics;
   final String pastaBackup;
 
@@ -69,11 +69,11 @@ class Config {
   /// Onde os cartazes são gravados: na pasta de imagens do Holyrics (modo local configurado)
   /// ou em data/cartazes (modo agente, que os copia para o PC da igreja).
   String get pastaCartazes => modoHolyrics == ModoHolyrics.local && pastaImagensHolyrics.isNotEmpty
-      ? p.join(pastaImagensHolyrics, subpastaHolyrics)
+      ? p.normalize(p.join(pastaImagensHolyrics, subpastaHolyrics))
       : p.join(pastaDados, 'cartazes');
 
   /// Subpasta dentro da biblioteca de imagens do Holyrics (usada no ShowImage).
-  static const subpastaHolyrics = 'Diako';
+  static const subpastaHolyrics = 'DiakoHub';
 
   static Future<Config> carregar(String arquivo) async {
     final f = File(arquivo);

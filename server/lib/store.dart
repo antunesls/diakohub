@@ -37,6 +37,11 @@ class Store {
       _colecoes[nome] = [for (final e in lista) Map<String, dynamic>.from(e as Map)];
       _versoes[nome] = 0;
     }
+    // Recados guardados antes da pasta virar "DiakoHub" ainda apontam para "Diako/...".
+    for (final r in _colecoes['recados']!) {
+      final img = r['imagemHolyrics'];
+      if (img is String && img.startsWith('Diako/')) r['imagemHolyrics'] = 'DiakoHub/${img.substring('Diako/'.length)}';
+    }
   }
 
   List<Map<String, dynamic>> listar(String colecao) => List.unmodifiable(_colecoes[colecao]!);

@@ -100,7 +100,7 @@ Uint8List gerarPngQr(String url, {String? rotulo, ArteDoQr? arte}) {
   return img.encodePng(imagem);
 }
 
-/// Grava o PNG do QR na pasta de cartazes (subpasta "Diako" do Holyrics).
+/// Grava o PNG do QR na pasta de cartazes (subpasta "DiakoHub" do Holyrics).
 Future<File> gravarQr(String pasta, String url, {ArteDoQr? arte}) async {
   await Directory(pasta).create(recursive: true);
   final f = File(p.join(pasta, arquivoQr));

@@ -98,8 +98,8 @@ void main() {
       expect(ultima.url.path, '/api/holyrics/ActionPreviousQuickPresentation');
       await c.telaPreta(true);
       expect(corpo(), {'enable': true});
-      await c.mostrarImagem('Diako/retiro.jpg');
-      expect(corpo(), {'file': 'Diako/retiro.jpg'});
+      await c.mostrarImagem('DiakoHub/retiro.jpg');
+      expect(corpo(), {'file': 'DiakoHub/retiro.jpg'});
     });
 
     test('apresentação atual', () async {
@@ -164,12 +164,12 @@ void main() {
 
     test('cartazes com endereço completo e upload de bytes', () async {
       final lista = await api([
-        {'nome': 'retiro.jpg', 'holyrics': 'Diako/retiro.jpg', 'url': '/cartazes/retiro.jpg'},
+        {'nome': 'retiro.jpg', 'holyrics': 'DiakoHub/retiro.jpg', 'url': '/cartazes/retiro.jpg'},
       ]).cartazes();
       expect(lista.single.url, 'http://192.168.0.10:8080/cartazes/retiro.jpg');
 
-      final caminho = await api({'nome': 'foto.jpg', 'holyrics': 'Diako/foto.jpg'}).enviarCartaz('Foto 1.jpg', [1, 2, 3]);
-      expect(caminho, 'Diako/foto.jpg');
+      final caminho = await api({'nome': 'foto.jpg', 'holyrics': 'DiakoHub/foto.jpg'}).enviarCartaz('Foto 1.jpg', [1, 2, 3]);
+      expect(caminho, 'DiakoHub/foto.jpg');
       expect(ultima.url.queryParameters['nome'], 'Foto 1.jpg');
       expect(ultima.bodyBytes, [1, 2, 3]);
     });

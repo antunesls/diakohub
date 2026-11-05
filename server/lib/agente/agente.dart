@@ -55,7 +55,8 @@ class AgenteConfig {
   final int backupsManter;
 
   /// Subpasta gerenciada pelo agente dentro da biblioteca de imagens do Holyrics.
-  String get pastaCartazes => p.join(pastaImagensHolyrics, Config.subpastaHolyrics);
+  // normalize: a pasta digitada pode ter "/" e o join, no Windows, deixaria "/" e "\" misturados.
+  String get pastaCartazes => p.normalize(p.join(pastaImagensHolyrics, Config.subpastaHolyrics));
 
   Uri get uriWs {
     final u = Uri.parse(servidor);
@@ -438,6 +439,9 @@ class Agente {
     switch (j['tipo']) {
       case 'holyrics':
         final acao = j['acao'] as String? ?? '';
+        // Cartaz recém-enviado (ex: recado com desfoque) ainda pode estar sendo copiado para a pasta
+        // do Holyrics; as mensagens são tratadas em paralelo, então espera a cópia antes do ShowImage.
+        if (acao == 'ShowImage' && _sincronizacao != null) await _sincronizacao;
         final r = await _holyrics.chamar(acao, j['corpo'] as String? ?? '{}');
         _canal?.sink.add(jsonEncode({'tipo': 'resposta', 'id': j['id'], 'status': r.status, 'corpo': r.corpo}));
         if (!{'GetCurrentPresentation', 'GetCPInfo', 'GetThumbnail', 'GetThemes'}.contains(acao)) {
