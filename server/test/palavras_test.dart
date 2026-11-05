@@ -304,7 +304,11 @@ void main() {
       });
 
       // Palavra de outro dia, rascunho ou inexistente: recusada.
-      expect((await chamar('POST', '/api/palavras/escolha-dia', token: telao, json: {'data': hoje, 'id': 'troca-ontem'})).$1, 400);
+      // Pode ser uma Palavra já usada em outra data.
+      expect((await chamar('POST', '/api/palavras/escolha-dia', token: telao, json: {'data': hoje, 'id': 'troca-ontem'})).$1, 200);
+      final (_, deOntem) = await chamar('GET', '/api/palavras/hoje?data=$hoje', token: telao);
+      expect(deOntem['palavra']['titulo'], 'De ontem');
+      expect((await chamar('POST', '/api/palavras/escolha-dia', token: telao, json: {'data': hoje, 'id': ''})).$1, 200);
       expect((await chamar('POST', '/api/palavras/escolha-dia', token: telao, json: {'data': hoje, 'id': 'troca-rascunho'})).$1, 400);
       expect((await chamar('POST', '/api/palavras/escolha-dia', token: telao, json: {'data': hoje, 'id': 'nao-existe'})).$1, 400);
       expect((await chamar('POST', '/api/palavras/escolha-dia', token: telao, json: {'data': '2026-99-99', 'id': 'troca-b'})).$1, 400);

@@ -69,7 +69,7 @@ class ModoCultoController extends ChangeNotifier {
     if (culto != null) scope.palavra.data = culto.data;
     _remontar();
     await scope.palavra.sincronizar();
-    await scope.palavra.buscarOpcoes(culto?.data ?? diaIso(_agora()));
+    await scope.palavra.buscarProntas();
   }
 
   /// Troca a Palavra atribuída ao dia do culto por uma das prontas dele; [id] vazio volta à

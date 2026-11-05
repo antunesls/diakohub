@@ -8,6 +8,7 @@ import 'package:flutter/material.dart';
 import '../app_scope.dart';
 import '../data/modo_culto.dart';
 import '../holyrics/status_controller.dart';
+import 'dia_formato.dart';
 import 'home_page.dart';
 import 'palco_panel.dart';
 
@@ -180,26 +181,50 @@ class _ModoCultoPageState extends State<ModoCultoPage> {
     await _acao(() => _c.selecionarCulto(culto));
   }
 
-  /// Escolhe entre as Palavras prontas da data do culto em uso.
+  /// Escolhe a Palavra do dia entre todas as prontas, inclusive as já usadas em outra data.
+  /// As da data do culto aparecem primeiro; o campo de busca filtra por título, série ou texto.
   Future<void> _escolherPalavra() async {
-    await _scope.palavra.buscarOpcoes(_c.culto?.data ?? diaIso(DateTime.now()));
+    final repo = _scope.palavra;
+    final dia = _c.culto?.data ?? diaIso(DateTime.now());
+    await repo.buscarProntas();
     if (!mounted) return;
-    final opcoes = _scope.palavra.opcoes;
     final id = await showDialog<String>(
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('Escolher Palavra'),
         content: SizedBox(
-          width: 420,
-          height: 320,
-          child: ListView(children: [
-            ListTile(
-                title: const Text('Automática'),
-                subtitle: const Text('Volta à escolha automática do dia'),
-                onTap: () => Navigator.pop(ctx, '')),
-            if (opcoes.isEmpty) const ListTile(title: Text('Nenhuma Palavra pronta nesta data')),
-            for (final p in opcoes) ListTile(title: Text(p.titulo), onTap: () => Navigator.pop(ctx, p.id)),
-          ]),
+          width: 480,
+          height: 420,
+          child: ListenableBuilder(
+            listenable: repo,
+            builder: (ctx, _) {
+              final opcoes = [...repo.opcoes]..sort((a, b) {
+                  final doDia = (a.data == dia ? 0 : 1).compareTo(b.data == dia ? 0 : 1);
+                  return doDia != 0 ? doDia : b.data.compareTo(a.data);
+                });
+              return Column(children: [
+                TextField(
+                  decoration: const InputDecoration(
+                      hintText: 'Buscar pelo título, série ou texto', prefixIcon: Icon(Icons.search)),
+                  onChanged: (t) => repo.buscarProntas(busca: t),
+                ),
+                Expanded(
+                  child: ListView(children: [
+                    ListTile(
+                        title: const Text('Automática'),
+                        subtitle: const Text('Volta à escolha automática do dia'),
+                        onTap: () => Navigator.pop(ctx, '')),
+                    if (opcoes.isEmpty) const ListTile(title: Text('Nenhuma Palavra pronta encontrada')),
+                    for (final p in opcoes)
+                      ListTile(
+                          title: Text(p.titulo),
+                          subtitle: Text(p.data == dia ? 'Desta data' : dataBr(p.data)),
+                          onTap: () => Navigator.pop(ctx, p.id)),
+                  ]),
+                ),
+              ]);
+            },
+          ),
         ),
         actions: [TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancelar'))],
       ),

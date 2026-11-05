@@ -2072,10 +2072,13 @@ class Servidor {
       });
     }
     // A troca feita no Modo Culto (POST /api/palavras/escolha-dia) vale para o dia, sem ?id.
+    // A escolha pode ser uma Palavra pronta de qualquer data (já usada em outro dia).
     final salva = q['id'] == null ? (store.buscar('escolhasPalavra', data)?['palavraId'] as String?) : null;
+    final daSalva = salva == null ? null : store.buscar('palavras', salva);
+    final salvaPronta = daSalva != null && daSalva['pronta'] == true ? Palavra.fromJson(daSalva) : null;
     final escolhida = q['id'] != null
         ? prontas.where((p) => p.id == q['id']).firstOrNull
-        : prontas.where((p) => p.id == salva).firstOrNull ??
+        : salvaPronta ??
             prontas.where((p) => culto.isNotEmpty && p.cultoId == culto).firstOrNull ??
             prontas.firstOrNull;
     return _json({'palavra': escolhida == null ? null : PalavraDoCulto.de(escolhida).toJson()});
@@ -2094,8 +2097,8 @@ class Servidor {
       return _json({'data': data, 'palavraId': ''});
     }
     final palavra = store.buscar('palavras', id);
-    if (palavra == null || palavra['pronta'] != true || palavra['data'] != data) {
-      return _erro(400, 'Essa Palavra não está pronta nesta data.');
+    if (palavra == null || palavra['pronta'] != true) {
+      return _erro(400, 'Essa Palavra não está pronta.');
     }
     await store.salvar('escolhasPalavra', {'id': data, 'palavraId': id});
     return _json({'data': data, 'palavraId': id});

@@ -34,8 +34,8 @@ class PalavraRepo extends ChangeNotifier {
   String data = '';
   String id = '';
 
-  /// Palavras prontas da data escolhida (título e id, para o seletor).
-  List<({String id, String titulo})> opcoes = [];
+  /// Palavras prontas de todas as datas (título, data e id, para o seletor).
+  List<({String id, String titulo, String data})> opcoes = [];
 
   /// Esquece a escolha manual (ao sair do Modo Culto, a Palavra volta a ser a de hoje).
   void limparEscolha() {
@@ -46,12 +46,13 @@ class PalavraRepo extends ChangeNotifier {
     _palavra = null;
   }
 
-  /// Busca as Palavras prontas do dia, sem o texto (é só para escolher).
-  Future<void> buscarOpcoes(String dia) async {
+  /// Busca as Palavras prontas de todas as datas, sem o texto (é só para escolher); [busca] filtra.
+  Future<void> buscarProntas({String busca = ''}) async {
     try {
-      final j = await api.palavraDeHoje(data: dia, listar: true);
+      final j = await api.palavrasProntas(busca: busca);
       opcoes = [
-        for (final p in j['palavras'] as List? ?? const []) (id: (p as Map)['id'] as String, titulo: p['titulo'] as String),
+        for (final p in j['palavras'] as List? ?? const [])
+          (id: (p as Map)['id'] as String, titulo: p['titulo'] as String, data: p['data'] as String? ?? ''),
       ];
       notifyListeners();
     } on ErroAmigavel catch (e) {

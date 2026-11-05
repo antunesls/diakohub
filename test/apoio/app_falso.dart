@@ -151,16 +151,27 @@ class ServidorFalso {
             },
           '/api/palavras/hoje' => () {
               final dia = req.url.queryParameters['data'] ?? hoje;
-              final prontas = [if (palavra != null) palavra!, ...palavrasExtras].where((p) => p.pronta && p.data == dia).toList();
+              final todasProntas = [if (palavra != null) palavra!, ...palavrasExtras].where((p) => p.pronta).toList();
+              final prontas = todasProntas.where((p) => p.data == dia).toList();
               if (req.url.queryParameters['listar'] == '1') {
                 return {'palavras': [for (final p in prontas) {'id': p.id, 'titulo': p.titulo}]};
               }
               final id = req.url.queryParameters['id'];
               final salva = id == null ? escolhasPalavra[dia] : null;
               final p = id == null
-                  ? (prontas.where((p) => p.id == salva).firstOrNull ?? prontas.firstOrNull)
+                  ? (todasProntas.where((p) => p.id == salva).firstOrNull ?? prontas.firstOrNull)
                   : prontas.where((p) => p.id == id).firstOrNull;
               return {'palavra': p == null ? null : PalavraDoCulto.de(p).toJson()};
+            }(),
+          '/api/palavras/prontas' => () {
+              final busca = (req.url.queryParameters['busca'] ?? '').toLowerCase();
+              final todas = [if (palavra != null) palavra!, ...palavrasExtras].where((p) => p.pronta);
+              return {
+                'palavras': [
+                  for (final p in todas.where((p) => p.titulo.toLowerCase().contains(busca)))
+                    {'id': p.id, 'titulo': p.titulo, 'data': p.data, 'serie': '', 'autorNome': p.autorNome, 'minutos': p.minutos},
+                ],
+              };
             }(),
           '/api/palavras/escolha-dia' => () {
               final c = Map<String, dynamic>.from(jsonDecode(req.body) as Map);
