@@ -1,8 +1,49 @@
 import 'package:diako_core/diako_core.dart';
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
 
 import '../app_scope.dart';
+import '../data/blur_cartaz.dart';
+import '../data/cartaz_composto.dart';
 import '../data/cores.dart';
+import '../sync/server_api.dart';
+
+/// Mostra a imagem real do cartaz do recado (a mesma que vai para o telão).
+/// Se o cartaz não puder ser carregado, mostra o caminho como antes.
+class _FotoDoCartaz extends StatelessWidget {
+  const _FotoDoCartaz({required this.caminho});
+
+  final String caminho;
+
+  @override
+  Widget build(BuildContext context) {
+    final api = AppScope.of(context).api;
+    return FutureBuilder<List<Cartaz>>(
+      future: api.cartazes(),
+      builder: (context, snap) {
+        if (snap.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white54));
+        }
+        final cartaz = snap.data?.where((c) => c.holyrics == caminho).firstOrNull;
+        if (cartaz == null) {
+          return Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(Icons.image_outlined, size: 48, color: Colors.white70),
+              const SizedBox(height: 8),
+              Text(caminho, style: const TextStyle(color: Colors.white70)),
+            ],
+          );
+        }
+        return Image.network(
+          cartaz.url,
+          fit: BoxFit.contain,
+          errorBuilder: (_, __, ___) => const Icon(Icons.broken_image_outlined, size: 48, color: Colors.white70),
+        );
+      },
+    );
+  }
+}
 
 class PreviewPanel extends StatelessWidget {
   const PreviewPanel({super.key, required this.recado, required this.selecionados});
@@ -14,7 +55,11 @@ class PreviewPanel extends StatelessWidget {
     final scope = AppScope.of(context);
     return executar(context, () async {
       if (r.ehImagem) {
-        await scope.client.mostrarImagem(r.imagemHolyrics!.trim());
+        final nivel = scope.settings.blurCartaz;
+        final caminho = nivel == NivelBlur.desligado
+            ? r.imagemHolyrics!.trim()
+            : await _cartazComTexto(scope, r, nivel);
+        await scope.client.mostrarImagem(caminho);
       } else {
         await scope.client.projetarTexto(
           montarSlide(r, negritoTitulo: scope.settings.negritoTitulo),
@@ -23,6 +68,24 @@ class PreviewPanel extends StatelessWidget {
       }
       scope.status.atualizar();
     }, sucesso: 'Projetando "${r.titulo}"');
+  }
+
+  /// Monta o cartaz do recado desfocado, com o título e o texto por cima, e o envia ao Holyrics.
+  /// Retorna o caminho da imagem nova.
+  Future<String> _cartazComTexto(AppScope scope, Recado r, NivelBlur nivel) async {
+    final caminho = r.imagemHolyrics!.trim();
+    final cartaz = (await scope.api.cartazes()).where((c) => c.holyrics == caminho).firstOrNull;
+    if (cartaz == null) throw ServidorException('O cartaz "$caminho" não está no servidor.');
+    final resposta = await http.get(Uri.parse(cartaz.url));
+    if (resposta.statusCode != 200) throw ServidorException('Não foi possível ler o cartaz.');
+    final png = await montarCartazComTexto(
+      cartaz: resposta.bodyBytes,
+      titulo: r.titulo,
+      texto: r.texto,
+      nivel: nivel,
+      negritoTitulo: scope.settings.negritoTitulo,
+    );
+    return scope.api.enviarCartaz('recado-${nivel.name}.png', png);
   }
 
   Future<void> _projetarSequencia(BuildContext context) {
@@ -82,14 +145,7 @@ class PreviewPanel extends StatelessWidget {
                     ],
                   )
                 : r.ehImagem
-                    ? Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          const Icon(Icons.image_outlined, size: 48, color: Colors.white70),
-                          const SizedBox(height: 8),
-                          Text(r.imagemHolyrics!, style: const TextStyle(color: Colors.white70)),
-                        ],
-                      )
+                    ? _FotoDoCartaz(caminho: r.imagemHolyrics!.trim())
                     : FittedBox(
                         fit: BoxFit.scaleDown,
                         child: Column(

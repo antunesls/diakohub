@@ -1,6 +1,8 @@
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'blur_cartaz.dart';
+
 class AppSettings extends ChangeNotifier {
   AppSettings(this._prefs);
 
@@ -21,6 +23,9 @@ class AppSettings extends ChangeNotifier {
   /// Mensagem ao palco com nada no ar: o telão mostra o papel de parede do Holyrics (F8) em vez do
   /// fundo do tema. Desligado por padrão: sem papel de parede, o F8 mostra a logo do Holyrics.
   bool get papelDeParedePalco => _prefs.getBool('papelDeParedePalco') ?? false;
+
+  /// Desfoque do cartaz de fundo quando o recado tem cartaz e texto.
+  NivelBlur get blurCartaz => nivelBlurDe(_prefs.getString('blurCartaz'));
   int get motivosPorSlide => _prefs.getInt('motivosPorSlide') ?? 4;
   String get pin => _prefs.getString('pin') ?? '';
 
@@ -79,6 +84,7 @@ class AppSettings extends ChangeNotifier {
     bool? repetirSequencia,
     bool? negritoTitulo,
     bool? papelDeParedePalco,
+    NivelBlur? blurCartaz,
     int? motivosPorSlide,
     String? pin,
   }) async {
@@ -92,6 +98,7 @@ class AppSettings extends ChangeNotifier {
     if (repetirSequencia != null) await _prefs.setBool('repetirSequencia', repetirSequencia);
     if (negritoTitulo != null) await _prefs.setBool('negritoTitulo', negritoTitulo);
     if (papelDeParedePalco != null) await _prefs.setBool('papelDeParedePalco', papelDeParedePalco);
+    if (blurCartaz != null) await _prefs.setString('blurCartaz', blurCartaz.name);
     if (motivosPorSlide != null) await _prefs.setInt('motivosPorSlide', motivosPorSlide);
     if (pin != null) await _prefs.setString('pin', pin.trim());
     notifyListeners();

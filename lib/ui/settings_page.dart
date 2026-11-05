@@ -4,8 +4,10 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import '../app_scope.dart';
+import '../data/blur_cartaz.dart';
 import '../data/settings.dart';
 import '../holyrics/agente_local.dart';
+import 'previa_fundo.dart';
 import '../sync/server_api.dart';
 
 class SettingsPage extends StatefulWidget {
@@ -29,6 +31,7 @@ class _SettingsPageState extends State<SettingsPage> {
   late bool _repetir;
   late bool _negrito;
   late bool _papelDeParedePalco;
+  late NivelBlur _blur;
   late int _motivosPorSlide;
   bool _iniciado = false;
   bool _entrando = false;
@@ -47,6 +50,7 @@ class _SettingsPageState extends State<SettingsPage> {
     _repetir = s.repetirSequencia;
     _negrito = s.negritoTitulo;
     _papelDeParedePalco = s.papelDeParedePalco;
+    _blur = s.blurCartaz;
     _motivosPorSlide = s.motivosPorSlide;
   }
 
@@ -64,6 +68,7 @@ class _SettingsPageState extends State<SettingsPage> {
         repetirSequencia: _repetir,
         negritoTitulo: _negrito,
         papelDeParedePalco: _papelDeParedePalco,
+        blurCartaz: _blur,
         motivosPorSlide: _motivosPorSlide,
         pin: _pin.text,
       );
@@ -514,6 +519,20 @@ class _SettingsPageState extends State<SettingsPage> {
               value: _papelDeParedePalco,
               onChanged: (v) => setState(() => _papelDeParedePalco = v),
             ),
+            const SizedBox(height: 16),
+            Text('Fundo do cartaz no telão', style: Theme.of(context).textTheme.titleMedium),
+            const SizedBox(height: 4),
+            Text('Recado com cartaz e texto: o cartaz vai ao fundo, desfocado, com o texto por cima. '
+                'Desligado projeta só o cartaz, como antes.',
+                style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant)),
+            const SizedBox(height: 12),
+            SegmentedButton<NivelBlur>(
+              segments: [for (final n in NivelBlur.values) ButtonSegment(value: n, label: Text(n.rotulo))],
+              selected: {_blur},
+              onSelectionChanged: (s) => setState(() => _blur = s.first),
+            ),
+            const SizedBox(height: 12),
+            PreviaFundo(nivel: _blur, negrito: _negrito),
             const Divider(height: 48),
             Text('Mensagens do palco', style: Theme.of(context).textTheme.titleLarge),
             const SizedBox(height: 4),
