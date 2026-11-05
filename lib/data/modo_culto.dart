@@ -5,6 +5,8 @@ import 'package:flutter/foundation.dart';
 
 import '../app_scope.dart';
 import '../sync/server_api.dart';
+import 'blur_cartaz.dart';
+import 'cartaz_composto.dart';
 import 'escala_repo.dart';
 
 /// Estado do Modo Culto: escolhe o culto de hoje, monta o roteiro com os dados do app,
@@ -464,15 +466,44 @@ class ModoCultoController extends ChangeNotifier {
         await limpar();
         await client.projetarTexto(passo.valor, tema: tema);
       case AcaoPasso.imagem:
+        // Recado com cartaz: o telão mostra o cartaz com título e texto (desfocado conforme a configuração),
+        // igual à prévia. Monta antes de limpar, para uma falha não deixar o telão vazio.
+        final nivel = scope.settings.blurCartaz;
+        final caminho = nivel == NivelBlur.desligado
+            ? passo.valor
+            : await cartazComTextoNoServidor(
+                api: scope.api,
+                caminho: passo.valor,
+                titulo: passo.rotulo,
+                texto: passo.texto,
+                nivel: nivel,
+                negritoTitulo: scope.settings.negritoTitulo,
+              );
         await limpar();
-        await client.mostrarImagem(passo.valor);
+        await client.mostrarImagem(caminho);
       case AcaoPasso.contagem:
-        // O Holyrics conta até uma hora de hoje: culto de outro dia começa sem contagem.
-        if (_culto?.data != diaIso(_agora())) {
-          throw ServidorException('A contagem só pode ser projetada no dia do culto. Use "Começar o culto agora".');
+        final agora = _agora();
+        final dataCulto = _culto?.data;
+        if (dataCulto == null || dataCulto.isEmpty) {
+          throw ServidorException('O culto escolhido não tem data para a contagem.');
+        }
+        // Hoje: o Holyrics conta até a hora exata (HH:MM). Outro dia: manda a duração até o culto (MM:SS),
+        // porque o Holyrics só conta até uma hora de hoje. Tudo é calculado antes de limpar o telão.
+        final String tempo;
+        final bool horaExata;
+        if (dataCulto == diaIso(agora)) {
+          tempo = passo.valor;
+          horaExata = true;
+        } else {
+          final alvo = DateTime.tryParse('${dataCulto}T${passo.valor}:00');
+          if (alvo == null) throw ServidorException('Hora do culto inválida para a contagem.');
+          final minutos = (alvo.difference(agora).inSeconds / 60).ceil();
+          if (minutos <= 0) throw ServidorException('Esse culto já passou.');
+          tempo = '$minutos:00';
+          horaExata = false;
         }
         await limpar();
-        await client.contagemTela(passo.valor, horaExata: true, textoAntes: 'O culto começa em', tema: tema);
+        await client.contagemTela(tempo, horaExata: horaExata, textoAntes: 'O culto começa em', tema: tema);
       case AcaoPasso.boasVindas:
         await limpar();
         await scope.visitas.projetarBoasVindas(ids: passo.ids);

@@ -129,6 +129,30 @@ void main() {
     expect(find.text('Começar o culto agora'), findsOneWidget, reason: 'o novo culto começa do início');
   });
 
+  testWidgets('contagem de um culto de outro dia manda a duração até ele, não a hora de hoje', (tester) async {
+    final dia = diaIso(DateTime.now().add(const Duration(days: 1)));
+    final servidor = await abrir(tester, const ModoCultoPage(), antes: (s) {
+      s.cultosExtras = [{...s.culto, 'id': 'futuro', 'data': dia, 'nome': 'Culto futuro'}];
+    });
+    await tocar(tester, find.text('Começar o culto agora'));
+    await tocar(tester, find.byTooltip('Escolher culto'));
+    await tocar(tester, find.textContaining('Culto futuro'));
+    await tocar(tester, find.text('Trocar e reiniciar'));
+    final antes = servidor.holyrics.length;
+    await tocar(tester, find.text('Iniciar contagem'));
+    final enviados = servidor.holyrics.sublist(antes);
+    expect(enviados, contains('ShowCountdown'));
+    final corpo = servidor.corpos[antes + enviados.indexOf('ShowCountdown')];
+    expect(corpo['exact_time'], false);
+    final minutos = int.parse((corpo['time'] as String).split(':').first);
+    final hora = servidor.culto['hora'] as String;
+    final p = hora.split(':');
+    final alvo = DateTime(DateTime.now().year, DateTime.now().month, DateTime.now().day + 1, int.parse(p[0]), int.parse(p[1]));
+    expect((minutos - alvo.difference(DateTime.now()).inMinutes).abs() <= 2, isTrue, reason: 'duração até o culto de amanhã');
+    expect(tester.takeException(), isNull);
+    await tester.pumpWidget(const SizedBox());
+  });
+
   testWidgets('Modo Culto: conferência, todos os momentos e o Avançar', (tester) async {
     final servidor = await abrir(tester, const ModoCultoPage());
     expect(tester.takeException(), isNull);

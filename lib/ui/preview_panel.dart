@@ -1,6 +1,5 @@
 import 'package:diako_core/diako_core.dart';
 import 'package:flutter/material.dart';
-import 'package:http/http.dart' as http;
 
 import '../app_scope.dart';
 import '../data/blur_cartaz.dart';
@@ -85,21 +84,14 @@ class PreviewPanel extends StatelessWidget {
 
   /// Monta o cartaz do recado desfocado, com o título e o texto por cima, e o envia ao Holyrics.
   /// Retorna o caminho da imagem nova.
-  Future<String> _cartazComTexto(AppScope scope, Recado r, NivelBlur nivel) async {
-    final caminho = r.imagemHolyrics!.trim();
-    final cartaz = (await scope.api.cartazes()).where((c) => c.holyrics == caminho).firstOrNull;
-    if (cartaz == null) throw ServidorException('O cartaz "$caminho" não está no servidor.');
-    final resposta = await http.get(Uri.parse(cartaz.url));
-    if (resposta.statusCode != 200) throw ServidorException('Não foi possível ler o cartaz.');
-    final png = await montarCartazComTexto(
-      cartaz: resposta.bodyBytes,
-      titulo: r.titulo,
-      texto: r.texto,
-      nivel: nivel,
-      negritoTitulo: scope.settings.negritoTitulo,
-    );
-    return scope.api.enviarCartaz('recado-${nivel.name}.png', png);
-  }
+  Future<String> _cartazComTexto(AppScope scope, Recado r, NivelBlur nivel) => cartazComTextoNoServidor(
+        api: scope.api,
+        caminho: r.imagemHolyrics!.trim(),
+        titulo: r.titulo,
+        texto: r.texto,
+        nivel: nivel,
+        negritoTitulo: scope.settings.negritoTitulo,
+      );
 
   Future<void> _projetarSequencia(BuildContext context) {
     final scope = AppScope.of(context);

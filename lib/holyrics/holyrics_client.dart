@@ -110,31 +110,20 @@ class HolyricsClient {
   /// Papel de parede do Holyrics (F8) por cima do que está no ar; projetar outra coisa o desliga.
   Future<void> papelDeParede(bool ativar) => call('SetF8', {'enable': ativar});
 
+  /// Mensagem na TV do palco. Sem tema nem custom_theme: vai só o texto, com a aparência padrão da TV.
   Future<void> mensagemPalco(String texto, {bool mostrar = true}) =>
       call('SetTextCP', {
         'text': texto,
         'show': mostrar,
         'display_ahead': mostrar,
-        // Sem tema: só o texto, sobre o que já está na TV do palco.
-        'custom_theme': {
-          'background': {'type': 'transparent', 'id': 'transparent'},
-          'font': {'bold': true, 'size': 14, 'color': 'FFFFFF'},
-          'align': {'horizontal': 'center', 'vertical': 'middle'},
-          'effect': {'shadow_color': '000000', 'shadow_x_weight': 20, 'shadow_y_weight': 20},
-        },
       });
 
-  /// Trecho da Palavra na TV do palco, para o pastor ler: alinhado à esquerda, no alto, sem negrito.
+  /// Trecho da Palavra na TV do palco, para o pastor ler. Sem tema, como as mensagens.
   Future<void> leituraPalco(String texto) =>
       call('SetTextCP', {
         'text': texto,
         'show': true,
         'display_ahead': true,
-        'custom_theme': {
-          'background': {'type': 'transparent', 'id': 'transparent'},
-          'font': {'bold': false, 'color': 'FFFFFF'},
-          'align': {'horizontal': 'left', 'vertical': 'top'},
-        },
       });
 
   /// Versículos no telão, na versão padrão do Holyrics. [ids] no formato LLCCCVVV (livro, capítulo,
