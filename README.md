@@ -44,7 +44,7 @@ Opera o telão durante o culto: recados, cartazes, motivos de oração, boas-vin
 
 ### Pessoas e LGPD
 - **Membros:** ficha em abas (*Pessoal*, *Contato*, *Igreja*, *Família*), foto, CEP com preenchimento automático, ministérios, importação e exportação em CSV e impressão.
-- **Visitantes:** três formas de cadastrar (QR da recepção, obreiro pelo celular em `/recepcao`, secretaria pelo painel), quem veio junto, interesses e acompanhamento com mensagem pronta de WhatsApp.
+- **Visitantes:** ficam na mesma lista de pessoas, com a situação *Visitante*. Não entram em aniversariantes, escalas nem na contagem de ativos até virarem *Congregado* ou *Membro*. Três formas de cadastrar (QR da recepção, obreiro pelo celular em `/recepcao`, secretaria pelo painel), quem veio junto, interesses e acompanhamento com mensagem pronta de WhatsApp.
 - **LGPD:** autorização com prova (link individual, termo assinado anexado ou QR), revogação e termo versionado. Aniversariantes só aparecem para quem autorizou.
 
 ### Escalas, repertório e PDF

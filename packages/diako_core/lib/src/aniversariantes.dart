@@ -12,7 +12,7 @@ List<DateTime> diasDaSemana(DateTime hoje) {
 
 bool _bissexto(int ano) => (ano % 4 == 0 && ano % 100 != 0) || ano % 400 == 0;
 
-/// Pode ter o nome divulgado (telão, mural, resumo): ativo e com autorização da LGPD
+/// Pode ter o nome divulgado (telão, mural, resumo): membro ou congregado (não visitante) e com autorização da LGPD
 /// vigente. A revogação apaga [Membro.consentimentoEm]; quem autoriza de novo volta.
 bool podeDivulgarAniversario(Membro m) => m.ativo && Membro.dataDe(m.consentimentoEm) != null;
 

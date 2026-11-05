@@ -2316,13 +2316,20 @@ class Servidor {
 
   /// GET /api/escalas/hoje — cultos de hoje para o tablet; sem culto hoje, o próximo em até 7
   /// dias. Com ?todos=1, todos os de hoje em diante (para o tablet escolher qual operar).
+  /// Com ?data=aaaa-mm-dd, os cultos desse dia (passado ou futuro), para consultar a escala.
   Response _escalaDeHoje(Request req) {
     final hoje = diaEscala(_agora());
     final limite = diaEscala(_agora().add(const Duration(days: 7)));
     final cultos = _cultos();
+    final dataPedida = req.url.queryParameters['data'];
     var lista = cultos.where((c) => c.data == hoje).toList();
-    final ehHoje = lista.isNotEmpty;
-    if (req.url.queryParameters['todos'] == '1') {
+    var ehHoje = lista.isNotEmpty;
+    if (dataPedida != null) {
+      final dia = DateTime.tryParse(dataPedida);
+      if (dia == null || diaIso(dia) != dataPedida) return _erro(400, 'Data inválida.');
+      lista = cultos.where((c) => c.data == dataPedida).toList()..sort((a, b) => a.hora.compareTo(b.hora));
+      ehHoje = dataPedida == hoje;
+    } else if (req.url.queryParameters['todos'] == '1') {
       lista = cultos.where((c) => c.data.compareTo(hoje) >= 0).toList()
         ..sort((a, b) => a.data == b.data ? a.hora.compareTo(b.hora) : a.data.compareTo(b.data));
     } else if (!ehHoje) {

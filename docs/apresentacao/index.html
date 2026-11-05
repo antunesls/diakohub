@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Visual da Apresentação DiakoHub</title>
+<link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
+<style>
+/* Layout: opção A com logo; capa larga em cima, dois slides embaixo. */
+:root{--fundo:#efede6;--texto:#25231f;--suave:#68645a;--linha:#ddd8cb;--teal:#1f5f5b;--superficie:#fff;--f-titulo:'Roboto',system-ui,sans-serif;--f-corpo:'Roboto',system-ui,sans-serif}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--fundo:#1b1d1c;--texto:#eceae3;--suave:#a9a69b;--linha:#3a3d3a;--superficie:#242726}}
+:root[data-theme="dark"]{--fundo:#1b1d1c;--texto:#eceae3;--suave:#a9a69b;--linha:#3a3d3a;--superficie:#242726;color-scheme:dark}
+*{box-sizing:border-box}
+body{margin:0;background:var(--fundo);color:var(--texto);font:16px/1.5 var(--f-corpo)}
+main{max-width:1100px;margin:0 auto;padding:40px 20px 64px}
+h1{font:300 clamp(26px,4vw,36px)/1.1 var(--f-titulo);margin:0 0 8px}
+.intro{color:var(--suave);max-width:70ch;margin:0 0 28px}
+.slides{display:grid;grid-template-columns:1fr 1fr;gap:20px}
+.slides figure:first-child{grid-column:1/-1}
+@media (max-width:800px){.slides{grid-template-columns:1fr}}
+figure{margin:0}
+figcaption{font-size:13px;color:var(--suave);margin-top:6px}
+.slide{container-type:inline-size;aspect-ratio:16/9;overflow:hidden;position:relative;border-radius:6px;box-shadow:0 1px 4px rgba(0,0,0,.3)}
+.slide *{margin:0}
+.slide ul{padding:0;list-style:none}
+.A{background:#f7f5f0;color:#2e2d2a;font-family:'Roboto',sans-serif}
+.A .barra{position:absolute;left:0;top:0;bottom:0;width:3.2cqw;background:#1f5f5b}
+.A .in{position:absolute;inset:0 0 0 3.2cqw;padding:5cqw 5cqw 4cqw}
+.A h3{font:400 5.4cqw/1.05 'Roboto',sans-serif;color:#16443f;text-transform:uppercase;letter-spacing:.02em}
+.A .sub{font-size:2.3cqw;color:#5f5c55;margin-top:1.6cqw}
+.A .logo{position:absolute;display:block}
+.A .rod{position:absolute;left:8.2cqw;bottom:2.6cqw;font-size:1.5cqw;color:#5f5c55;letter-spacing:.08em;text-transform:uppercase}
+.A.capa .logo{left:8.2cqw;top:5cqw;width:36cqw}
+.A.capa h3{font-size:8.4cqw;margin-top:17cqw}
+.A.capa .sub{font-size:2.6cqw;max-width:60cqw}
+.A.capa .faixa{position:absolute;right:0;bottom:0;width:30cqw;height:100%;background:#dceae7;clip-path:polygon(40% 0,100% 0,100% 100%,0 100%)}
+.A:not(.capa) .logo{right:4cqw;top:3.4cqw;width:19cqw}
+.A h4{font:400 3.4cqw/1.1 'Roboto',sans-serif;text-transform:uppercase;letter-spacing:.04em;color:#16443f;margin:6cqw 0 2.4cqw}
+.A .grade{display:grid;grid-template-columns:repeat(3,1fr);gap:1.6cqw}
+.A .cx{background:#fff;border:1px solid #e4e0d6;border-radius:.8cqw;padding:1.6cqw}
+.A .cx b{display:block;font-size:1.9cqw;color:#1f5f5b}
+.A .cx span{font-size:1.6cqw;color:#5f5c55;line-height:1.3;display:block;margin-top:.4cqw}
+.A .fases{display:grid;grid-template-columns:repeat(3,1fr);gap:1.6cqw}
+.A .fase{border-top:.7cqw solid #1f5f5b;background:#fff;padding:1.6cqw;border-radius:0 0 .8cqw .8cqw}
+.A .fase em{font:300 3.4cqw 'Roboto',sans-serif;color:#1f5f5b;font-style:normal}
+.A .fase b{display:block;font-size:2cqw;margin:.4cqw 0}
+.A .fase span{font-size:1.55cqw;color:#5f5c55;line-height:1.3;display:block}
+</style>
+</head>
+<body>
+<main>
+  <h1>Opção A com o logo da igreja</h1>
+  <p class="intro">O logo (livro aberto e "Igreja Diakonia Tulipas") fica grande na capa e pequeno no canto superior direito dos demais slides. No PowerPoint, ele vem como imagem original, sem perda de qualidade.</p>
+  <div class="slides">
+    <figure><div class="slide A capa"><div class="faixa"></div><div class="barra"></div><img class="logo" src="logo.png" alt="Igreja Diakonia Tulipas"><div class="in"><h3>DiakoHub</h3><p class="sub">O site, o painel, o telão, o tablet e as TVs da igreja em um só lugar.</p></div></div><figcaption>Capa</figcaption></figure>
+    <figure><div class="slide A"><div class="barra"></div><img class="logo" src="logo.png" alt="Igreja Diakonia Tulipas"><div class="in"><h4>Culto sem improviso</h4><ul class="grade">
+      <li class="cx"><b>Modo Culto</b><span>Roteiro passo a passo no tablet</span></li>
+      <li class="cx"><b>Palavra</b><span>Versículos e frases no telão</span></li>
+      <li class="cx"><b>Escalas</b><span>Pastoral e louvor, com avisos</span></li>
+      <li class="cx"><b>Repertório</b><span>Busca por título, tom e cantor</span></li>
+      <li class="cx"><b>Recados</b><span>Cartazes e avisos com um toque</span></li>
+      <li class="cx"><b>Oração</b><span>Pedidos públicos e particulares</span></li></ul></div><div class="rod">Funcionalidades · 4</div></div><figcaption>Funcionalidades</figcaption></figure>
+    <figure><div class="slide A"><div class="barra"></div><img class="logo" src="logo.png" alt="Igreja Diakonia Tulipas"><div class="in"><h4>Plano em 3 fases</h4><div class="fases">
+      <div class="fase"><em>1</em><b>Base</b><span>Servidor, site, painel, usuários, backup e LGPD</span></div>
+      <div class="fase"><em>2</em><b>Culto</b><span>Escalas, repertório, tablet e Modo Culto</span></div>
+      <div class="fase"><em>3</em><b>Expansão</b><span>TVs, comunicação e indicadores</span></div></div></div><div class="rod">Plano · 12</div></div><figcaption>Plano</figcaption></figure>
+  </div>
+</main>
+</body>
+</html>
