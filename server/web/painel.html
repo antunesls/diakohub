@@ -1038,7 +1038,8 @@
       <select id="r-categoria"><option value="aviso">Aviso</option><option value="evento">Evento</option><option value="aniversario">Aniversário</option></select>
     </div>
     <div class="campo"><label for="r-validade">Mostrar até <span class="dica">(opcional)</span></label><input type="date" id="r-validade"></div>
-    <div class="campo"><label for="r-imagem">Cartaz <span class="dica">(opcional — projeta a imagem em vez do texto)</span></label><select id="r-imagem"></select></div>
+    <div class="campo"><label for="r-imagem">Cartaz <span class="dica">(opcional — projeta a imagem em vez do texto)</span></label><select id="r-imagem"></select>
+      <img id="r-imagem-previa" alt="Prévia do cartaz escolhido" hidden style="display:block;width:100%;max-width:360px;aspect-ratio:16/9;object-fit:cover;border-radius:6px;margin-top:8px;background:#222"></div>
     <div class="campo"><label class="marcar"><input type="checkbox" id="r-fixo"><span>Fixo no topo da lista</span></label></div>
     <div class="campo"><label class="marcar"><input type="checkbox" id="r-site"><span>Mostrar no site<br><span class="dica">Aparece em "Avisos da semana" na página inicial pública.</span></span></label></div>
     <div class="campo"><label class="marcar"><input type="checkbox" id="r-urgente"><span>Urgente<br><span class="dica">Faixa em destaque no topo do site (ex.: culto cancelado). Use a data "Mostrar até" para sair sozinho.</span></span></label></div>
@@ -1268,7 +1269,7 @@
 <script src="/comum.js?v=5"></script>
 <script src="/form-visitante.js?v=2"></script>
 <script src="/menu-lateral.js?v=3"></script>
-<script src="/painel.js?v=17"></script>
+<script src="/painel.js?v=18"></script>
 <script src="/acessos-escala.js?v=2"></script>
 <script src="/repertorio-busca.js?v=1"></script>
 <script src="/musica-youtube.js?v=1"></script>

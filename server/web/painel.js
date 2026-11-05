@@ -532,6 +532,16 @@ async function mover(lista, i, delta) {
   await carregarRecados();
 }
 
+/** Mostra no formulário do recado a imagem do cartaz escolhido (a mesma que vai ao telão). */
+function atualizarPreviaCartaz() {
+  const escolhido = cartazes.find((c) => c.holyrics === $('r-imagem').value);
+  const img = $('r-imagem-previa');
+  img.hidden = !escolhido;
+  if (escolhido) img.src = escolhido.url;
+  else img.removeAttribute('src');
+}
+$('r-imagem').addEventListener('change', atualizarPreviaCartaz);
+
 /** [r] com id edita; sem id (modelo, ex: vindo da agenda) ou null cria um novo. */
 function editarRecado(r) {
   const novo = !r || !r.id;
@@ -547,6 +557,7 @@ function editarRecado(r) {
     el('option', { value: '' }, '(nenhum — projetar o texto)'),
     ...cartazes.map((c) => el('option', { value: c.holyrics }, c.nome)));
   $('r-imagem').value = r && r.imagemHolyrics ? r.imagemHolyrics : '';
+  atualizarPreviaCartaz();
   abrirDialogo($('dlg-recado'), $('erro-recado'), async () => {
     const dados = {
       titulo: $('r-titulo').value.trim(),

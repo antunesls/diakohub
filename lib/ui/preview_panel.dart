@@ -6,20 +6,24 @@ import '../app_scope.dart';
 import '../data/blur_cartaz.dart';
 import '../data/cartaz_composto.dart';
 import '../data/cores.dart';
+import 'previa_fundo.dart';
 import '../sync/server_api.dart';
 
-/// Mostra a imagem real do cartaz do recado (a mesma que vai para o telão).
-/// Se o cartaz não puder ser carregado, mostra o caminho como antes.
+/// Prévia do recado com cartaz, como vai ao telão: com desfoque, o cartaz com título e texto
+/// por cima; sem desfoque (Desligado), só o cartaz, como a projeção. Se o cartaz não carregar,
+/// mostra o caminho.
 class _FotoDoCartaz extends StatelessWidget {
-  const _FotoDoCartaz({required this.caminho});
+  const _FotoDoCartaz({required this.recado});
 
-  final String caminho;
+  final Recado recado;
 
   @override
   Widget build(BuildContext context) {
-    final api = AppScope.of(context).api;
+    final scope = AppScope.of(context);
+    final caminho = recado.imagemHolyrics!.trim();
+    final nivel = scope.settings.blurCartaz;
     return FutureBuilder<List<Cartaz>>(
-      future: api.cartazes(),
+      future: scope.api.cartazes(),
       builder: (context, snap) {
         if (snap.connectionState == ConnectionState.waiting) {
           return const Center(child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white54));
@@ -35,10 +39,19 @@ class _FotoDoCartaz extends StatelessWidget {
             ],
           );
         }
-        return Image.network(
-          cartaz.url,
-          fit: BoxFit.contain,
-          errorBuilder: (_, __, ___) => const Icon(Icons.broken_image_outlined, size: 48, color: Colors.white70),
+        if (nivel == NivelBlur.desligado) {
+          return Image.network(
+            cartaz.url,
+            fit: BoxFit.contain,
+            errorBuilder: (_, __, ___) => const Icon(Icons.broken_image_outlined, size: 48, color: Colors.white70),
+          );
+        }
+        return CartazComTexto(
+          url: cartaz.url,
+          titulo: recado.titulo,
+          texto: recado.texto,
+          nivel: nivel,
+          negrito: scope.settings.negritoTitulo,
         );
       },
     );
@@ -145,7 +158,7 @@ class PreviewPanel extends StatelessWidget {
                     ],
                   )
                 : r.ehImagem
-                    ? _FotoDoCartaz(caminho: r.imagemHolyrics!.trim())
+                    ? _FotoDoCartaz(recado: r)
                     : FittedBox(
                         fit: BoxFit.scaleDown,
                         child: Column(

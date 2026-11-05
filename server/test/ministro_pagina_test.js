@@ -30,6 +30,6 @@ test('administração de acessos permite vincular uma conta Ministro ao membro',
 
 test('painel invalida cache dos scripts de perfis e acessos atualizados', () => {
   const html = fs.readFileSync(path.join(__dirname, '../web/painel.html'), 'utf8');
-  assert.match(html, /src="\/painel\.js\?v=16"/);
+  assert.match(html, /src="\/painel\.js\?v=18"/);
   assert.match(html, /src="\/acessos-escala\.js\?v=2"/);
 });
