@@ -155,12 +155,15 @@ enum AcaoPasso {
 
 /// Um toque em Avançar: uma ação no telão, com o rótulo que o pastor vê.
 class Passo {
-  const Passo(this.acao, this.rotulo, {this.valor = '', this.ids = const []});
+  const Passo(this.acao, this.rotulo, {this.valor = '', this.ids = const [], this.texto = ''});
 
   final AcaoPasso acao;
   final String rotulo;
   final String valor;
   final List<String> ids;
+
+  /// Texto do recado de cartaz (o título é o [rotulo]): vai por cima da imagem, como na prévia.
+  final String texto;
 }
 
 class Momento {
@@ -243,7 +246,7 @@ List<Momento> montarRoteiro({
   final textos = [
     for (final r in recados)
       r.ehImagem
-          ? Passo(AcaoPasso.imagem, r.titulo.isEmpty ? 'Cartaz' : r.titulo, valor: r.imagemHolyrics!.trim())
+          ? Passo(AcaoPasso.imagem, r.titulo, valor: r.imagemHolyrics!.trim(), texto: r.texto)
           : Passo(AcaoPasso.texto, r.titulo, valor: montarSlide(r, negritoTitulo: negritoTitulo)),
   ];
   final oracao = montarSlidesOracao(motivos, porSlide: motivosPorSlide, negritoTitulo: negritoTitulo, comTexto: textoMotivos);

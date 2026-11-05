@@ -5,6 +5,8 @@ import 'package:flutter/foundation.dart';
 
 import '../app_scope.dart';
 import '../sync/server_api.dart';
+import 'blur_cartaz.dart';
+import 'cartaz_composto.dart';
 import 'escala_repo.dart';
 
 /// Estado do Modo Culto: escolhe o culto de hoje, monta o roteiro com os dados do app,
@@ -464,8 +466,21 @@ class ModoCultoController extends ChangeNotifier {
         await limpar();
         await client.projetarTexto(passo.valor, tema: tema);
       case AcaoPasso.imagem:
+        // Recado com cartaz: o telão mostra o cartaz com título e texto (desfocado conforme a configuração),
+        // igual à prévia. Monta antes de limpar, para uma falha não deixar o telão vazio.
+        final nivel = scope.settings.blurCartaz;
+        final caminho = nivel == NivelBlur.desligado
+            ? passo.valor
+            : await cartazComTextoNoServidor(
+                api: scope.api,
+                caminho: passo.valor,
+                titulo: passo.rotulo,
+                texto: passo.texto,
+                nivel: nivel,
+                negritoTitulo: scope.settings.negritoTitulo,
+              );
         await limpar();
-        await client.mostrarImagem(passo.valor);
+        await client.mostrarImagem(caminho);
       case AcaoPasso.contagem:
         final agora = _agora();
         final dataCulto = _culto?.data;

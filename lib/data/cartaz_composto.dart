@@ -3,11 +3,38 @@ import 'dart:typed_data';
 import 'dart:ui' as ui;
 
 import 'package:flutter/painting.dart';
+import 'package:http/http.dart' as http;
 
+import '../sync/server_api.dart';
 import 'blur_cartaz.dart';
 
 const _largura = 1920.0;
 const _altura = 1080.0;
+
+/// Pega o cartaz [caminho] no servidor, monta o slide com [titulo] e [texto] por cima (desfocado
+/// conforme [nivel]) e envia o PNG ao Holyrics. Retorna o caminho da imagem nova para o ShowImage.
+/// Usado pela prévia e pelo Modo Culto, para o telão mostrar o mesmo slide nos dois.
+Future<String> cartazComTextoNoServidor({
+  required ServerApi api,
+  required String caminho,
+  required String titulo,
+  required String texto,
+  required NivelBlur nivel,
+  bool negritoTitulo = false,
+}) async {
+  final cartaz = (await api.cartazes()).where((c) => c.holyrics == caminho).firstOrNull;
+  if (cartaz == null) throw ServidorException('O cartaz "$caminho" não está no servidor.');
+  final resposta = await http.get(Uri.parse(cartaz.url));
+  if (resposta.statusCode != 200) throw ServidorException('Não foi possível ler o cartaz.');
+  final png = await montarCartazComTexto(
+    cartaz: resposta.bodyBytes,
+    titulo: titulo,
+    texto: texto,
+    nivel: nivel,
+    negritoTitulo: negritoTitulo,
+  );
+  return api.enviarCartaz('recado-${nivel.name}.png', png);
+}
 
 /// Monta o slide de um recado sobre o cartaz, no tamanho do telão (1920x1080):
 /// o cartaz em tela cheia, desfocado conforme [nivel], escurecido, com título e texto por cima.
