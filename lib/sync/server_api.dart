@@ -118,6 +118,10 @@ class ServerApi {
 
   Future<Map<String, dynamic>> escalaHoje() async => Map<String, dynamic>.from(await _req('GET', '/api/escalas/hoje') as Map);
 
+  /// Cultos de uma data (aaaa-mm-dd), passada ou futura, para consultar a escala.
+  Future<Map<String, dynamic>> escalaDoDia(String data) async => Map<String, dynamic>.from(
+      await _req('GET', '/api/escalas/hoje?data=${Uri.encodeQueryComponent(data)}') as Map);
+
   /// Cultos da escala de hoje em diante, para escolher no tablet.
   Future<Map<String, dynamic>> cultosFuturos() async =>
       Map<String, dynamic>.from(await _req('GET', '/api/escalas/hoje?todos=1') as Map);

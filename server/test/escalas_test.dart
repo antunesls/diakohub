@@ -244,6 +244,14 @@ void main() {
       expect(hoje['hoje'], isFalse);
       expect(hoje['cultos'].single['rotulo'], 'Dom 01/11');
       expect(hoje['cultos'].single['musicas'].single['titulo'], 'Abertura');
+
+      // Consulta por data: o dia pedido (mesmo sem ser hoje), vazio quando não há culto, 400 se inválida.
+      final (_, dom) = await chamar('GET', '/api/escalas/hoje?data=2026-11-01', token: midia);
+      expect(dom['hoje'], isFalse);
+      expect(dom['cultos'].single['rotulo'], 'Dom 01/11');
+      final (_, seg) = await chamar('GET', '/api/escalas/hoje?data=2026-11-02', token: midia);
+      expect(seg['cultos'], isEmpty);
+      expect((await chamar('GET', '/api/escalas/hoje?data=31-12-2026', token: midia)).$1, 400);
     });
 
     test('consulta todos os avisos ativos com autor e envio; cancelar remove da lista', () async {

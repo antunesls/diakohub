@@ -8,6 +8,7 @@ import 'escala_panel.dart';
 import 'mensagem_panel.dart';
 import 'modo_culto_page.dart';
 import 'oracao_panel.dart';
+import 'palavra_dia_panel.dart';
 import 'palco_panel.dart';
 import 'preview_panel.dart';
 import 'recado_form.dart';
@@ -22,7 +23,7 @@ class HomePage extends StatefulWidget {
   State<HomePage> createState() => _HomePageState();
 }
 
-enum _Secao { recados, oracao, visitantes, agenda, escala, mensagens }
+enum _Secao { recados, oracao, visitantes, agenda, escala, palavra, mensagens }
 
 class _HomePageState extends State<HomePage> {
   final Set<String> _selecionados = {};
@@ -152,6 +153,7 @@ class _HomePageState extends State<HomePage> {
           if (conta.pode('visitantes')) _Secao.visitantes,
           if (conta.pode('agendaVer')) _Secao.agenda,
           if (conta.pode('escalasVer')) _Secao.escala,
+          _Secao.palavra,
           if (conta.pode('mensagens')) _Secao.mensagens,
         };
         if (!permitidas.contains(_secao)) _secao = _Secao.recados;
@@ -230,6 +232,7 @@ class _HomePageState extends State<HomePage> {
                                   _destino(Icons.waving_hand_outlined, Icons.waving_hand, 'Visitantes', paraCitar),
                                 _Secao.agenda => _destino(Icons.event_outlined, Icons.event, 'Agenda'),
                                 _Secao.escala => _destino(Icons.groups_outlined, Icons.groups, 'Escala'),
+                                _Secao.palavra => _destino(Icons.menu_book_outlined, Icons.menu_book, 'Palavra'),
                                 _Secao.mensagens =>
                                   _destino(Icons.mail_outline, Icons.mail, 'Mensagens', scope.mensagens.novas),
                               },
@@ -292,6 +295,7 @@ class _HomePageState extends State<HomePage> {
                               _Secao.visitantes => const VisitantesPanel(),
                               _Secao.agenda => AgendaPanel(onVirarRecado: _recadoDoEvento),
                               _Secao.escala => const EscalaPanel(),
+                              _Secao.palavra => const PalavraDiaPanel(),
                               _Secao.mensagens => const MensagemPanel(),
                               _Secao.recados => RecadoList(
                                   selecionados: _selecionados,
