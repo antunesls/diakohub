@@ -302,7 +302,16 @@ class Agente {
             {'id': t['id'] as String, 'hash': t['hash'] as String, 'nome': t['nome'] as String? ?? ''},
       ];
 
-  Future<void> _gravar(String nome, Object dados) async {
+  /// Gravações em andamento: [parar] espera por elas, para não deixar tablets/histórico pela metade.
+  final Set<Future<void>> _gravacoes = {};
+
+  Future<void> _gravar(String nome, Object dados) {
+    final op = _gravarArquivo(nome, dados);
+    _gravacoes.add(op);
+    return op.whenComplete(() => _gravacoes.remove(op));
+  }
+
+  Future<void> _gravarArquivo(String nome, Object dados) async {
     final f = _arquivo(nome);
     if (f == null) return;
     try {
@@ -602,7 +611,7 @@ class Agente {
     _timerHolyrics?.cancel();
     await _canal?.sink.close();
     // Não deixa arquivo pela metade (ou aberto) nas pastas de cartazes e de backup.
-    await Future.wait([for (final f in [_sincronizacao, _copiaBackup]) if (f != null) f]);
+    await Future.wait([for (final f in [_sincronizacao, _copiaBackup]) if (f != null) f, ..._gravacoes]);
   }
 
 }
