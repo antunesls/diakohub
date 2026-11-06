@@ -41,6 +41,12 @@ void main() {
   /// as chamadas ao Holyrics pararem (3 rodadas seguidas sem nenhuma nova), não um tempo fixo: no CI
   /// a sequência (tirar a tela vazia, projetar, religar) demora mais que aqui.
   Future<void> tocar(WidgetTester tester, Finder alvo) async {
+    // O botão pode ainda não existir: a tela carrega escalas e Palavra de forma assíncrona, e no CI
+    // isso demora mais. Espera o alvo aparecer (até ~5 s) antes de tocar.
+    for (var i = 0; i < 200 && alvo.evaluate().isEmpty; i++) {
+      await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 25)));
+      await tester.pump();
+    }
     await tester.tap(alvo);
     var quietas = 0, antes = -1;
     for (var i = 0; i < 60 && quietas < 3; i++) {
