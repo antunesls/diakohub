@@ -1,0 +1,130 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Cadastro de membros</title>
+<link rel="stylesheet" href="/estilo.css?v=5">
+<style>
+  .cadastro { max-width: 760px; margin: 0 auto; padding: 20px; }
+  .cadastro header { text-align: center; margin-bottom: 24px; }
+  .cadastro header img { max-width: 210px; max-height: 90px; object-fit: contain; }
+  .cadastro fieldset { border: 1px solid #ddd; border-radius: 14px; padding: 18px; margin: 18px 0; }
+  .cadastro legend { font-weight: 700; padding: 0 8px; }
+  .cadastro .campos { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(220px, 100%), 1fr)); gap: 14px; }
+  .cadastro label { display: block; font-weight: 600; }
+  .cadastro input, .cadastro select, .cadastro textarea { display: block; width: 100%; margin-top: 5px; box-sizing: border-box; }
+  .cadastro .familia { padding: 10px 0; border-bottom: 1px solid #ddd; display: grid; grid-template-columns: 1fr 160px auto; gap: 8px; align-items: end; }
+  @media (max-width: 600px) { .cadastro .familia { grid-template-columns: 1fr; } }
+  .cadastro .aceite input { width: auto; display: inline; }
+  .cadastro #termo { max-height: 200px; overflow: auto; white-space: pre-wrap; padding: 12px; border: 1px solid #ddd; border-radius: 8px; }
+</style>
+</head>
+<body class="publico">
+<main class="cadastro">
+  <header><img src="/logo.png" alt=""><h1>Cadastro de membros</h1>
+    <p>Preencha seus dados. A secretaria vai conferir a ficha e fazer os vínculos familiares antes da aprovação.</p></header>
+  <form id="ficha">
+    <fieldset><legend>Dados pessoais</legend><div class="campos">
+      <label>Nome completo *<input id="nome" name="nome" required maxlength="100" autocomplete="name"></label>
+      <label>Data de nascimento *<input id="aniversario" name="aniversario" type="date" required></label>
+      <label>Sexo<select id="sexo" name="sexo"><option value="">Não informado</option><option value="F">Feminino</option><option value="M">Masculino</option></select></label>
+      <label>Estado civil<input id="estadoCivil" name="estadoCivil" maxlength="60"></label>
+      <label>CPF<input id="cpf" name="cpf" inputmode="numeric" maxlength="14"></label>
+      <label>RG<input id="rg" name="rg" maxlength="30"></label>
+      <label>Foto (opcional, JPG ou PNG; até 15 MB)<input id="foto" type="file" accept="image/jpeg,image/png"></label>
+    </div></fieldset>
+    <fieldset><legend>Contato e endereço</legend><p>Informe pelo menos um contato: telefone, WhatsApp ou e-mail.</p><div class="campos">
+      <label>Telefone<input id="telefone" name="telefone" type="tel" maxlength="20" autocomplete="tel"></label>
+      <label>WhatsApp<input id="whatsapp" name="whatsapp" type="tel" maxlength="20"></label>
+      <label>E-mail<input id="email" name="email" type="email" maxlength="120" autocomplete="email"></label>
+      <label>CEP<input id="cep" name="cep" maxlength="9" autocomplete="postal-code"></label>
+      <label>Rua<input id="rua" name="rua" maxlength="120" autocomplete="street-address"></label>
+      <label>Número<input id="numero" name="numero" maxlength="20"></label>
+      <label>Complemento<input id="complemento" name="complemento" maxlength="80"></label>
+      <label>Bairro<input id="bairro" name="bairro" maxlength="80"></label>
+      <label>Cidade<input id="cidade" name="cidade" maxlength="80"></label>
+      <label>Estado<input id="estado" name="estado" maxlength="2"></label>
+    </div></fieldset>
+    <fieldset><legend>Vida na igreja</legend><div class="campos">
+      <label>Data de chegada<input id="dataChegada" name="dataChegada" type="date"></label>
+      <label>Data de batismo<input id="dataBatismo" name="dataBatismo" type="date"></label>
+      <label>Data de membresia<input id="dataMembresia" name="dataMembresia" type="date"></label>
+      <label>Ministérios (separe por vírgula)<input id="ministerios" name="ministerios" maxlength="250"></label>
+      <label>Função<input id="funcao" name="funcao" maxlength="80"></label>
+      <label>Como conheceu a igreja?<input id="comoConheceu" name="comoConheceu" maxlength="200"></label>
+    </div></fieldset>
+    <fieldset><legend>Família</legend><p>Informe nomes e parentesco. A secretaria fará os vínculos depois.</p>
+      <div id="familiares"></div><button type="button" class="botao secundario" id="adicionar-familiar">Adicionar familiar</button>
+    </fieldset>
+    <fieldset><legend>Contato de emergência</legend><div class="campos">
+      <label>Nome<input id="emergenciaNome" name="emergenciaNome" maxlength="100"></label>
+      <label>Telefone<input id="emergenciaTelefone" name="emergenciaTelefone" type="tel" maxlength="20"></label>
+      <label>Vínculo<input id="emergenciaVinculo" name="emergenciaVinculo" maxlength="60"></label>
+    </div></fieldset>
+    <fieldset><legend>Autorização de uso dos dados</legend>
+      <div id="termo" aria-label="Termo LGPD">Carregando o termo…</div>
+      <label>Responsável legal (obrigatório para menores de 18 anos)<input id="responsavel" name="responsavel" maxlength="100"></label>
+      <label class="aceite"><input id="autorizo" type="checkbox" required> Li e autorizo o uso dos dados conforme o termo acima. *</label>
+    </fieldset>
+    <input name="website" class="escondido" tabindex="-1" autocomplete="off" aria-hidden="true">
+    <p id="resultado" role="status"></p>
+    <button type="submit" class="botao" id="enviar" disabled>Enviar cadastro</button>
+  </form>
+  <section id="obrigado" hidden><h2>Cadastro recebido</h2><p>Obrigado! A secretaria vai revisar seus dados e entrar em contato se precisar.</p></section>
+</main>
+<script>
+  const $ = (id) => document.getElementById(id);
+  fetch('/api/public/termo-lgpd').then((r) => r.json()).then((termo) => {
+    $('termo').textContent = termo.texto;
+    document.title = 'Cadastro de membros — ' + termo.igreja;
+    $('enviar').disabled = false;
+  }).catch(() => { $('termo').textContent = 'Não foi possível carregar o termo. Recarregue a página.'; });
+
+  $('adicionar-familiar').addEventListener('click', () => {
+    if ($('familiares').children.length >= 10) return;
+    const linha = document.createElement('div'); linha.className = 'familia';
+    const nome = document.createElement('input'); nome.placeholder = 'Nome completo'; nome.maxLength = 100; nome.required = true;
+    const parentesco = document.createElement('select');
+    for (const [valor, texto] of [['conjuge','Cônjuge'],['pai','Pai'],['mae','Mãe'],['filho','Filho(a)'],['outro','Outro']]) {
+      const opcao = document.createElement('option'); opcao.value = valor; opcao.textContent = texto; parentesco.append(opcao);
+    }
+    const remover = document.createElement('button'); remover.type = 'button'; remover.className = 'botao secundario';
+    remover.textContent = 'Remover'; remover.addEventListener('click', () => linha.remove());
+    const rotulo = document.createElement('label'); rotulo.textContent = 'Nome'; rotulo.append(nome);
+    linha.append(rotulo, parentesco, remover); $('familiares').append(linha);
+  });
+
+  $('ficha').addEventListener('submit', async (event) => {
+    event.preventDefault();
+    const form = event.currentTarget;
+    const dados = Object.fromEntries(new FormData(form));
+    if (![dados.telefone, dados.whatsapp, dados.email].some((v) => v.trim())) {
+      $('resultado').textContent = 'Informe pelo menos um contato.'; return;
+    }
+    dados.autorizo = $('autorizo').checked;
+    dados.ministerios = dados.ministerios ? dados.ministerios.split(',').map((s) => s.trim()).filter(Boolean) : [];
+    dados.familiares = [...$('familiares').children].map((linha) => ({
+      nome: linha.querySelector('input').value.trim(), parentesco: linha.querySelector('select').value,
+    }));
+    for (const chave of Object.keys(dados)) if (dados[chave] === '') delete dados[chave];
+    const foto = $('foto').files[0];
+    if (foto && foto.size > 15 * 1024 * 1024) { $('resultado').textContent = 'Foto maior que 15 MB.'; return; }
+    $('enviar').disabled = true; $('resultado').textContent = 'Enviando…';
+    try {
+      const resposta = await fetch('/api/public/cadastro', {method: 'POST', headers: {'content-type': 'application/json'}, body: JSON.stringify(dados)});
+      const envio = await resposta.json();
+      if (!resposta.ok) throw new Error(envio.erro || 'Não foi possível enviar.');
+      if (foto) {
+        const rf = await fetch(`/api/public/cadastro/${encodeURIComponent(envio.id)}/foto`, {
+          method: 'POST', headers: {'x-chave-foto': envio.chaveFoto}, body: foto,
+        });
+        if (!rf.ok) { $('resultado').textContent = 'Ficha recebida, mas a foto não foi enviada. Fale com a secretaria.'; return; }
+      }
+      form.hidden = true; $('obrigado').hidden = false;
+    } catch (e) { $('resultado').textContent = e.message; $('enviar').disabled = false; }
+  });
+</script>
+</body>
+</html>

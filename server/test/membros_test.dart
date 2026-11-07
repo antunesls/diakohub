@@ -68,11 +68,11 @@ void main() {
     });
 
     Future<(int, dynamic)> chamar(String metodo, String caminho,
-        {Object? json, List<int>? bytes, bool login = true}) async {
+        {Object? json, List<int>? bytes, bool login = true, Map<String, String> headers = const {}}) async {
       final r = await handler(Request(metodo, Uri.parse('http://x$caminho'),
           headers: {
             if (login) 'authorization': 'Bearer $token',
-            if (json != null) 'content-type': 'application/json'
+            if (json != null) 'content-type': 'application/json', ...headers,
           },
           body: bytes ?? (json == null ? null : jsonEncode(json))));
       final corpo = await r.read().expand((b) => b).toList();
@@ -82,6 +82,107 @@ void main() {
 
     Future<Map<String, dynamic>> criar(Map<String, dynamic> dados) async =>
         (await chamar('POST', '/api/membros', json: dados)).$2 as Map<String, dynamic>;
+
+    test('autocadastro exige consentimento e mantém ficha pendente', () async {
+      const dados = {'nome': 'Ana', 'aniversario': '05/03/1990', 'telefone': '11988887777',
+        'autorizo': true, 'familiares': [{'nome': 'Bruno', 'parentesco': 'conjuge'}]};
+      expect((await chamar('POST', '/api/public/cadastro', json: {...dados, 'autorizo': false}, login: false)).$1, 400);
+      final envio = await chamar('POST', '/api/public/cadastro', json: dados, login: false);
+      expect(envio.$1, 201);
+      expect((await chamar('GET', '/api/membros')).$2, isEmpty);
+      expect((await chamar('GET', '/api/solicitacoes-membros', login: false)).$1, 401);
+      final lista = (await chamar('GET', '/api/solicitacoes-membros')).$2 as List;
+      expect(lista.single['dados']['nome'], 'Ana');
+      expect(lista.single['familiares'].single['nome'], 'Bruno');
+      expect(lista.single['consentimento']['versaoTermo'], isNotNull);
+      expect((await chamar('POST', '/api/public/cadastro', json: dados, login: false)).$1, 409);
+    });
+
+    test('aprovação reaproveita visitante, preserva dados e liga cônjuge, pai e filho', () async {
+      final visitante = await criar({'nome': 'Ana', 'telefone': '11988887777', 'rua': 'Rua antiga', 'status': 'visitante'});
+      final conjuge = await criar({'nome': 'Bruno', 'status': 'membro'});
+      final pai = await criar({'nome': 'João', 'status': 'membro'});
+      final filho = await criar({'nome': 'Pedro', 'status': 'visitante'});
+      await chamar('POST', '/api/public/cadastro', login: false, json: {
+        'nome': 'Ana', 'aniversario': '05/03/1990', 'telefone': '11988887777', 'email': 'ana@teste.com',
+        'autorizo': true, 'familiares': [
+          {'nome': 'Bruno', 'parentesco': 'conjuge'}, {'nome': 'João', 'parentesco': 'pai'},
+          {'nome': 'Pedro', 'parentesco': 'filho'},
+        ],
+      });
+      final lista = (await chamar('GET', '/api/solicitacoes-membros')).$2 as List;
+      final id = lista.single['id'];
+      expect(lista.single['possiveisMembros'], isNotEmpty);
+      final (st, aprovado) = await chamar('POST', '/api/solicitacoes-membros/$id/aprovar', json: {
+        'membroId': visitante['id'], 'status': 'congregado', 'familia': [
+          {'membroId': conjuge['id'], 'parentesco': 'conjuge'},
+          {'membroId': pai['id'], 'parentesco': 'pai'},
+          {'membroId': filho['id'], 'parentesco': 'filho'},
+        ],
+      });
+      expect(st, 200, reason: '$aprovado');
+      expect(aprovado['id'], visitante['id']);
+      expect(aprovado['rua'], 'Rua antiga');
+      expect(aprovado['email'], 'ana@teste.com');
+      expect(aprovado['conjugeId'], conjuge['id']);
+      expect(aprovado['paisIds'], [pai['id']]);
+      expect(store.buscar('membros', conjuge['id'])!['conjugeId'], visitante['id']);
+      expect(store.buscar('membros', filho['id'])!['paisIds'], [visitante['id']]);
+      expect((await chamar('POST', '/api/solicitacoes-membros/$id/aprovar', json: {'status': 'membro'})).$1, 409);
+    });
+
+    test('rejeição e exclusão manual não criam membro', () async {
+      await chamar('POST', '/api/public/cadastro', login: false, json: {
+        'nome': 'Ana', 'aniversario': '05/03/1990', 'email': 'ana@teste.com', 'autorizo': true,
+        'status': 'membro', 'conjugeId': 'inexistente',
+      });
+      final id = ((await chamar('GET', '/api/solicitacoes-membros')).$2 as List).single['id'];
+      expect((await chamar('POST', '/api/solicitacoes-membros/$id/aprovar', json: {'status': 'visitante'})).$1, 400);
+      expect((await chamar('POST', '/api/solicitacoes-membros/$id/rejeitar', json: {'motivo': 'Duplicado'})).$1, 200);
+      expect(((await chamar('GET', '/api/solicitacoes-membros')).$2 as List).single['estado'], 'rejeitada');
+      expect((await chamar('GET', '/api/membros')).$2, isEmpty);
+      expect((await chamar('DELETE', '/api/solicitacoes-membros/$id')).$1, 200);
+    });
+
+    test('foto exige chave no envio e login na leitura; backup inclui solicitação e foto', () async {
+      final (_, envio) = await chamar('POST', '/api/public/cadastro', login: false, json: {
+        'nome': 'Ana', 'aniversario': '05/03/1990', 'email': 'ana@teste.com', 'autorizo': true,
+      });
+      final id = envio['id'];
+      expect((await chamar('POST', '/api/public/cadastro/$id/foto', bytes: foto(80, 80), login: false)).$1, 404);
+      expect((await chamar('POST', '/api/public/cadastro/$id/foto', bytes: foto(80, 80), login: false,
+        headers: {'x-chave-foto': envio['chaveFoto'] as String})).$1, 200);
+      expect((await chamar('GET', '/api/solicitacoes-membros/$id/foto', login: false)).$1, 401);
+      expect((await chamar('GET', '/api/solicitacoes-membros/$id/foto')).$1, 200);
+      expect(((await chamar('GET', '/api/solicitacoes-membros')).$2 as List).single.containsKey('chaveFotoHash'), false);
+      final (_, zipBytes) = await chamar('GET', '/api/backups/agora/download');
+      final zip = ZipDecoder().decodeBytes(zipBytes as List<int>);
+      expect(zip.findFile('data/solicitacoesMembros.json'), isNotNull);
+      expect(zip.files.where((f) => f.name.startsWith('fotos-membros/')), hasLength(2));
+      await chamar('POST', '/api/solicitacoes-membros/$id/rejeitar', json: {'motivo': 'Teste'});
+      await chamar('DELETE', '/api/solicitacoes-membros/$id');
+      expect((await chamar('POST', '/api/backups/restaurar', bytes: zipBytes)).$1, 200);
+      expect(((await chamar('GET', '/api/solicitacoes-membros')).$2 as List).single['estado'], 'pendente');
+      expect((await chamar('GET', '/api/solicitacoes-membros/$id/foto')).$1, 200);
+    });
+
+    test('menor exige responsável inclusive antes do aniversário de 18 anos', () async {
+      final futuro = DateTime.now().add(const Duration(days: 1));
+      final aniversario = '${futuro.day.toString().padLeft(2, '0')}/${futuro.month.toString().padLeft(2, '0')}/${futuro.year - 18}';
+      final dados = {'nome': 'Bia', 'aniversario': aniversario, 'telefone': '11988887777', 'autorizo': true};
+      expect((await chamar('POST', '/api/public/cadastro', json: dados, login: false)).$1, 400);
+      expect((await chamar('POST', '/api/public/cadastro', json: {...dados, 'responsavel': 'Maria',
+        'consentimentoEm': '2000-01-01'}, login: false)).$1, 201);
+      final doc = ((await chamar('GET', '/api/solicitacoes-membros')).$2 as List).single;
+      expect(doc['consentimento']['responsavel'], 'Maria');
+      expect(doc['dados'].containsKey('consentimentoEm'), false);
+    });
+
+    test('contato informado precisa ser utilizável', () async {
+      const dados = {'nome': 'Ana', 'aniversario': '05/03/1990', 'autorizo': true};
+      expect((await chamar('POST', '/api/public/cadastro', login: false, json: {...dados, 'telefone': 'abc'})).$1, 400);
+      expect((await chamar('POST', '/api/public/cadastro', login: false, json: {...dados, 'email': 'invalido@'})).$1, 400);
+    });
 
     test('falha ao gravar no disco não confirma o cadastro', () async {
       discoCheio = true;

@@ -118,6 +118,7 @@ const carregar = {
   cartazes: carregarCartazes,
   galeria: carregarGaleria,
   membros: carregarMembros,
+  gestaoCasa: carregarCasa,
   resumo: carregarResumo,
   historico: carregarHistorico,
   status: carregarStatus,
@@ -149,9 +150,12 @@ async function carregarInicio() {
 
   // Só busca o que o perfil pode ver (os cartões sem permissão já estão escondidos).
   const se = (permissao, caminho, vazio) => (pode(permissao) ? api('GET', caminho) : Promise.resolve(vazio));
-  const [listaMotivos, listaMensagens, listaRecados, agenda, membros] = await Promise.all([
+  const [listaMotivos, listaMensagens, listaRecados, agenda, membros, cadastros] = await Promise.all([
     se('motivosVer', '/api/motivos', []), se('mensagens', '/api/mensagens', []), se('recados', '/api/recados', []),
-    se('agendaVer', '/api/agenda?dias=7', { configurada: false, eventos: [] }), se('membros', '/api/membros', [])]);
+    se('agendaVer', '/api/agenda?dias=7', { configurada: false, eventos: [] }), se('membros', '/api/membros', []),
+    se('membros', '/api/solicitacoes-membros', [])]);
+  atualizarBadgeCadastros(cadastros);
+  if (pode('gestaoCasa')) api('GET', '/api/casa').then(atualizarResumoCasa).catch(() => {});
   motivos = listaMotivos;
   mensagensRecebidas = listaMensagens;
   atualizarBadge();
@@ -1009,8 +1013,134 @@ $('b-cep').addEventListener('keydown', (e) => {
 
 async function carregarMembros() {
   [membros] = await Promise.all([api('GET', '/api/membros'), carregarVisitas()]);
+  await carregarSolicitacoesMembros();
   montarFiltroMinisterios();
   renderMembros();
+}
+
+const rotulosCadastro = {
+  nome: 'Nome', dia: 'Dia', mes: 'Mês', ano: 'Ano', sexo: 'Sexo', estadoCivil: 'Estado civil',
+  cpf: 'CPF', rg: 'RG', telefone: 'Telefone', whatsapp: 'WhatsApp', email: 'E-mail',
+  cep: 'CEP', rua: 'Rua', numero: 'Número', complemento: 'Complemento', bairro: 'Bairro',
+  cidade: 'Cidade', estado: 'Estado', dataChegada: 'Chegada', dataBatismo: 'Batismo',
+  dataMembresia: 'Membresia', ministerios: 'Ministérios', funcao: 'Função',
+  comoConheceu: 'Como conheceu', emergenciaNome: 'Contato de emergência',
+  emergenciaTelefone: 'Telefone de emergência', emergenciaVinculo: 'Vínculo de emergência',
+};
+
+async function carregarSolicitacoesMembros() {
+  const solicitacoes = await api('GET', '/api/solicitacoes-membros');
+  const pendentes = solicitacoes.filter((s) => s.estado === 'pendente' || s.estado === 'processando');
+  atualizarBadgeCadastros(solicitacoes);
+  $('solicitacoes-contagem').textContent = pendentes.length;
+  $('solicitacoes-contagem').hidden = !pendentes.length;
+  const lista = $('solicitacoes-membros');
+  lista.replaceChildren();
+  if (!solicitacoes.length) { lista.append(el('p', { class: 'dica' }, 'Nenhuma solicitação recebida.')); return; }
+  for (const s of [...solicitacoes].sort((a, b) => b.criadoEm.localeCompare(a.criadoEm))) {
+    const bloco = el('div', { class: 'item' });
+    const info = el('div', { class: 'conteudo' });
+    info.append(el('strong', {}, s.dados.nome), el('p', { class: 'dica' },
+      `${s.estado} · ${new Date(s.criadoEm).toLocaleString('pt-BR')} · ${s.dados.telefone || s.dados.email || ''}`));
+    const acoes = el('div', { class: 'acoes' });
+    if (s.estado === 'pendente' || s.estado === 'processando') {
+      acoes.append(botao('Revisar', () => revisarSolicitacao(s), 'pequeno'));
+    } else {
+      acoes.append(botao('Excluir solicitação', async () => {
+        if (!confirm(`Excluir a solicitação de ${s.dados.nome}?`)) return;
+        try { await api('DELETE', `/api/solicitacoes-membros/${s.id}`); await carregarSolicitacoesMembros(); }
+        catch (e) { mensagem($('resultado-solicitacoes'), e.message, false); }
+      }, 'secundario pequeno'));
+    }
+    bloco.append(info, acoes); lista.append(bloco);
+  }
+}
+
+function atualizarBadgeCadastros(solicitacoes) {
+  const badge = $('badge-cadastros');
+  if (!badge) return;
+  const quantidade = solicitacoes.filter((s) => s.estado === 'pendente' || s.estado === 'processando').length;
+  badge.textContent = quantidade;
+  badge.hidden = !quantidade;
+}
+
+$('copiar-link-cadastro').addEventListener('click', async () => {
+  try { await navigator.clipboard.writeText(new URL('/cadastro', location.href).href);
+    mensagem($('resultado-solicitacoes'), 'Link copiado.', true);
+  } catch (_) { mensagem($('resultado-solicitacoes'), 'Copie o endereço da página de cadastro.', false); }
+});
+
+function revisarSolicitacao(s) {
+  const dlg = document.createElement('dialog'); dlg.className = 'dialogo-largo';
+  const form = document.createElement('form'); form.className = 'dialogo-coluna';
+  const titulo = el('h2', {}, `Revisar: ${s.dados.nome}`);
+  const aviso = el('p', { class: 'dica' }, 'Compare os dados antes de atualizar outra pessoa. A ficha original não é alterada até a aprovação.');
+  form.append(titulo, aviso);
+  if (s.foto) {
+    const img = document.createElement('img'); img.alt = `Foto enviada por ${s.dados.nome}`;
+    img.style.cssText = 'max-width:160px;max-height:180px;object-fit:cover';
+    urlAutenticada(`/api/solicitacoes-membros/${s.id}/foto`).then((url) => { if (url && img.isConnected) img.src = url; });
+    form.append(img);
+  }
+  const pessoa = document.createElement('select');
+  pessoa.append(el('option', { value: '' }, 'Criar pessoa nova'));
+  for (const m of membros) pessoa.append(el('option', { value: m.id }, `${m.nome} — ${m.status}`));
+  const labelPessoa = el('label', {}, 'Ficha a aproveitar (confira a identidade)'); labelPessoa.append(pessoa);
+  const possiveis = (s.possiveisMembros || []).map((m) => m.nome).join(', ');
+  form.append(el('p', { class: 'dica' }, `Possíveis correspondências: ${possiveis || 'nenhuma'}`), labelPessoa);
+  const status = document.createElement('select');
+  for (const valor of ['congregado', 'membro']) status.append(el('option', { value: valor }, valor === 'membro' ? 'Membro' : 'Congregado'));
+  const labelStatus = el('label', {}, 'Situação após aprovação'); labelStatus.append(status); form.append(labelStatus);
+  pessoa.addEventListener('change', () => {
+    const atual = membros.find((m) => m.id === pessoa.value);
+    if (atual?.status === 'membro' || atual?.status === 'congregado') status.value = atual.status;
+  });
+  const campos = el('div', { class: 'grade-campos' });
+  const controles = {};
+  for (const [chave, rotulo] of Object.entries(rotulosCadastro)) {
+    const campo = document.createElement('input'); campo.value = Array.isArray(s.dados[chave]) ? s.dados[chave].join(', ') : s.dados[chave] ?? '';
+    const label = el('label', {}, rotulo); label.append(campo); campos.append(label); controles[chave] = campo;
+  }
+  form.append(el('h3', {}, 'Dados enviados — revise antes de aprovar'), campos);
+  const familiares = el('div');
+  const escolhas = [];
+  for (const f of s.familiares || []) {
+    const select = document.createElement('select'); select.append(el('option', { value: '' }, 'Ainda não vincular'));
+    for (const m of membros) select.append(el('option', { value: m.id }, `${m.nome} — ${m.status}`));
+    const achado = membros.filter((m) => normalizado(m.nome) === normalizado(f.nome));
+    if (f.parentesco === 'outro') { select.disabled = true; select.title = 'O cadastro só vincula cônjuge, pais e filhos.'; }
+    else if (achado.length === 1) select.value = achado[0].id;
+    const label = el('label', {}, `${f.nome} (${f.parentesco})`); label.append(select); familiares.append(label);
+    escolhas.push({f, select});
+  }
+  form.append(el('h3', {}, 'Família — confirme cada correspondência'), familiares);
+  const erro = el('p', { role: 'alert' }); form.append(erro);
+  const acoes = el('div', { class: 'dialogo-acoes' });
+  const cancelar = botao('Fechar', () => dlg.close(), 'secundario');
+  const rejeitar = botao('Rejeitar', async () => {
+    const motivo = prompt('Motivo interno da rejeição (opcional):'); if (motivo === null) return;
+    try { await api('POST', `/api/solicitacoes-membros/${s.id}/rejeitar`, {motivo}); dlg.close(); await carregarSolicitacoesMembros(); }
+    catch (e) { erro.textContent = e.message; }
+  }, 'secundario');
+  const aprovar = botao('Aprovar cadastro', async () => {
+    const dados = {};
+    for (const [k, v] of Object.entries(controles)) {
+      const original = Array.isArray(s.dados[k]) ? s.dados[k].join(', ') : String(s.dados[k] ?? '');
+      if (v.value.trim() !== original) dados[k] = v.value.trim() || null;
+    }
+    for (const k of ['dia', 'mes', 'ano']) if (k in dados) dados[k] = Number(dados[k]) || null;
+    if ('ministerios' in dados) dados.ministerios = (dados.ministerios || '').split(',').map((v) => v.trim()).filter(Boolean);
+    const familia = escolhas.filter(({select}) => select.value).map(({f, select}) => ({parentesco: f.parentesco, membroId: select.value}));
+    if (familia.some(({membroId}) => membroId === pessoa.value)) { erro.textContent = 'Uma pessoa não pode ser seu próprio familiar.'; return; }
+    if (!confirm(`Aprovar ${s.dados.nome} como ${status.value}${pessoa.value ? ' na ficha existente' : ' como pessoa nova'}?`)) return;
+    try {
+      await api('POST', `/api/solicitacoes-membros/${s.id}/aprovar`, {membroId: pessoa.value || undefined, status: status.value, dados, familia});
+      dlg.close(); await carregarMembros();
+    } catch (e) { erro.textContent = e.message; }
+  });
+  acoes.append(cancelar, rejeitar, aprovar); form.append(acoes);
+  dlg.append(form); document.body.append(dlg);
+  dlg.addEventListener('close', () => dlg.remove(), {once: true}); dlg.showModal();
 }
 
 function montarFiltroMinisterios() {
@@ -1245,6 +1375,7 @@ const VIA_LGPD = {
   link: 'pela própria pessoa, no link enviado',
   termo: 'termo impresso e assinado',
   recepcao: 'pela própria pessoa, no QR da recepção',
+  autocadastro: 'pela própria pessoa, no cadastro público',
 };
 const dataHoraBr = (iso) => new Date(iso).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' });
 

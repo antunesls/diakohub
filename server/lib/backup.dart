@@ -8,6 +8,7 @@ import 'package:diako_core/diako_core.dart';
 import 'package:path/path.dart' as p;
 
 import 'cartazes.dart';
+import 'anexos_casa.dart';
 import 'fotos_membros.dart';
 import 'lgpd.dart';
 import 'artes_qr.dart';
@@ -157,6 +158,15 @@ class Backup {
         final nome = p.basename(e.path);
         if (e is File && FotosMembros.nomeValido(nome)) {
           arquivo.add(ArchiveFile.bytes('fotos-membros/$nome', await e.readAsBytes()));
+        }
+      }
+    }
+    final dirAnexosCasa = Directory(AnexosCasa(pastaDados).pasta);
+    if (await dirAnexosCasa.exists()) {
+      await for (final e in dirAnexosCasa.list()) {
+        final nome = p.basename(e.path);
+        if (e is File && AnexosCasa.nomeValido(nome)) {
+          arquivo.add(ArchiveFile.bytes('anexos-casa/$nome', await e.readAsBytes()));
         }
       }
     }
@@ -409,6 +419,11 @@ class Restauracao {
               if (doc['id'] is! String || doc['hash'] is! String) throw const FormatException('Link de escala inválido.');
             case 'repertorio':
               if (RepertorioMusica.fromJson(doc).id.isEmpty) throw const FormatException('Música sem id.');
+            case 'gestaoCasa':
+              if (doc['id'] is! String || !{'tarefa', 'rotina'}.contains(doc['registro']) ||
+                  (doc['anexos'] is List && (doc['anexos'] as List).any((a) => a is! String || !AnexosCasa.nomeValido(a)))) {
+                throw const FormatException('Registro da Gestão da Casa inválido.');
+              }
           }
         }
         colecoes[nome] = lista;
@@ -465,6 +480,14 @@ class Restauracao {
       temPastaTermos = true;
       final nome = f.name.substring('termos-lgpd/'.length);
       if (TermosAssinados.nomeValido(nome)) termos[nome] = f.content;
+    }
+    final anexosCasa = <String, List<int>>{};
+    var temPastaAnexosCasa = false;
+    for (final f in arquivo.files) {
+      if (!f.isFile || !f.name.startsWith('anexos-casa/')) continue;
+      temPastaAnexosCasa = true;
+      final nome = f.name.substring('anexos-casa/'.length);
+      if (AnexosCasa.nomeValido(nome)) anexosCasa[nome] = f.content;
     }
     final historico = arquivo.findFile('data/historico.jsonl');
     Map<String, dynamic>? cfg;
@@ -563,6 +586,16 @@ class Restauracao {
         await File(p.join(dir.path, f.key)).writeAsBytes(f.value, flush: true);
       }
       resumo.termosLgpd = termos.length;
+    }
+    if (temPastaAnexosCasa) {
+      final dir = Directory(AnexosCasa(pastaDados).pasta);
+      await dir.create(recursive: true);
+      await for (final e in dir.list()) {
+        if (e is File && AnexosCasa.nomeValido(p.basename(e.path))) await e.delete();
+      }
+      for (final a in anexosCasa.entries) {
+        await File(p.join(dir.path, a.key)).writeAsBytes(a.value, flush: true);
+      }
     }
     if (cfg != null && aplicarConfiguracoes != null) {
       await aplicarConfiguracoes!(cfg);

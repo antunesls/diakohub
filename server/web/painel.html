@@ -107,6 +107,31 @@
   .foto .acoes { display: flex; flex-wrap: wrap; gap: 6px; }
   .grade-evento { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 0 12px; }
   /* Membros */
+  /* Gestão da Casa: uma mesa de trabalho por prazo, não um catálogo de cartões. */
+  .casa-topo { display:flex; flex-wrap:wrap; align-items:flex-start; gap:12px; margin-bottom:18px; }
+  .casa-topo h1 { margin:0; }
+  .casa-topo .acoes-lista { margin-left:auto; }
+  .casa-resumo { display:flex; flex-wrap:wrap; gap:8px; margin:16px 0; }
+  .casa-resumo span { display:inline-block; padding:8px 12px; border-radius:8px; background:var(--neutro); }
+  .casa-resumo .atrasado { background:#fae7e0; color:#8a3525; font-weight:700; }
+  .casa-filtros { display:flex; gap:8px; flex-wrap:wrap; align-items:end; margin:20px 0 12px; }
+  .casa-filtros label { min-width:180px; flex:1; }
+  .casa-filtros input, .casa-filtros select { display:block; width:100%; }
+  .casa-lista { border-top:2px solid var(--primaria); }
+  .casa-linha { display:grid; grid-template-columns:110px minmax(180px,1fr) minmax(130px,180px) 120px auto; gap:12px; align-items:center; border-bottom:1px solid var(--linha); padding:14px 8px; }
+  .casa-linha .casa-prazo { font-weight:700; }
+  .casa-linha .casa-prazo.atrasado { color:#9b312a; }
+  .casa-linha .casa-titulo { font-weight:700; }
+  .casa-linha small { display:block; color:var(--suave); font-size:13px; }
+  .casa-linha .casa-acoes { display:flex; gap:6px; flex-wrap:wrap; justify-content:end; }
+  .casa-form { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px; }
+  .casa-form label { display:block; font-weight:600; }
+  .casa-form input, .casa-form select, .casa-form textarea { display:block; width:100%; box-sizing:border-box; }
+  .casa-form .largo { grid-column:1/-1; }
+  dialog.dialogo-largo.casa-dialogo .dialogo-coluna { overflow-y:auto; }
+  dialog.dialogo-largo form.casa-form { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); height:auto; overflow-y:auto; flex:1; min-height:0; align-content:start; }
+  @media (max-width:760px) { .casa-linha { grid-template-columns:1fr auto; } .casa-linha > * { grid-column:1/-1; } .casa-linha .casa-acoes { justify-content:start; } }
+  @media (max-width:520px) { dialog.dialogo-largo form.casa-form { grid-template-columns:1fr; } .casa-form .largo { grid-column:1; } }
   /* Status: fundo claro + texto escuro (contraste ≥ 4,5:1); --cor é o tom da barra de composição. */
   .st-visitante { --st-fundo: #dbeafb; --st-texto: #1c4f86; --st-cor: #3b82c4; }
   .st-congregado { --st-fundo: #d6f0ec; --st-texto: #17594f; --st-cor: #2a9d8f; }
@@ -395,6 +420,7 @@
         <button type="button" class="indicador" id="ind-mensagens" data-permissao="mensagens" data-ir="mensagens"><span>Mensagens novas</span><strong>–</strong><small></small></button>
         <button type="button" class="indicador" id="ind-recados" data-ir="recados"><span>Recados no tablet</span><strong>–</strong><small></small></button>
         <button type="button" class="indicador" id="ind-eventos" data-ir="agenda"><span>Eventos em 7 dias</span><strong>–</strong><small></small></button>
+        <button type="button" class="indicador" id="ind-casa" data-permissao="gestaoCasa" data-ir="gestaoCasa"><span>Gestão da Casa</span><strong>–</strong><small></small></button>
       </div>
       <div class="cockpit">
         <section class="cartao" data-permissao="visitantes"><h2>Visitantes de hoje <span class="acoes-ck"><button type="button" class="link" id="ck-acompanhamento" data-permissao="membros">Acompanhamento</button></span></h2><div id="ck-visitantes"></div></section>
@@ -404,6 +430,7 @@
         <section class="cartao" data-permissao="membros"><h2>Aniversariantes da semana <button type="button" class="link" data-ir="membros">Ver todos</button></h2><div id="ck-aniversarios"></div></section>
         <section class="cartao"><h2>Recados no tablet <button type="button" class="link" data-ir="recados">Editar</button></h2><div id="ck-recados"></div></section>
         <section class="cartao"><h2>Sistema <button type="button" class="link" data-ir="status">Detalhes</button></h2><div id="ck-sistema"></div></section>
+        <section class="cartao" data-permissao="gestaoCasa"><h2>Casa: prazos <button type="button" class="link" data-ir="gestaoCasa">Ver tarefas</button></h2><div id="ck-casa"></div></section>
       </div>
     </section>
 
@@ -720,7 +747,36 @@
       <div class="grade-galeria" id="lista-galeria"></div>
     </section>
 
+    <section data-painel="gestaoCasa" hidden>
+      <div class="casa-topo">
+        <div><h1>Gestão da Casa</h1><p class="dica">O que precisa ser resolvido no prédio, comprado ou revisado.</p></div>
+        <div class="acoes-lista">
+          <button type="button" class="botao secundario pequeno" id="casa-nova-rotina">+ Rotina recorrente</button>
+          <button type="button" class="botao pequeno" id="casa-nova-tarefa">+ Nova tarefa</button>
+        </div>
+      </div>
+      <div class="casa-resumo" id="casa-resumo" role="status"></div>
+      <div class="casa-filtros">
+        <label>Buscar<input id="casa-busca" type="search" placeholder="Serviço, local ou responsável"></label>
+        <label>Tipo<select id="casa-tipo"><option value="">Todos</option><option value="pendencia">Pendências</option><option value="compra">Compras planejadas</option><option value="preventiva">Manutenção preventiva</option></select></label>
+        <label>Situação<select id="casa-estado"><option value="abertas">A fazer</option><option value="concluida">Concluídas</option><option value="cancelada">Canceladas</option><option value="">Todas</option></select></label>
+      </div>
+      <p id="casa-resultado" role="status"></p>
+      <div class="casa-lista" id="casa-lista"></div>
+      <h2>Rotinas programadas</h2>
+      <p class="dica">A próxima tarefa aparece quando a anterior é concluída. Alterações na rotina não mudam o histórico.</p>
+      <div id="casa-rotinas" class="lista"></div>
+    </section>
+
     <section data-painel="membros" hidden>
+      <div class="cartao" style="padding:16px;margin-bottom:16px">
+        <div class="barra"><h2>Cadastros enviados pelo link <span id="solicitacoes-contagem" class="badge" hidden></span></h2><span class="espaco"></span>
+          <a href="/cadastro" target="_blank" rel="noopener">Abrir link compartilhável</a>
+          <button type="button" class="botao secundario pequeno" id="copiar-link-cadastro">Copiar link</button></div>
+        <p class="dica">Os dados só entram no cadastro após revisão e aprovação. Confira a identidade antes de atualizar uma ficha existente.</p>
+        <p id="resultado-solicitacoes" role="status"></p>
+        <div id="solicitacoes-membros" class="lista"></div>
+      </div>
       <div class="composicao" id="composicao-membros"></div>
       <div class="filtros-membros">
         <label class="rotulo" for="busca-membro">Buscar
@@ -1268,8 +1324,9 @@
 
 <script src="/comum.js?v=5"></script>
 <script src="/form-visitante.js?v=2"></script>
-<script src="/menu-lateral.js?v=3"></script>
-<script src="/painel.js?v=18"></script>
+<script src="/menu-lateral.js?v=4"></script>
+<script src="/painel.js?v=20"></script>
+<script src="/gestao-casa.js?v=1"></script>
 <script src="/acessos-escala.js?v=2"></script>
 <script src="/repertorio-busca.js?v=1"></script>
 <script src="/musica-youtube.js?v=1"></script>

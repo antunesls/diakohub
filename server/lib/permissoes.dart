@@ -16,6 +16,7 @@ enum Permissao {
   cartazes('Cartazes'),
   galeria('Galeria do site'),
   membros('Cadastro de membros'),
+  gestaoCasa('Gestão da Casa: pendências, compras e manutenção'),
   visitantes('Ver os visitantes do dia e dar as boas-vindas'),
   visitantesCadastrar('Cadastrar visitantes (recepção)'),
   resumo('Resumo da semana'),
@@ -41,18 +42,18 @@ const _base = {Permissao.sessao, Permissao.painel, Permissao.motivosVer, Permiss
 enum Perfil {
   administrador('Administrador', 'Tudo, inclusive configurações, backup e usuários.', {
     ..._base, Permissao.motivosParticulares, Permissao.motivosEditar, Permissao.mensagens, Permissao.agendaEditar,
-    Permissao.galeria, Permissao.membros, Permissao.resumo, Permissao.projetar, Permissao.admin, Permissao.usuarios,
+    Permissao.galeria, Permissao.membros, Permissao.gestaoCasa, Permissao.resumo, Permissao.projetar, Permissao.admin, Permissao.usuarios,
     Permissao.visitantes, Permissao.visitantesCadastrar, Permissao.escalasVer, Permissao.escalaPastoral, Permissao.escalaLouvor,
     Permissao.minhaEscala, Permissao.acessosEscala, Permissao.palavras, Permissao.palavrasTodas,
   }),
   pastor('Pastor', 'Todo o conteúdo, inclusive pedidos particulares. Sem configurações técnicas.', {
     ..._base, Permissao.motivosParticulares, Permissao.motivosEditar, Permissao.mensagens, Permissao.agendaEditar,
-    Permissao.galeria, Permissao.membros, Permissao.resumo, Permissao.projetar,
+    Permissao.galeria, Permissao.membros, Permissao.gestaoCasa, Permissao.resumo, Permissao.projetar,
     Permissao.visitantes, Permissao.visitantesCadastrar, Permissao.escalasVer, Permissao.escalaPastoral, Permissao.escalaLouvor,
     Permissao.minhaEscala, Permissao.palavras, Permissao.palavrasTodas,
   }),
   secretaria('Secretaria', 'Recados, agenda, mensagens, aniversariantes e pedidos públicos.', {
-    ..._base, Permissao.motivosEditar, Permissao.mensagens, Permissao.agendaEditar, Permissao.membros, Permissao.resumo,
+    ..._base, Permissao.motivosEditar, Permissao.mensagens, Permissao.agendaEditar, Permissao.membros, Permissao.gestaoCasa, Permissao.resumo,
     Permissao.visitantes, Permissao.visitantesCadastrar, Permissao.escalasVer,
     Permissao.minhaEscala, Permissao.acessosEscala,
   }),
@@ -64,6 +65,9 @@ enum Perfil {
   }),
   recepcao('Recepção', 'Obreiro da recepção: cadastra visitantes pelo celular (/recepcao) e vê os do dia. Nada mais.', {
     Permissao.sessao, Permissao.visitantes, Permissao.visitantesCadastrar,
+  }),
+  gestaoCasa('Gestão da Casa', 'Cuida das pendências, compras planejadas e manutenções preventivas.', {
+    Permissao.sessao, Permissao.painel, Permissao.gestaoCasa,
   }),
   comissaoLouvor('Comissão do Louvor', 'Membros da comissão: montam a escala e as músicas do louvor e veem a escala pastoral e a agenda.', {
     Permissao.sessao, Permissao.painel, Permissao.agendaVer, Permissao.escalasVer, Permissao.escalaLouvor, Permissao.minhaEscala,
@@ -113,6 +117,8 @@ Permissao permissaoDaRota(String metodo, String caminho) {
   if (comeca('api/cartazes')) return Permissao.cartazes;
   if (comeca('api/galeria')) return Permissao.galeria;
   if (comeca('api/membros')) return Permissao.membros;
+  if (comeca('api/solicitacoes-membros')) return Permissao.membros;
+  if (comeca('api/casa')) return Permissao.gestaoCasa;
   if (comeca('api/visitas')) {
     // Contato pós-visita mexe com telefone e anotações: só quem cuida do cadastro.
     if (caminho.endsWith('/contato')) return Permissao.membros;

@@ -9,7 +9,7 @@ const MENU_GRUPOS = [
   { nome: 'Acompanhamento', itens: [
     { id: 'motivos', titulo: 'Motivos de oração', permissao: 'motivosVer', badge: 'badge' },
     { id: 'mensagens', titulo: 'Mensagens', permissao: 'mensagens', badge: 'badge-mensagens' },
-    { id: 'membros', titulo: 'Membros', permissao: 'membros' },
+    { id: 'membros', titulo: 'Membros', permissao: 'membros', badge: 'badge-cadastros' },
   ] },
   { nome: 'Cultos', itens: [
     { id: 'escalas', titulo: 'Escalas', permissao: 'escalasVer' },
@@ -25,6 +25,7 @@ const MENU_GRUPOS = [
     { id: 'resumo', titulo: 'Resumo da semana', permissao: 'resumo' },
   ] },
   { nome: 'Operação', itens: [
+    { id: 'gestaoCasa', titulo: 'Gestão da Casa', permissao: 'gestaoCasa', badge: 'badge-casa' },
     { id: 'historico', titulo: 'Histórico', permissao: 'painel' },
     { id: 'status', titulo: 'Status', permissao: 'painel' },
     { id: 'acessos', titulo: 'Acessos às escalas', permissao: 'acessosEscala' },

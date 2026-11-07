@@ -38,5 +38,7 @@ test('painel oferece busca, filtros e edição de tom e status sem checkbox conf
   assert.match(html, /<select id="rep-tomSelecionado"/);
   assert.match(html, /<select id="rep-status"/);
   assert.doesNotMatch(html, /id="rep-ativo"/);
-  assert.ok(html.indexOf('/repertorio-busca.js?v=1') < html.indexOf('/repertorio.js?v=2'));
+  const busca = html.indexOf('/repertorio-busca.js?v=1');
+  const repertorio = html.match(/\/repertorio\.js\?v=(\d+)/);
+  assert.ok(busca >= 0 && repertorio && Number(repertorio[1]) >= 2 && busca < html.indexOf(repertorio[0]));
 });

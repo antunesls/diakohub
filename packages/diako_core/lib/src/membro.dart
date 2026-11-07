@@ -42,7 +42,10 @@ abstract final class ViaConsentimento {
   /// A pessoa se cadastrou pelo QR code da recepção e aceitou o termo.
   static const recepcao = 'recepcao';
 
-  static const todas = [manual, link, termo, recepcao];
+  /// A pr?pria pessoa enviou a ficha p?blica para aprova??o da secretaria.
+  static const autocadastro = 'autocadastro';
+
+  static const todas = [manual, link, termo, recepcao, autocadastro];
 
   static String? valida(Object? v) => todas.contains(v) ? v as String : null;
 }

@@ -14,6 +14,7 @@ import 'package:web_socket_channel/web_socket_channel.dart';
 
 import 'agenda.dart';
 import 'agenda_google_api.dart';
+import 'anexos_casa.dart';
 import 'agente_hub.dart';
 import 'auth.dart';
 import 'backup.dart';
@@ -29,6 +30,7 @@ import 'fotos_membros.dart';
 import 'artes_qr.dart';
 import 'fundos_tv.dart';
 import 'galeria.dart';
+import 'gestao_casa.dart';
 import 'lgpd.dart';
 import 'pagina_inicial.dart';
 import 'palavras.dart';
@@ -100,6 +102,8 @@ class Servidor {
   final Historico historico;
   final String versao;
   final Store store;
+  late final GestaoCasa casa = GestaoCasa(store, agora: _agora);
+  late final AnexosCasa anexosCasa = AnexosCasa(store.pasta);
   final Auth auth;
   final PonteHolyrics holyrics;
 
@@ -153,6 +157,8 @@ class Servidor {
   final LimiteTaxa _limiteMensagens = LimiteTaxa(maximo: 5, janela: const Duration(minutes: 10));
   final LimiteTaxa _limiteLgpd = LimiteTaxa(maximo: 20, janela: const Duration(minutes: 10));
   final LimiteTaxa _limiteVisitantes = LimiteTaxa(maximo: 5, janela: const Duration(minutes: 10));
+  final LimiteTaxa _limiteCadastros = LimiteTaxa(maximo: 5, janela: const Duration(minutes: 10));
+  final Set<String> _aprovacoesEmCurso = {};
   List<Map<String, String>> _temasCache = [];
   static const maximoTemas = 500;
   DateTime? _temasAtualizados;
@@ -174,6 +180,7 @@ class Servidor {
       ..get('/minha-escala', (Request _) => _pagina('minha-escala.html'))
       ..get('/recepcao', (Request _) => _pagina('recepcao.html'))
       ..get('/visitante', (Request _) => cfg?.visitanteQrAtivo == false ? _paginaDesligada() : _pagina('visitante.html'))
+      ..get('/cadastro', (Request _) => _pagina('cadastro.html'))
       ..get('/qr-visitante.png', _qrVisitante)
       ..get('/qr-minha-escala.png', (Request _) => Response.ok(gerarPngQr('$_urlBase/minha-escala', rotulo: 'MINHA ESCALA'),
           headers: {'content-type': 'image/png', 'cache-control': 'no-cache'}))
@@ -182,6 +189,8 @@ class Servidor {
       ..get('/api/public/visitante', _infoVisitante)
       ..get('/api/public/termo-lgpd', (Request _) => _json({'versao': _termo.versao, 'texto': _termo.texto, 'igreja': _termo.igreja}))
       ..post('/api/public/visitante', _novoVisitantePublico)
+      ..post('/api/public/cadastro', _novoCadastroPublico)
+      ..post('/api/public/cadastro/<id>/foto', _fotoCadastroPublico)
       ..get(ajudaAgenda, (Request _) => _pagina('ajuda-agenda.html'))
       ..get('/ajuda/usuarios', (Request _) => _pagina('ajuda-usuarios.html'))
       ..get('/ajuda/rede-local', (Request _) => _pagina('ajuda-rede-local.html'))
@@ -247,6 +256,25 @@ class Servidor {
       ..get('/api/membros/termo-lgpd', (Request _) => _json({'versao': _termo.versao, 'texto': _termo.texto, 'igreja': _termo.igreja}))
       ..post('/api/membros', _criarMembro)
       ..post('/api/membros/importar', _importarMembros)
+      // Gestão da Casa (painel, sem rotas públicas ou integração com o tablet).
+      ..get('/api/casa', (Request _) => _json(casa.listar()))
+      ..get('/api/casa/responsaveis', (Request _) => _json([
+        Conta.principal.nome,
+        for (final u in auth.usuarios?.lista ?? const []) if (u.ativo && u.perfil.pode(Permissao.gestaoCasa)) u.nome,
+      ]))
+      ..post('/api/casa/tarefas', _criarTarefaCasa)
+      ..put('/api/casa/tarefas/<id>', _editarTarefaCasa)
+      ..post('/api/casa/tarefas/<id>/concluir', _concluirTarefaCasa)
+      ..post('/api/casa/tarefas/<id>/anexos', _enviarAnexoCasa)
+      ..delete('/api/casa/tarefas/<id>/anexos/<nome>', _excluirAnexoCasa)
+      ..get('/api/casa/anexos/<nome>', _verAnexoCasa)
+      ..post('/api/casa/rotinas', _criarRotinaCasa)
+      ..put('/api/casa/rotinas/<id>', _editarRotinaCasa)
+      ..get('/api/solicitacoes-membros', _listarSolicitacoesMembros)
+      ..get('/api/solicitacoes-membros/<id>/foto', _fotoSolicitacaoMembro)
+      ..post('/api/solicitacoes-membros/<id>/aprovar', _aprovarSolicitacaoMembro)
+      ..post('/api/solicitacoes-membros/<id>/rejeitar', _rejeitarSolicitacaoMembro)
+      ..delete('/api/solicitacoes-membros/<id>', _excluirSolicitacaoMembro)
       ..put('/api/membros/<id>', _atualizarMembro)
       ..delete('/api/membros/<id>', _excluirMembro)
       ..post('/api/membros/<id>/foto', _enviarFotoMembro)
@@ -946,10 +974,455 @@ class Servidor {
     return _json(novo);
   }
 
+  // ---------- Gestão da Casa ----------
+
+  String _autorCasa(Request req) => Auth.contaDa(req)?.nome ?? 'Equipe';
+
+  Future<Response> _operacaoCasa(Future<Map<String, dynamic>> Function() executar, {int status = 200}) async {
+    try {
+      return _json(await executar(), status: status);
+    } on FormatException catch (e) {
+      return _erro(400, e.message);
+    } on StateError catch (e) {
+      return _erro(409, e.message);
+    }
+  }
+
+  Future<Response> _criarTarefaCasa(Request req) async =>
+      _operacaoCasa(() async => casa.criarTarefa(await _corpo(req), por: _autorCasa(req)), status: 201);
+
+  Future<Response> _editarTarefaCasa(Request req, String id) async =>
+      _operacaoCasa(() async => casa.editarTarefa(id, await _corpo(req), por: _autorCasa(req)));
+
+  Future<Response> _concluirTarefaCasa(Request req, String id) async =>
+      _operacaoCasa(() async => casa.concluir(id, await _corpo(req), por: _autorCasa(req)));
+
+  Future<Response> _criarRotinaCasa(Request req) async =>
+      _operacaoCasa(() async => casa.criarRotina(await _corpo(req), por: _autorCasa(req)), status: 201);
+
+  Future<Response> _editarRotinaCasa(Request req, String id) async =>
+      _operacaoCasa(() async => casa.editarRotina(id, await _corpo(req), por: _autorCasa(req)));
+
+  Future<Response> _enviarAnexoCasa(Request req, String id) async {
+    final tarefa = casa.tarefa(id);
+    if (tarefa == null) return _erro(404, 'Tarefa não encontrada.');
+    final atuais = (tarefa['anexos'] as List? ?? const []).cast<String>();
+    if (atuais.length >= 10) return _erro(400, 'No máximo 10 anexos por tarefa.');
+    final bytes = await _lerBytes(req, AnexosCasa.tamanhoMaximo);
+    if (bytes == null) return _erro(413, 'Arquivo maior que 15 MB.');
+    try {
+      final nome = await anexosCasa.salvar(bytes);
+      try {
+        await store.salvar('gestaoCasa', {...tarefa, 'anexos': [...atuais, nome]});
+      } catch (_) {
+        await anexosCasa.excluir(nome);
+        rethrow;
+      }
+      return _json({'nome': nome}, status: 201);
+    } on FormatException catch (e) {
+      return _erro(400, e.message);
+    }
+  }
+
+  Response _verAnexoCasa(Request _, String nome) {
+    final vinculado = (casa.listar()['tarefas'] as List).any((t) =>
+        (t['anexos'] as List? ?? const []).contains(nome));
+    final arquivo = vinculado ? anexosCasa.arquivo(nome) : null;
+    return arquivo == null ? _erro(404, 'Anexo não encontrado.') : _arquivo(arquivo);
+  }
+
+  Future<Response> _excluirAnexoCasa(Request _, String id, String nome) async {
+    final tarefa = casa.tarefa(id);
+    final atuais = (tarefa?['anexos'] as List? ?? const []).cast<String>();
+    if (tarefa == null || !atuais.contains(nome)) return _erro(404, 'Anexo não encontrado.');
+    await store.salvar('gestaoCasa', {...tarefa, 'anexos': atuais.where((e) => e != nome).toList()});
+    await anexosCasa.excluir(nome);
+    return _json({'ok': true});
+  }
+
   // ---------- Membros ----------
 
   /// Membros normalizados: documentos antigos (só nome/dia/mês/ativo) ganham status.
   List<Membro> _listaMembros() => store.listar('membros').map(Membro.fromJson).toList();
+
+  static const _camposCadastro = {
+    'nome',
+    'dia',
+    'mes',
+    'ano',
+    'sexo',
+    'estadoCivil',
+    'cpf',
+    'rg',
+    'telefone',
+    'whatsapp',
+    'email',
+    'cep',
+    'rua',
+    'numero',
+    'complemento',
+    'bairro',
+    'cidade',
+    'estado',
+    'dataChegada',
+    'dataBatismo',
+    'dataMembresia',
+    'ministerios',
+    'funcao',
+    'comoConheceu',
+    'emergenciaNome',
+    'emergenciaTelefone',
+    'emergenciaVinculo',
+  };
+
+  Future<Response> _novoCadastroPublico(Request req) async {
+    final bytes = await _lerBytes(req, 20 * 1024);
+    if (bytes == null) return _erro(413, 'Cadastro muito grande.');
+    final corpo =
+        Map<String, dynamic>.from(jsonDecode(utf8.decode(bytes)) as Map);
+    if ((corpo['website'] as String? ?? '').isNotEmpty)
+      return _json({'ok': true}, status: 201);
+    if (!_limiteCadastros.permitir(_ip(req)))
+      return _erro(429, 'Aguarde alguns minutos antes de enviar novamente.');
+    if (corpo['autorizo'] != true)
+      return _erro(400, 'Leia e aceite o termo de uso dos dados.');
+    final contato =
+        '${corpo['telefone'] ?? ''}${corpo['whatsapp'] ?? ''}${corpo['email'] ?? ''}'
+            .trim();
+    if (contato.isEmpty)
+      return _erro(400, 'Informe telefone, WhatsApp ou e-mail.');
+    final dados = {
+      for (final e in corpo.entries)
+        if (_camposCadastro.contains(e.key)) e.key: e.value
+    };
+    final aniversario = (corpo['aniversario'] as String? ?? '').trim();
+    if (aniversario.isEmpty) return _erro(400, 'Informe a data de nascimento.');
+    final nascimento = Membro.dataDe(aniversario);
+    if (nascimento == null || !Membro.dataIsoValida(nascimento))
+      return _erro(400, 'Data de nascimento inválida.');
+    final partes = nascimento.split('-').map(int.parse).toList();
+    dados
+      ..['ano'] = partes[0]
+      ..['mes'] = partes[1]
+      ..['dia'] = partes[2];
+    for (final campo in ['dataChegada', 'dataBatismo', 'dataMembresia']) {
+      if (dados[campo] != null &&
+          dados[campo].toString().trim().isNotEmpty &&
+          Membro.dataDe(dados[campo]) == null) {
+        return _erro(400, 'Data inválida em $campo.');
+      }
+    }
+    final responsavel = (corpo['responsavel'] as String? ?? '').trim();
+    final hojeCadastro = _agora();
+    final maiorDeIdade =
+        !DateTime(partes[0] + 18, partes[1], partes[2]).isAfter(hojeCadastro);
+    if (!maiorDeIdade && responsavel.isEmpty) {
+      return _erro(400, 'Informe o responsável pelo menor de idade.');
+    }
+    if (responsavel.length > 100)
+      return _erro(400, 'Nome do responsável muito longo.');
+    final lista = corpo['familiares'] ?? const [];
+    if (lista is! List || lista.length > 10)
+      return _erro(400, 'Informe no máximo 10 familiares.');
+    final familiares = <Map<String, String>>[];
+    for (final item in lista) {
+      if (item is! Map ||
+          item['nome'] is! String ||
+          item['parentesco'] is! String)
+        return _erro(400, 'Familiar inválido.');
+      final nome = (item['nome'] as String).trim();
+      final parentesco = item['parentesco'] as String;
+      if (nome.isEmpty ||
+          nome.length > 100 ||
+          !{'conjuge', 'pai', 'mae', 'filho', 'outro'}.contains(parentesco)) {
+        return _erro(400, 'Familiar inválido.');
+      }
+      familiares.add({'nome': nome, 'parentesco': parentesco});
+    }
+    final id = novoId();
+    final candidato =
+        Membro.fromJson({...dados, 'id': id, 'status': 'visitante'});
+    final erro = _validarMembro(candidato);
+    if (erro != null) return _erro(400, erro);
+    for (final telefone in [candidato.telefone, candidato.whatsapp]) {
+      if (telefone != null && (Membro.soDigitos(telefone)?.length ?? 0) < 10) {
+        return _erro(400, 'Informe um telefone com DDD válido.');
+      }
+    }
+    final contatoNovo = (Membro.soDigitos(candidato.telefone) ??
+        Membro.soDigitos(candidato.whatsapp) ??
+        candidato.email?.toLowerCase());
+    if (store.listar('solicitacoesMembros').any((s) {
+      if (s['estado'] != 'pendente' && s['estado'] != 'processando')
+        return false;
+      final outro = Membro.fromJson({
+        ...Map<String, dynamic>.from(s['dados'] as Map),
+        'id': s['id'],
+        'status': 'visitante'
+      });
+      return _nomeComparavel(outro.nome) == _nomeComparavel(candidato.nome) &&
+          outro.ano == candidato.ano &&
+          outro.mes == candidato.mes &&
+          outro.dia == candidato.dia &&
+          contatoNovo != null &&
+          [
+            Membro.soDigitos(outro.telefone),
+            Membro.soDigitos(outro.whatsapp),
+            outro.email?.toLowerCase()
+          ].contains(contatoNovo);
+    }))
+      return _erro(409,
+          'Já recebemos uma solicitação com estes dados. Fale com a secretaria.');
+    // Nunca cria membro, visita ou vínculo antes da aprovação.
+    final chave = novoTokenLgpd();
+    await store.salvar('solicitacoesMembros', {
+      'id': id,
+      'estado': 'pendente',
+      'dados': dados,
+      'familiares': familiares,
+      'consentimento': {
+        'em': _agora().toUtc().toIso8601String(),
+        'versaoTermo': _termo.versao,
+        ..._origem(req),
+        if (responsavel.isNotEmpty) 'responsavel': responsavel,
+      },
+      'chaveFotoHash': hashTokenLgpd(chave),
+      'criadoEm': _agora().toIso8601String(),
+    });
+    return _json({'ok': true, 'id': id, 'chaveFoto': chave}, status: 201);
+  }
+
+  Future<Response> _fotoCadastroPublico(Request req, String id) async {
+    final doc = store.buscar('solicitacoesMembros', id);
+    final chave = req.headers['x-chave-foto'] ?? '';
+    if (doc == null ||
+        doc['estado'] != 'pendente' ||
+        chave.isEmpty ||
+        !iguaisSeguro(
+            hashTokenLgpd(chave), doc['chaveFotoHash'] as String? ?? '')) {
+      return _erro(404, 'Solicitação não encontrada.');
+    }
+    if (!_limiteCadastros.permitir(_ip(req)))
+      return _erro(429, 'Aguarde alguns minutos.');
+    final bytes = await _lerBytes(req, FotosMembros.tamanhoMaximo);
+    if (bytes == null) return _erro(413, 'Foto maior que 15 MB.');
+    final anterior = doc['foto'] as String?;
+    final salva = await fotosMembros.salvar(bytes);
+    try {
+      await store
+          .salvar('solicitacoesMembros', {...doc, 'foto': salva.arquivo});
+    } catch (_) {
+      await _apagarFotoMembro(salva.arquivo);
+      rethrow;
+    }
+    if (anterior != null) await _apagarFotoMembro(anterior);
+    return _json({'ok': true});
+  }
+
+  Response _listarSolicitacoesMembros(Request _) => _json([
+        for (final doc in store.listar('solicitacoesMembros'))
+          {
+            for (final e in doc.entries)
+              if (e.key != 'chaveFotoHash') e.key: e.value,
+            if (doc['estado'] == 'pendente')
+              'possiveisMembros': [
+                for (final m in _listaMembros())
+                  if (_possivelDuplicado(
+                      m, Map<String, dynamic>.from(doc['dados'] as Map)))
+                    {'id': m.id, 'nome': m.nome, 'status': m.status.name},
+              ],
+          },
+      ]);
+
+  bool _possivelDuplicado(Membro membro, Map<String, dynamic> dados) {
+    if (_nomeComparavel(membro.nome) ==
+        _nomeComparavel(dados['nome'] as String)) return true;
+    final cpf = Membro.soDigitos(dados['cpf'] as String?);
+    if (cpf != null && membro.cpf == cpf) return true;
+    final telefone =
+        Membro.soDigitos((dados['telefone'] ?? dados['whatsapp']) as String?);
+    return telefone != null &&
+        telefone.length >= 10 &&
+        [membro.telefone, membro.whatsapp]
+            .any((v) => Membro.soDigitos(v) == telefone);
+  }
+
+  Response _fotoSolicitacaoMembro(Request _, String id) {
+    final doc = store.buscar('solicitacoesMembros', id);
+    final f = fotosMembros.arquivo(doc?['foto'] as String? ?? '');
+    return f == null ? _erro(404, 'Foto não encontrada.') : _arquivo(f);
+  }
+
+  Future<Response> _aprovarSolicitacaoMembro(Request req, String id) async {
+    if (!_aprovacoesEmCurso.add(id))
+      return _erro(409, 'Aprovação em andamento.');
+    try {
+      final doc = store.buscar('solicitacoesMembros', id);
+      if (doc == null) return _erro(404, 'Solicitação não encontrada.');
+      if (doc['estado'] != 'pendente' && doc['estado'] != 'processando')
+        return _erro(409, 'Solicitação já analisada.');
+      final corpo = await _corpo(req);
+      if (!{'membro', 'congregado'}.contains(corpo['status']))
+        return _erro(400, 'Escolha Membro ou Congregado.');
+      final alvoId =
+          corpo['membroId'] as String? ?? (doc['alvoId'] as String? ?? id);
+      if (doc['estado'] == 'processando' && alvoId != doc['alvoId'])
+        return _erro(409, 'Aprovação em andamento para outra ficha.');
+      final base = store.buscar('membros', alvoId);
+      if (corpo['membroId'] != null && base == null)
+        return _erro(400, 'Pessoa não encontrada.');
+      final enviados = Map<String, dynamic>.from(doc['dados'] as Map);
+      final revisados = corpo['dados'] is Map
+          ? Map<String, dynamic>.from(corpo['dados'] as Map)
+          : <String, dynamic>{};
+      if (revisados.keys.any((k) => !_camposCadastro.contains(k)))
+        return _erro(400, 'Campo não permitido na revisão.');
+      // No cadastro existente, só completa o que faltava; ajustes explícitos da secretaria prevalecem.
+      final alteracoes = <String, dynamic>{};
+      for (final e in enviados.entries) {
+        if (base == null || base[e.key] == null || base[e.key] == '')
+          alteracoes[e.key] = e.value;
+      }
+      alteracoes.addAll(revisados);
+      final conjuge = corpo['conjugeId'];
+      final pais = corpo['paisIds'] ?? const [];
+      final familia = corpo['familia'] ?? const [];
+      if (conjuge != null && conjuge is! String ||
+          pais is! List ||
+          pais.any((e) => e is! String)) {
+        return _erro(400, 'Vínculos inválidos.');
+      }
+      if (familia is! List || familia.length > 10)
+        return _erro(400, 'Vínculos inválidos.');
+      final filhos = <String>[];
+      final paisConfirmados = <String>[];
+      String? conjugeConfirmado;
+      for (final f in familia) {
+        if (f is! Map || f['membroId'] is! String || f['parentesco'] is! String)
+          return _erro(400, 'Vínculos inválidos.');
+        final familiarId = f['membroId'] as String;
+        if (familiarId == alvoId || store.buscar('membros', familiarId) == null)
+          return _erro(400, 'Familiar não encontrado.');
+        switch (f['parentesco']) {
+          case 'conjuge':
+            if (conjugeConfirmado != null)
+              return _erro(400, 'Escolha somente um cônjuge.');
+            conjugeConfirmado = familiarId;
+          case 'pai' || 'mae':
+            paisConfirmados.add(familiarId);
+          case 'filho':
+            filhos.add(familiarId);
+          case 'outro':
+            return _erro(400, 'O vínculo "outro" não é representado no cadastro. Deixe sem vínculo.');
+          default:
+            return _erro(400, 'Parentesco inválido.');
+        }
+      }
+      if (paisConfirmados.toSet().length > 2 ||
+          paisConfirmados.length != paisConfirmados.toSet().length ||
+          filhos.length != filhos.toSet().length)
+        return _erro(400, 'Vínculos repetidos ou em excesso.');
+      for (final filhoId in filhos) {
+        final atuais =
+            (store.buscar('membros', filhoId)!['paisIds'] as List? ?? const [])
+                .cast<String>();
+        if (!atuais.contains(alvoId) && atuais.length >= 2)
+          return _erro(400, 'O filho já tem dois pais vinculados.');
+      }
+      if (conjuge != null) alteracoes['conjugeId'] = conjuge;
+      if (pais.isNotEmpty) alteracoes['paisIds'] = pais;
+      if (conjugeConfirmado != null)
+        alteracoes['conjugeId'] = conjugeConfirmado;
+      if (paisConfirmados.isNotEmpty) alteracoes['paisIds'] = paisConfirmados;
+      alteracoes['status'] = corpo['status'];
+      final consentimento =
+          Map<String, dynamic>.from(doc['consentimento'] as Map);
+      if (base?['consentimentoEm'] == null) {
+        alteracoes['consentimentoEm'] =
+            (consentimento['em'] as String).substring(0, 10);
+      }
+      final membro = _montarMembro(
+          alteracoes..remove('consentimentoEm'), base ?? {}, alvoId,
+          por: Auth.contaDa(req)?.nome);
+      final atualizado = membro.toJson();
+      if (base?['consentimentoEm'] == null) {
+        atualizado['consentimentoEm'] =
+            (consentimento['em'] as String).substring(0, 10);
+        atualizado['consentimentoVia'] = ViaConsentimento.autocadastro;
+        atualizado['consentimentoRegistro'] = consentimento;
+      }
+      if (doc['foto'] != null && (base == null || base['foto'] == null))
+        atualizado['foto'] = doc['foto'];
+      if (doc['estado'] == 'pendente') {
+        await store.salvar('solicitacoesMembros',
+            {...doc, 'estado': 'processando', 'alvoId': alvoId});
+      }
+      await store.salvar('membros', atualizado);
+      await _sincronizarConjuge(base == null ? null : Membro.fromJson(base),
+          Membro.fromJson(atualizado));
+      for (final filhoId in filhos) {
+        final filho = store.buscar('membros', filhoId)!;
+        final atuais = (filho['paisIds'] as List? ?? const []).cast<String>();
+        if (!atuais.contains(alvoId)) {
+          await store.salvar('membros', {
+            ...filho,
+            'paisIds': [...atuais, alvoId]
+          });
+        }
+      }
+      await store.salvar(
+          'solicitacoesMembros',
+          {
+            ...doc,
+            'estado': 'aprovada',
+            'alvoId': alvoId,
+            'aprovadaEm': _agora().toIso8601String(),
+            'analisadaPor': Auth.contaDa(req)?.nome,
+          }..remove('chaveFotoHash'));
+      return _json(_membroParaPainel(atualizado));
+    } on FormatException catch (e) {
+      return _erro(400, e.message);
+    } finally {
+      _aprovacoesEmCurso.remove(id);
+    }
+  }
+
+  Future<Response> _rejeitarSolicitacaoMembro(Request req, String id) async {
+    if (_aprovacoesEmCurso.contains(id)) return _erro(409, 'Aprovação em andamento.');
+    final doc = store.buscar('solicitacoesMembros', id);
+    if (doc == null) return _erro(404, 'Solicitação não encontrada.');
+    if (doc['estado'] != 'pendente')
+      return _erro(409, 'Solicitação já analisada.');
+    final motivo = ((await _corpo(req))['motivo'] as String? ?? '').trim();
+    if (motivo.length > 300) return _erro(400, 'Motivo muito longo.');
+    await store.salvar(
+        'solicitacoesMembros',
+        {
+          ...doc,
+          'estado': 'rejeitada',
+          'motivo': motivo,
+          'analisadaPor': Auth.contaDa(req)?.nome,
+          'analisadaEm': _agora().toIso8601String(),
+        }..remove('chaveFotoHash'));
+    return _json({'ok': true});
+  }
+
+  Future<Response> _excluirSolicitacaoMembro(Request _, String id) async {
+    if (_aprovacoesEmCurso.contains(id)) return _erro(409, 'Aprovação em andamento.');
+    final doc = store.buscar('solicitacoesMembros', id);
+    if (doc == null) return _erro(404, 'Solicitação não encontrada.');
+    if (doc['estado'] == 'pendente' || doc['estado'] == 'processando')
+      return _erro(409, 'Analise a solicitação antes de excluir.');
+    await store.excluir('solicitacoesMembros', id);
+    if (doc['foto'] is String &&
+        (doc['estado'] == 'rejeitada' ||
+            store.buscar('membros', doc['alvoId'] as String? ?? '')?['foto'] !=
+                doc['foto'])) {
+      await _apagarFotoMembro(doc['foto'] as String);
+    }
+    return _json({'ok': true});
+  }
+
 
   /// O que o painel recebe: sem o hash do link de autorização, só até quando ele vale.
   Map<String, dynamic> _membroParaPainel(Map<String, dynamic> doc) {

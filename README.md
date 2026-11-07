@@ -22,6 +22,7 @@ Plataforma da Igreja Diakonia Tulipas. Junta num só lugar o **site da igreja**,
 - **Pedidos de oração (`/oracao`):** quem pede escolhe se o pedido pode ir para o telão. Pedidos particulares nunca são projetados nem aparecem no mural.
 - **Caixa de mensagens (`/mensagens`):** dúvidas, sugestões e críticas, anônimas ou com contato. A equipe recebe aviso por e-mail (sem o conteúdo).
 - **Cadastro de visitante (`/visitante`):** o visitante se cadastra pelo QR da recepção e já autoriza o uso dos dados (LGPD).
+- **Cadastro de membros (`/cadastro`):** link público compartilhável para a pessoa preencher sua ficha; a secretaria revisa, aprova e confirma a família no painel.
 - **Minha escala (`/minha-escala`):** cada integrante entra com usuário e senha e vê só os próprios cultos, com as músicas, o tom e o link do YouTube; também avisa indisponibilidades.
 
 ### Painel da equipe (`/painel`)
@@ -33,7 +34,7 @@ Menu organizado por área; cada pessoa vê só o que o seu perfil permite.
 | Acompanhamento | Motivos de oração (aprovação, testemunhos), Mensagens (*Nova*, *Em análise*, *Resolvida*), Membros (cadastro completo, família, visitantes, acompanhamento, LGPD) |
 | Cultos | Escalas pastoral e do louvor, Repertório, Roteiros do Modo Culto, Palavras (sermões) |
 | Comunicação | Agenda (Google), Recados, Cartazes, Galeria do site, Resumo da semana para o WhatsApp |
-| Operação | Histórico do que foi projetado, Status (Holyrics, agente, QR codes), Acessos às escalas, Administração |
+| Operação | Gestão da Casa, Histórico do que foi projetado, Status (Holyrics, agente, QR codes), Acessos às escalas, Administração |
 
 ### Tablet do pastor (app Android)
 Opera o telão durante o culto: recados, cartazes, motivos de oração, boas-vindas aos visitantes, agenda, escala do dia, **Modo Culto** com o roteiro passo a passo e a leitura da **Palavra** com versículos e frases de destaque. Funciona com a última cópia salva se a internet cair. Detalhes em [Funções do app](#funções-do-app).
@@ -44,8 +45,15 @@ Opera o telão durante o culto: recados, cartazes, motivos de oração, boas-vin
 
 ### Pessoas e LGPD
 - **Membros:** ficha em abas (*Pessoal*, *Contato*, *Igreja*, *Família*), foto, CEP com preenchimento automático, ministérios, importação e exportação em CSV e impressão.
+- **Solicitações de cadastro:** envio público com dados, foto opcional e familiares por nome; só após a aprovação da secretaria entra no cadastro. A secretaria escolhe Congregado ou Membro, pode aproveitar a ficha existente e rejeitar solicitações; pedidos rejeitados são guardados até exclusão manual.
 - **Visitantes:** ficam na mesma lista de pessoas, com a situação *Visitante*. Não entram em aniversariantes, escalas nem na contagem de ativos até virarem *Congregado* ou *Membro*. Três formas de cadastrar (QR da recepção, obreiro pelo celular em `/recepcao`, secretaria pelo painel), quem veio junto, interesses e acompanhamento com mensagem pronta de WhatsApp.
 - **LGPD:** autorização com prova (link individual, termo assinado anexado ou QR), revogação e termo versionado. Aniversariantes só aparecem para quem autorizou.
+
+### Gestão da Casa
+- **Pendências:** tarefas por local, prioridade, prazo e responsável; andamento, conclusão, histórico, fotos e comprovantes privados.
+- **Compras planejadas:** quantidade e valor previsto, sem controle de estoque nem aprovação de compras.
+- **Manutenção preventiva:** rotinas com periodicidade em dias, semanas, meses ou anos. A próxima tarefa é criada ao concluir a atual; cada rotina escolhe se conserva a data programada ou conta da execução. É possível pausar e retomar.
+- **Acesso:** perfil próprio *Gestão da Casa* (também disponível para administração, pastor e secretaria). Equipe do painel e pessoas externas podem ser indicadas como responsáveis, mas isso não cria acesso para terceiros. Prazos vencidos aparecem no menu.
 
 ### Escalas, repertório e PDF
 - **Escalas pastoral e do louvor:** cultos do mês gerados pelos horários cadastrados, sugestão de pessoas por ministério, avisos de conflito e de indisponibilidade, texto pronto para o WhatsApp.
@@ -82,7 +90,7 @@ A tabela completa fica em `/ajuda/usuarios`, no próprio site.
 | Endereço | Para quem |
 |---|---|
 | `/` | Página inicial pública da igreja |
-| `/oracao`, `/mensagens`, `/visitante` | Formulários públicos (também abertos pelos QR codes) |
+| `/oracao`, `/mensagens`, `/visitante`, `/cadastro` | Formulários públicos; o link de cadastro de membros pode ser compartilhado |
 | `/minha-escala` | Integrantes das escalas (com login) |
 | `/painel` | Equipe (com login) |
 | `/admin` | Administração (com login) |

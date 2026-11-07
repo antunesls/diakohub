@@ -23,8 +23,8 @@ class Store {
   // Serializa as operações inteiras (ler o estado, gravar, publicar), na ordem pedida.
   Future<void> _fila = Future.value();
 
-  static const colecoes = ['recados', 'motivos', 'membros', 'mensagens', 'galeria', 'visitas', 'escalas',
-    'indisponibilidades', 'linksEscala', 'repertorio', 'palavras', 'roteiros', 'escolhasPalavra'];
+  static const colecoes = ['recados', 'motivos', 'membros', 'solicitacoesMembros', 'mensagens', 'galeria', 'visitas', 'escalas',
+    'indisponibilidades', 'linksEscala', 'repertorio', 'palavras', 'roteiros', 'escolhasPalavra', 'gestaoCasa'];
 
   Stream<String> get mudancas => _mudancas.stream;
   Map<String, int> get versoes => Map.unmodifiable(_versoes);
