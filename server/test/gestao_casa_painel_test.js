@@ -16,6 +16,15 @@ test('Gestão da Casa tem página no painel, menu protegido e interface de taref
   assert.match(script, /function carregarCasa/);
 });
 
+test('script da Casa é carregado antes de painel.js, que referencia carregarCasa ao iniciar', () => {
+  const html = fs.readFileSync(path.join(__dirname, '../web/painel.html'), 'utf8');
+  const scripts = [...html.matchAll(/<script src="\/([^"?]+)\?v=\d+"><\/script>/g)].map((m) => m[1]);
+  const casa = scripts.indexOf('gestao-casa.js');
+  const painel = scripts.indexOf('painel.js');
+  assert.ok(casa >= 0 && painel >= 0 && casa < painel,
+    'gestao-casa.js precisa definir carregarCasa antes da avaliação de painel.js');
+});
+
 test('painel e menu mostram atrasadas e próximas, e diálogo da Casa permite formulário rolável', () => {
   const html = fs.readFileSync(path.join(__dirname, '../web/painel.html'), 'utf8');
   const script = fs.readFileSync(path.join(__dirname, '../web/gestao-casa.js'), 'utf8');
