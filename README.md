@@ -82,6 +82,7 @@ Opera o telão durante o culto: recados, cartazes, motivos de oração, boas-vin
 | Ministro | Escolhe as músicas dos cultos em que ministra. |
 | Pregador | Prepara as próprias Palavras no painel. |
 | Louvor / Integrante | Consulta a própria escala e avisa indisponibilidades. |
+| DiakoPlayer | Conta do PC do som: o [DiakoPlayer](https://github.com/antunesls/DiakoPlayer) lê as escalas e o repertório para montar a fila do louvor. Não entra no painel. O endereço do controle vai em `/admin › DiakoPlayer` e faz aparecer o botão "Abrir no DiakoPlayer" nas músicas da escala. |
 
 A tabela completa fica em `/ajuda/usuarios`, no próprio site.
 

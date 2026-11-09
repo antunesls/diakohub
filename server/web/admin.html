@@ -98,6 +98,7 @@
       <a href="#mural">Mural</a>
       <a href="#lgpd">LGPD</a>
       <a href="#holyrics">Holyrics</a>
+      <a href="#diakoplayer">DiakoPlayer</a>
       <a href="#agenda">Agenda (Google)</a>
       <a href="#email">Avisos por e-mail</a>
       <a href="#projecao">Projeção</a>
@@ -267,6 +268,18 @@
           <div class="aviso">Gerar uma nova chave desconecta o agente na hora. Depois, atualize o <code>agente.json</code> no PC da igreja e reinicie o agente.</div>
           <div class="acoes"><button class="botao secundario" type="button" id="nova-chave-agente">Gerar nova chave</button><button class="botao secundario" type="button" id="testar-holyrics-agente">Testar conexão</button><span id="res-agente" role="status"></span></div>
         </div>
+      </section>
+
+      <section class="cartao" id="diakoplayer">
+        <h2>DiakoPlayer</h2>
+        <p class="dica">O DiakoPlayer (PC do som) lê a escala e o repertório para montar a fila do louvor. Crie em <a href="#usuarios">Usuários e perfis</a> um usuário com o perfil <strong>DiakoPlayer</strong> e informe-o no menu <em>DiakoPlayer › Integração DiakoHub</em> do PC.</p>
+        <form id="form-diakoplayer">
+          <div class="campo">
+            <label for="diakoPlayerUrl">Endereço do controle <span class="dica">(opcional: mostra "Abrir no DiakoPlayer" nas músicas da escala)</span></label>
+            <input type="url" id="diakoPlayerUrl" maxlength="200" placeholder="http://192.168.0.20:26538">
+          </div>
+          <div class="acoes"><button class="botao">Salvar</button><span id="res-diakoplayer" role="status"></span></div>
+        </form>
       </section>
 
       <section class="cartao" id="agenda">
@@ -497,6 +510,6 @@
 
 <script src="/comum.js?v=5"></script>
 <script src="/arte-qr.js?v=1"></script>
-<script src="/admin.js?v=12"></script>
+<script src="/admin.js?v=13"></script>
 </body>
 </html>

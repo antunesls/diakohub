@@ -34,6 +34,11 @@ void main() {
     expect(Perfil.ministro.pode(Permissao.escalaLouvor), isFalse);
     expect(Perfil.telao.pode(Permissao.escalasVer), isTrue);
     expect(Perfil.telao.pode(Permissao.escalaLouvor), isFalse);
+    // DiakoPlayer: só lê escalas e repertório; não edita, não projeta, não entra no painel.
+    expect(Perfil.porNome('player'), Perfil.player);
+    expect(Perfil.player.permissoes, {Permissao.sessao, Permissao.escalasVer});
+    expect(permissaoDaRota('GET', 'api/escalas/hoje'), Permissao.escalasVer);
+    expect(permissaoDaRota('GET', 'api/repertorio'), Permissao.escalasVer);
     expect(Perfil.secretaria.pode(Permissao.escalaLouvor), isFalse);
     expect(Perfil.secretaria.pode(Permissao.escalaPastoral), isFalse);
     expect(Perfil.secretaria.pode(Permissao.acessosEscala), isTrue);

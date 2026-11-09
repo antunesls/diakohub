@@ -26,7 +26,7 @@ test('painel oferece os dois PDFs e não abre mais a tela de impressão', () => 
   assert.match(html, /Baixar PDF/);
   assert.match(html, /Como deseja gerar o PDF da escala\?/);
   assert.ok(html.indexOf('/escala-impressao.js?v=3') !== -1);
-  assert.ok(html.indexOf('/escala-impressao.js?v=3') < html.indexOf('/escalas.js?v=9'));
+  assert.ok(html.indexOf('/escala-impressao.js?v=3') < html.indexOf('/escalas.js?v=10'));
   assert.doesNotMatch(js, /window\.print/);
   assert.match(js, /baixarArquivo\(/);
   assert.match(js, /\/api\/escalas\/pdf\?mes=/);

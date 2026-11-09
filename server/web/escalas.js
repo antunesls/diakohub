@@ -306,6 +306,10 @@ async function abrirMusicas(c, editavel) {
   numerarMusicas();
   $('musicas-adicionar').hidden = !editavel;
   $('musicas-salvar').hidden = !editavel;
+  // Abre o controle do DiakoPlayer já na aba Culto deste culto (lá alguém carrega a fila e dá o play).
+  const player = escala.dados?.diakoPlayerUrl;
+  $('musicas-player').hidden = !player || !musicas.length;
+  if (player) $('musicas-player').href = `${player}/#culto=${encodeURIComponent(c.id)}`;
   abrirDialogo($('dlg-musicas'), $('erro-musicas'), async () => {
     const lista = [...$('musicas-lista').querySelectorAll('.musica')]
       .map((l) => {

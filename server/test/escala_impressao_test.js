@@ -21,6 +21,6 @@ test('painel carrega o filtro antes do script que gera o PDF', () => {
   const html = fs.readFileSync(path.join(__dirname, '../web/painel.html'), 'utf8');
   const script = fs.readFileSync(path.join(__dirname, '../web/escalas.js'), 'utf8');
   assert.ok(html.indexOf('/escala-impressao.js?v=3') !== -1);
-  assert.ok(html.indexOf('/escala-impressao.js?v=3') < html.indexOf('/escalas.js?v=9'));
+  assert.ok(html.indexOf('/escala-impressao.js?v=3') < html.indexOf('/escalas.js?v=10'));
   assert.match(script, /cultosParaImpressao\(d\.cultos, escala\.tipo\)/);
 });

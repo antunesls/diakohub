@@ -82,6 +82,7 @@ class Configuracoes {
       'sitePixCidade': '',
       'siteInstagram': '',
       'siteYoutube': '',
+      'diakoPlayerUrl': '',
       'siteWhatsapp': '',
       'termoLgpdTexto': '', // vazio: termo padrão (termoLgpdPadrao)
       'termoLgpdVersao': 1,
@@ -234,6 +235,9 @@ class Configuracoes {
   String get siteInstagram => _s('siteInstagram');
   String get siteYoutube => _s('siteYoutube');
 
+  /// Endereço do controle do DiakoPlayer (ex.: http://192.168.0.20:26538); vazio esconde o botão na escala.
+  String get diakoPlayerUrl => _s('diakoPlayerUrl');
+
   /// Só os dígitos (com DDI ou não).
   String get siteWhatsapp => _s('siteWhatsapp');
 
@@ -348,6 +352,13 @@ class Configuracoes {
             throw FormatException('Use o link completo, começando com https://, em "$k".');
           }
           novos[k] = v;
+        case 'diakoPlayerUrl':
+          // O DiakoPlayer roda na rede local, sem HTTPS: aceita http:// e tira a barra do fim.
+          final v = texto(k, 200).replaceFirst(RegExp(r'/+$'), '');
+          if (v.isNotEmpty && !RegExp(r'^https?://[^\s/?#]+$').hasMatch(v)) {
+            throw const FormatException('Endereço do DiakoPlayer inválido. Use, por exemplo, http://192.168.0.20:26538');
+          }
+          novos[k] = v;
         case 'siteWhatsapp':
           final v = texto(k, 30).replaceAll(RegExp(r'\D'), '');
           if (v.isNotEmpty && (v.length < 10 || v.length > 15)) {
@@ -423,7 +434,7 @@ class Configuracoes {
       'temaPadrao', 'horaBackup', 'backupsManter', 'agendaMostrarDescricao', 'agendaDiasMural', 'agendaCalendarioId',
       'smtpHost', 'smtpPorta', 'smtpSsl', 'smtpUsuario', 'smtpRemetente', 'smtpDestinatario',
       'siteAtivo', 'siteAgenda', 'sitePix', 'siteGaleria', 'siteCultos', 'siteEndereco', 'sitePixChave', 'sitePixNome', 'sitePixCidade',
-      'siteInstagram', 'siteYoutube', 'siteWhatsapp', 'termoLgpdTexto', 'termoLgpdVersao', 'visitanteQrAtivo', 'muralBoasVindas',
+      'siteInstagram', 'siteYoutube', 'siteWhatsapp', 'diakoPlayerUrl', 'termoLgpdTexto', 'termoLgpdVersao', 'visitanteQrAtivo', 'muralBoasVindas',
       'textoMotivos', 'muralFundoCor', 'muralFundoImagem', 'muralFundoEscurecer',
       'boasVindasFundoCor', 'boasVindasFundoImagem', 'boasVindasFundoEscurecer',
       for (final qr in qrsComArte)

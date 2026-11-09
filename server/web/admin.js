@@ -75,7 +75,7 @@ async function carregar() {
 function preencher() {
   for (const id of ['nomeIgreja', 'urlPublica', 'pedidoTitulo', 'pedidoIntro', 'pedidoObrigado', 'holyricsHost',
     'holyricsPorta', 'motivosPorSlide', 'segundosPorSlide', 'diasRespondidas', 'temaPadrao', 'horaBackup', 'backupsManter',
-    'siteCultos', 'siteEndereco', 'sitePixChave', 'sitePixNome', 'sitePixCidade', 'siteInstagram', 'siteYoutube', 'siteWhatsapp']) {
+    'siteCultos', 'siteEndereco', 'sitePixChave', 'sitePixNome', 'sitePixCidade', 'siteInstagram', 'siteYoutube', 'siteWhatsapp', 'diakoPlayerUrl']) {
     if ($(id) && document.activeElement !== $(id)) $(id).value = cfg[id] ?? '';
   }
   $('siteAtivo').checked = cfg.siteAtivo !== false;
@@ -313,6 +313,11 @@ $('buscar-temas-holyrics').addEventListener('click', async () => {
   } catch (err) {
     estado.textContent = err.message + ' O tema digitado foi preservado.';
   }
+});
+
+$('form-diakoplayer').addEventListener('submit', (e) => {
+  e.preventDefault();
+  salvar({ diakoPlayerUrl: valor('diakoPlayerUrl') }, $('res-diakoplayer'));
 });
 
 $('form-holyrics').addEventListener('submit', (e) => {

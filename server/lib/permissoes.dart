@@ -83,6 +83,10 @@ enum Perfil {
   }),
   integrante('Integrante', 'Consulta a própria escala e avisa indisponibilidades.', {
     Permissao.sessao, Permissao.minhaEscala,
+  }),
+  // Conta de máquina: o DiakoPlayer (PC do som) lê o culto e o repertório para montar a fila do louvor.
+  player('DiakoPlayer', 'Conta do PC do som: o DiakoPlayer lê as escalas e o repertório para montar a fila do louvor. Não entra no painel.', {
+    Permissao.sessao, Permissao.escalasVer,
   });
 
   const Perfil(this.nome, this.descricao, this.permissoes);

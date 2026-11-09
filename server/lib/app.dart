@@ -2822,6 +2822,8 @@ class Servidor {
       'mes': prefixo,
       'titulo': '${nomesMeses[mes.mes - 1]} de ${mes.ano}',
       'horariosConfigurados': horariosDosCultos(cfg?.siteCultos ?? '').isNotEmpty,
+      // Controle do DiakoPlayer: o painel mostra "Abrir no DiakoPlayer" nas músicas do louvor.
+      if ((cfg?.diakoPlayerUrl ?? '').isNotEmpty) 'diakoPlayerUrl': cfg!.diakoPlayerUrl,
       'cultos': [for (final c in cultos) _cultoParaTela(c, membros, ind)],
       'avisos': {
         for (final t in TipoEscala.values)
