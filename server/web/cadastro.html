@@ -24,24 +24,26 @@
     font-family: var(--fonte-titulo); font-size: 20px; font-weight: 600; }
   .cadastro legend + * { clear: both; }
   .cadastro fieldset > p { margin: 0 0 14px; font-size: 14px; color: var(--suave); }
-  .cadastro .campos { clear: both; display: grid; gap: 14px; grid-template-columns: repeat(auto-fit, minmax(min(220px, 100%), 1fr)); }
-  .cadastro .campos > * { min-width: 0; }
+  /* Grade de 6 colunas: cada campo diz quanto ocupa (c2/c3/c4/c6) no computador
+     e (m2/m3/m4) no celular; sem classe "m", ocupa a linha inteira no celular. */
+  .cadastro .campos { clear: both; display: grid; gap: 14px; grid-template-columns: repeat(6, minmax(0, 1fr)); }
+  .cadastro .campos > * { min-width: 0; grid-column: span 6; }
+  .cadastro .campos > .c2 { grid-column: span 2; }
+  .cadastro .campos > .c3 { grid-column: span 3; }
+  .cadastro .campos > .c4 { grid-column: span 4; }
   .cadastro label { margin: 0; font-size: 15px; }
-  .cadastro input, .cadastro select { display: block; width: 100%; min-width: 0; max-width: 100%; margin-top: 6px; font-size: 16px; font-weight: 400; min-height: 48px; }
+  .cadastro input:not([type=checkbox]), .cadastro select { display: block; width: 100%; min-width: 0; max-width: 100%; margin-top: 6px; font-size: 16px; font-weight: 400; min-height: 48px; }
   /* iOS desenha o input de data com largura própria e alinhamento central */
   .cadastro input[type=date] { -webkit-appearance: none; appearance: none; text-align: left; }
   .cadastro input[type=date]::-webkit-date-and-time-value { text-align: left; }
   .cadastro input[type=file] { padding: 10px; border: 1px dashed var(--borda); border-radius: 12px; background: var(--campo); font-size: 14px; }
-  .cadastro .largo { grid-column: 1 / -1; }
-  .cadastro .cep-linha { display: flex; gap: 8px; align-items: stretch; margin-top: 6px; }
+  .cadastro .cep-linha { display: flex; gap: 8px; align-items: stretch; margin-top: 6px; max-width: 360px; }
   .cadastro .cep-linha input { margin-top: 0; flex: 1; }
   .cadastro .cep-linha .botao { min-height: 48px; flex-shrink: 0; }
   .cadastro .aviso-cep { margin: 6px 0 0; font-size: 14px; color: var(--suave); min-height: 0; }
   .cadastro .aviso-cep:empty { display: none; }
   .cadastro .aviso-cep.erro { color: var(--perigo); }
   .cadastro .aviso-cep.ok { color: var(--ok); }
-  .cadastro .dupla { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
-  .cadastro .dupla.estreita { grid-template-columns: 2fr 1fr; }
 
   .cadastro .familia { display: grid; grid-template-columns: 1fr 150px auto; gap: 10px; align-items: end;
     padding: 12px; margin-bottom: 10px; border: 1px solid var(--linha); border-radius: 12px; background: var(--campo); }
@@ -50,8 +52,12 @@
 
   .cadastro #termo { max-height: 220px; overflow: auto; -webkit-overflow-scrolling: touch; white-space: pre-wrap;
     padding: 12px; margin-bottom: 14px; font-size: 14px; border: 1px solid var(--linha); border-radius: 12px; background: var(--campo); }
-  .cadastro .aceite { margin-top: 16px; padding: 12px; border-radius: 12px; background: var(--primaria-suave); font-weight: 600; }
-  .cadastro .aceite input { min-height: 0; margin: 2px 0 0; }
+  .cadastro #responsavel { margin-bottom: 4px; }
+  .cadastro .aceite { display: flex; gap: 12px; align-items: flex-start; margin-top: 16px; padding: 14px;
+    border-radius: 12px; background: var(--primaria-suave); font-weight: 600; cursor: pointer; }
+  .cadastro .aceite input { flex: 0 0 22px; width: 22px; height: 22px; margin: 1px 0 0; accent-color: var(--primaria); }
+  .cadastro .aceite span { flex: 1; min-width: 0; }
+  .publico #enviar { margin-top: 4px; }
 
   .cadastro #resultado:not(:empty) { padding: 12px; border-radius: 12px; background: #fbeeed; color: var(--perigo); font-weight: 500; }
   .cadastro #obrigado { padding: 32px 8px; }
@@ -61,9 +67,10 @@
     .cadastro fieldset { padding: 16px 14px 18px; margin-bottom: 12px; }
     .cadastro .familia { grid-template-columns: 1fr 1fr; }
     .cadastro .familia label { grid-column: 1 / -1; }
-  }
-  @media (max-width: 360px) {
-    .cadastro .dupla, .cadastro .dupla.estreita { grid-template-columns: 1fr; }
+    .cadastro .campos > .c2, .cadastro .campos > .c3, .cadastro .campos > .c4 { grid-column: span 6; }
+    .cadastro .campos > .m2 { grid-column: span 2; }
+    .cadastro .campos > .m3 { grid-column: span 3; }
+    .cadastro .campos > .m4 { grid-column: span 4; }
   }
 </style>
 </head>
@@ -74,23 +81,21 @@
     <p class="obrigatorios">Campos com * são obrigatórios. Leva uns 5 minutos.</p></header>
   <form id="ficha" novalidate>
     <fieldset><legend>Dados pessoais</legend><div class="campos">
-      <label class="largo">Nome completo *<input id="nome" name="nome" required maxlength="100" autocomplete="name" autocapitalize="words"></label>
-      <label>Data de nascimento *<input id="aniversario" name="aniversario" type="date" required autocomplete="bday"></label>
-      <label>Sexo<select id="sexo" name="sexo"><option value="">Não informado</option><option value="F">Feminino</option><option value="M">Masculino</option></select></label>
-      <label>Estado civil<select id="estadoCivil" name="estadoCivil"><option value="">Não informado</option><option>Solteiro(a)</option><option>Casado(a)</option><option>União estável</option><option>Divorciado(a)</option><option>Viúvo(a)</option></select></label>
-      <div class="dupla">
-        <label>CPF<input id="cpf" name="cpf" inputmode="numeric" maxlength="14" placeholder="000.000.000-00"></label>
-        <label>RG<input id="rg" name="rg" maxlength="20" pattern="[0-9A-Za-z.\-/ ]*[0-9][0-9A-Za-z.\-/ ]*"></label>
-      </div>
-      <label class="largo">Foto (opcional, JPG ou PNG; até 15 MB)<input id="foto" type="file" accept="image/jpeg,image/png"></label>
+      <label>Nome completo *<input id="nome" name="nome" required maxlength="100" autocomplete="name" autocapitalize="words"></label>
+      <label class="c3">Data de nascimento *<input id="aniversario" name="aniversario" type="date" required autocomplete="bday"></label>
+      <label class="c3">Sexo<select id="sexo" name="sexo"><option value="">Não informado</option><option value="F">Feminino</option><option value="M">Masculino</option></select></label>
+      <label class="c2">Estado civil<select id="estadoCivil" name="estadoCivil"><option value="">Não informado</option><option>Solteiro(a)</option><option>Casado(a)</option><option>União estável</option><option>Divorciado(a)</option><option>Viúvo(a)</option></select></label>
+      <label class="c2 m3">CPF<input id="cpf" name="cpf" inputmode="numeric" maxlength="14" placeholder="000.000.000-00"></label>
+      <label class="c2 m3">RG<input id="rg" name="rg" maxlength="20" pattern="[0-9A-Za-z.\-/ ]*[0-9][0-9A-Za-z.\-/ ]*"></label>
+      <label>Foto (opcional, JPG ou PNG; até 15 MB)<input id="foto" type="file" accept="image/jpeg,image/png"></label>
     </div></fieldset>
     <fieldset><legend>Contato</legend><p>Informe pelo menos um: telefone, WhatsApp ou e-mail.</p><div class="campos">
-      <label>WhatsApp<input id="whatsapp" name="whatsapp" type="tel" inputmode="tel" maxlength="20" autocomplete="tel" placeholder="(00) 00000-0000"></label>
-      <label>Outro telefone<input id="telefone" name="telefone" type="tel" inputmode="tel" maxlength="20"></label>
-      <label class="largo">E-mail<input id="email" name="email" type="email" inputmode="email" maxlength="120" autocomplete="email" autocapitalize="off"></label>
+      <label class="c3">WhatsApp<input id="whatsapp" name="whatsapp" type="tel" inputmode="tel" maxlength="20" autocomplete="tel" placeholder="(00) 00000-0000"></label>
+      <label class="c3">Outro telefone<input id="telefone" name="telefone" type="tel" inputmode="tel" maxlength="20"></label>
+      <label>E-mail<input id="email" name="email" type="email" inputmode="email" maxlength="120" autocomplete="email" autocapitalize="off"></label>
     </div></fieldset>
     <fieldset><legend>Endereço</legend><p>Digite o CEP que a gente preenche o resto. Não sabe o CEP? Preencha à mão.</p><div class="campos">
-      <div class="largo">
+      <div>
         <label for="cep">CEP</label>
         <div class="cep-linha">
           <input id="cep" name="cep" inputmode="numeric" maxlength="9" autocomplete="postal-code" placeholder="00000-000" pattern="\d{5}-?\d{3}">
@@ -98,42 +103,38 @@
         </div>
         <p id="cep-aviso" class="aviso-cep" role="status"></p>
       </div>
-      <label class="largo">Rua<input id="rua" name="rua" maxlength="120" autocomplete="address-line1"></label>
-      <div class="dupla">
-        <label>Número<input id="numero" name="numero" maxlength="10" placeholder="Ou S/N" pattern="[0-9A-Za-z /\-]+"></label>
-        <label>Complemento<input id="complemento" name="complemento" maxlength="60" autocomplete="address-line2" placeholder="Apto, bloco"></label>
-      </div>
-      <label>Bairro<input id="bairro" name="bairro" maxlength="80"></label>
-      <div class="dupla estreita">
-        <label>Cidade<input id="cidade" name="cidade" maxlength="80" autocomplete="address-level2"></label>
-        <label>UF<select id="estado" name="estado" autocomplete="address-level1"><option value="">—</option>
+      <label class="c4">Rua<input id="rua" name="rua" maxlength="120" autocomplete="address-line1"></label>
+      <label class="c2 m2">Número<input id="numero" name="numero" maxlength="10" placeholder="Ou S/N" pattern="[0-9A-Za-z /\-]+"></label>
+      <label class="c2 m4">Complemento<input id="complemento" name="complemento" maxlength="60" autocomplete="address-line2" placeholder="Apto, bloco"></label>
+      <label class="c4">Bairro<input id="bairro" name="bairro" maxlength="80"></label>
+      <label class="c4 m4">Cidade<input id="cidade" name="cidade" maxlength="80" autocomplete="address-level2"></label>
+      <label class="c2 m2">UF<select id="estado" name="estado" autocomplete="address-level1"><option value="">—</option>
           <option>AC</option><option>AL</option><option>AP</option><option>AM</option><option>BA</option><option>CE</option>
           <option>DF</option><option>ES</option><option>GO</option><option>MA</option><option>MT</option><option>MS</option>
           <option>MG</option><option>PA</option><option>PB</option><option>PR</option><option>PE</option><option>PI</option>
           <option>RJ</option><option>RN</option><option>RS</option><option>RO</option><option>RR</option><option>SC</option>
           <option>SP</option><option>SE</option><option>TO</option></select></label>
-      </div>
     </div></fieldset>
     <fieldset><legend>Vida na igreja</legend><p>Deixe em branco o que não souber.</p><div class="campos">
-      <label>Data de chegada<input id="dataChegada" name="dataChegada" type="date"></label>
-      <label>Data de batismo<input id="dataBatismo" name="dataBatismo" type="date"></label>
-      <label>Data de membresia<input id="dataMembresia" name="dataMembresia" type="date"></label>
-      <label>Função<input id="funcao" name="funcao" maxlength="60"></label>
-      <label class="largo">Ministérios (separe por vírgula)<input id="ministerios" name="ministerios" maxlength="250"></label>
-      <label class="largo">Como conheceu a igreja?<input id="comoConheceu" name="comoConheceu" maxlength="200"></label>
+      <label class="c2">Data de chegada<input id="dataChegada" name="dataChegada" type="date"></label>
+      <label class="c2">Data de batismo<input id="dataBatismo" name="dataBatismo" type="date"></label>
+      <label class="c2">Data de membresia<input id="dataMembresia" name="dataMembresia" type="date"></label>
+      <label class="c2">Função<input id="funcao" name="funcao" maxlength="60"></label>
+      <label class="c4">Ministérios (separe por vírgula)<input id="ministerios" name="ministerios" maxlength="250"></label>
+      <label>Como conheceu a igreja?<input id="comoConheceu" name="comoConheceu" maxlength="200"></label>
     </div></fieldset>
     <fieldset><legend>Família</legend><p>Informe nomes e parentesco. A secretaria fará os vínculos depois.</p>
       <div id="familiares"></div><button type="button" class="botao secundario" id="adicionar-familiar">+ Adicionar familiar</button>
     </fieldset>
     <fieldset><legend>Contato de emergência</legend><div class="campos">
-      <label class="largo">Nome<input id="emergenciaNome" name="emergenciaNome" maxlength="100" autocapitalize="words"></label>
-      <label>Telefone<input id="emergenciaTelefone" name="emergenciaTelefone" type="tel" inputmode="tel" maxlength="20"></label>
-      <label>Vínculo<input id="emergenciaVinculo" name="emergenciaVinculo" maxlength="40" placeholder="Ex.: mãe, irmão"></label>
+      <label>Nome<input id="emergenciaNome" name="emergenciaNome" maxlength="100" autocapitalize="words"></label>
+      <label class="c3">Telefone<input id="emergenciaTelefone" name="emergenciaTelefone" type="tel" inputmode="tel" maxlength="20"></label>
+      <label class="c3">Vínculo<input id="emergenciaVinculo" name="emergenciaVinculo" maxlength="40" placeholder="Ex.: mãe, irmão"></label>
     </div></fieldset>
     <fieldset><legend>Autorização de uso dos dados</legend>
       <div id="termo" tabindex="0" aria-label="Termo LGPD">Carregando o termo…</div>
       <label>Responsável legal (obrigatório para menores de 18 anos)<input id="responsavel" name="responsavel" maxlength="100" autocapitalize="words"></label>
-      <label class="aceite marcar"><input id="autorizo" type="checkbox" required> <span>Li e autorizo o uso dos dados conforme o termo acima. *</span></label>
+      <label class="aceite"><input id="autorizo" type="checkbox" required> <span>Li e autorizo o uso dos dados conforme o termo acima. *</span></label>
     </fieldset>
     <input name="website" class="escondido" tabindex="-1" autocomplete="off" aria-hidden="true">
     <p id="resultado" role="status"></p>
