@@ -19,6 +19,7 @@ import 'agente_hub.dart';
 import 'auth.dart';
 import 'backup.dart';
 import 'backup_cifrado.dart';
+import 'cadastro_publico.dart';
 import 'cartazes.dart';
 import 'config.dart';
 import 'configuracoes.dart';
@@ -63,6 +64,7 @@ class Servidor {
     this.agenda,
     this.clienteAgenda,
     this.enviarAvisoMensagem,
+    this.enviarAvisoCadastro,
     this.senhaMinima = 6,
     DateTime Function()? relogio,
     LimiteTaxa? limitePedidos,
@@ -137,6 +139,9 @@ class Servidor {
   /// Cliente HTTP do teste de endereço da agenda (substituível nos testes).
   final http.Client? clienteAgenda;
   final Future<void> Function(Mensagem mensagem, String urlPainel)? enviarAvisoMensagem;
+
+  /// Envia o aviso de ficha nova do cadastro público (substituível nos testes).
+  final Future<void> Function(ResumoCadastro resumo, String urlRevisar)? enviarAvisoCadastro;
 
   /// Tamanho mínimo da senha ao trocar pelo painel (10 quando o servidor está na internet).
   final int senhaMinima;
@@ -380,6 +385,7 @@ class Servidor {
       ..post('/api/admin/sessoes/encerrar', _adminEncerrarSessoes)
       ..post('/api/admin/testar-holyrics', _adminTestarHolyrics)
       ..post('/api/admin/testar-email', _adminTestarEmail)
+      ..post('/api/admin/testar-email-cadastro', _adminTestarEmailCadastro)
       ..get('/api/agenda', _agenda)
       ..post('/api/agenda/eventos', _criarEvento)
       ..put('/api/agenda/eventos/<id>', _atualizarEvento)
@@ -1086,34 +1092,34 @@ class Servidor {
       return _erro(429, 'Aguarde alguns minutos antes de enviar novamente.');
     if (corpo['autorizo'] != true)
       return _erro(400, 'Leia e aceite o termo de uso dos dados.');
-    final contato =
-        '${corpo['telefone'] ?? ''}${corpo['whatsapp'] ?? ''}${corpo['email'] ?? ''}'
-            .trim();
-    if (contato.isEmpty)
+    final hojeCadastro = _agora();
+    // Só campos conhecidos, com valores de listas fechadas e textos limpos.
+    final limpo = limparCadastroPublico(corpo, hojeCadastro);
+    if (limpo.erro != null) return _erro(400, limpo.erro!);
+    final dados = limpo.dados;
+    if (!dados.containsKey('telefone') &&
+        !dados.containsKey('whatsapp') &&
+        !dados.containsKey('email'))
       return _erro(400, 'Informe telefone, WhatsApp ou e-mail.');
-    final dados = {
-      for (final e in corpo.entries)
-        if (_camposCadastro.contains(e.key)) e.key: e.value
-    };
-    final aniversario = (corpo['aniversario'] as String? ?? '').trim();
+    final aniversarioBruto = corpo['aniversario'];
+    final aniversario =
+        aniversarioBruto is String ? aniversarioBruto.trim() : '';
     if (aniversario.isEmpty) return _erro(400, 'Informe a data de nascimento.');
     final nascimento = Membro.dataDe(aniversario);
     if (nascimento == null || !Membro.dataIsoValida(nascimento))
       return _erro(400, 'Data de nascimento inválida.');
     final partes = nascimento.split('-').map(int.parse).toList();
+    if (DateTime(partes[0], partes[1], partes[2]).isAfter(hojeCadastro))
+      return _erro(400, 'A data de nascimento não pode estar no futuro.');
     dados
       ..['ano'] = partes[0]
       ..['mes'] = partes[1]
       ..['dia'] = partes[2];
-    for (final campo in ['dataChegada', 'dataBatismo', 'dataMembresia']) {
-      if (dados[campo] != null &&
-          dados[campo].toString().trim().isNotEmpty &&
-          Membro.dataDe(dados[campo]) == null) {
-        return _erro(400, 'Data inválida em $campo.');
-      }
-    }
-    final responsavel = (corpo['responsavel'] as String? ?? '').trim();
-    final hojeCadastro = _agora();
+    final responsavelBruto = corpo['responsavel'];
+    final responsavel =
+        responsavelBruto is String ? limparTexto(responsavelBruto) : '';
+    if (responsavel.isNotEmpty && !nomeDePessoaValido(responsavel))
+      return _erro(400, 'Nome do responsável inválido.');
     final maiorDeIdade =
         !DateTime(partes[0] + 18, partes[1], partes[2]).isAfter(hojeCadastro);
     if (!maiorDeIdade && responsavel.isEmpty) {
@@ -1130,10 +1136,9 @@ class Servidor {
           item['nome'] is! String ||
           item['parentesco'] is! String)
         return _erro(400, 'Familiar inválido.');
-      final nome = (item['nome'] as String).trim();
+      final nome = limparTexto(item['nome'] as String);
       final parentesco = item['parentesco'] as String;
-      if (nome.isEmpty ||
-          nome.length > 100 ||
+      if (!nomeDePessoaValido(nome) ||
           !{'conjuge', 'pai', 'mae', 'filho', 'outro'}.contains(parentesco)) {
         return _erro(400, 'Familiar inválido.');
       }
@@ -1189,7 +1194,58 @@ class Servidor {
       'chaveFotoHash': hashTokenLgpd(chave),
       'criadoEm': _agora().toIso8601String(),
     });
+    // Sem esperar o SMTP: a pessoa não fica parada na tela se o e-mail demorar.
+    unawaited(_avisarCadastro(id, ResumoCadastro.de(dados,
+        recebidoEm: _agora(), familiares: familiares.length, menor: !maiorDeIdade)));
     return _json({'ok': true, 'id': id, 'chaveFoto': chave}, status: 201);
+  }
+
+  String get _urlRevisarCadastros =>
+      '${cfg?.urlBase ?? urlOracao.replaceFirst(RegExp(r'/oracao$'), '')}/painel?aba=membros';
+
+  /// Quem manda o aviso: o substituto dos testes ou o SMTP, se estiver configurado.
+  Future<void> Function(ResumoCadastro, String)? get _enviadorCadastro =>
+      enviarAvisoCadastro ??
+      (cfg?.avisoCadastroConfigurado == true
+          ? (ResumoCadastro r, String url) =>
+              enviarEmailCadastro(cfg!, r, urlRevisar: url, arquivoLogo: p.join(pastaWeb, 'logo.png'))
+          : null);
+
+  /// Manda o aviso de ficha nova e grava na solicitação se o e-mail saiu.
+  Future<void> _avisarCadastro(String id, ResumoCadastro resumo) async {
+    final enviar = _enviadorCadastro;
+    if (enviar == null) return;
+    var resultado = 'enviado';
+    try {
+      await enviar(resumo, _urlRevisarCadastros).timeout(const Duration(seconds: 20));
+    } catch (e) {
+      stderr.writeln('Falha ao enviar aviso de cadastro $id: ${e.runtimeType}');
+      resultado = 'falhou';
+    }
+    final atual = store.buscar('solicitacoesMembros', id);
+    if (atual != null) await store.salvar('solicitacoesMembros', {...atual, 'avisoEmail': resultado});
+  }
+
+  /// Manda um aviso de exemplo (dados fictícios) para conferir o visual e o destinatário.
+  Future<Response> _adminTestarEmailCadastro(Request _) async {
+    final enviar = _enviadorCadastro;
+    if (enviar == null) return _erro(400, 'Configure o SMTP primeiro.');
+    final exemplo = ResumoCadastro(
+      nome: 'Maria Exemplo da Silva',
+      recebidoEm: _agora(),
+      whatsapp: '11912345678',
+      email: 'maria.exemplo@exemplo.com',
+      cidade: 'Centro, São Paulo, SP',
+      familiares: 2,
+      exemplo: true,
+    );
+    try {
+      await enviar(exemplo, _urlRevisarCadastros).timeout(const Duration(seconds: 20));
+      return _json({'ok': true, 'para': cfg?.destinatarioCadastros});
+    } catch (e) {
+      stderr.writeln('Falha no teste do aviso de cadastro: ${e.runtimeType}');
+      return _erro(502, 'Não foi possível enviar. Confira os dados do SMTP e a conexão do servidor.');
+    }
   }
 
   Future<Response> _fotoCadastroPublico(Request req, String id) async {

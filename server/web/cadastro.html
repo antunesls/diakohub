@@ -2,71 +2,138 @@
 <html lang="pt-BR">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="robots" content="noindex">
+<meta name="theme-color" content="#1f5f5b">
 <title>Cadastro de membros</title>
 <link rel="stylesheet" href="/estilo.css?v=5">
 <style>
-  .cadastro { max-width: 760px; margin: 0 auto; padding: 20px; }
-  .cadastro header { text-align: center; margin-bottom: 24px; }
-  .cadastro header img { max-width: 210px; max-height: 90px; object-fit: contain; }
-  .cadastro fieldset { border: 1px solid #ddd; border-radius: 14px; padding: 18px; margin: 18px 0; }
-  .cadastro legend { font-weight: 700; padding: 0 8px; }
-  .cadastro .campos { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(220px, 100%), 1fr)); gap: 14px; }
-  .cadastro label { display: block; font-weight: 600; }
-  .cadastro input, .cadastro select, .cadastro textarea { display: block; width: 100%; margin-top: 5px; box-sizing: border-box; }
-  .cadastro .familia { padding: 10px 0; border-bottom: 1px solid #ddd; display: grid; grid-template-columns: 1fr 160px auto; gap: 8px; align-items: end; }
-  @media (max-width: 600px) { .cadastro .familia { grid-template-columns: 1fr; } }
-  .cadastro .aceite input { width: auto; display: inline; }
-  .cadastro #termo { max-height: 200px; overflow: auto; white-space: pre-wrap; padding: 12px; border: 1px solid #ddd; border-radius: 8px; }
+  html { -webkit-text-size-adjust: 100%; }
+  body.publico { overflow-x: hidden; }
+  .publico main.cadastro { max-width: 720px; padding: 24px 16px calc(40px + env(safe-area-inset-bottom)); }
+  .cadastro header { display: block; text-align: center; padding-bottom: 18px; margin-bottom: 20px; }
+  .cadastro header img { display: block; margin: 0 auto 14px; width: auto; max-width: min(210px, 60%); max-height: 84px; object-fit: contain; }
+  .cadastro header h1 { font-size: clamp(26px, 7vw, 34px); }
+  .cadastro header p { margin: 0; color: var(--suave); }
+  .cadastro .obrigatorios { font-size: 14px; color: var(--suave); margin: 8px 0 0; }
+
+  /* fieldset tem min-width: min-content por padrão, o que estoura a largura no celular */
+  .cadastro fieldset { min-width: 0; margin: 0 0 16px; padding: 18px 16px 20px;
+    background: var(--superficie); border: 1px solid var(--linha); border-radius: var(--raio); }
+  .cadastro legend { float: left; width: 100%; padding: 0; margin: 0 0 12px;
+    font-family: var(--fonte-titulo); font-size: 20px; font-weight: 600; }
+  .cadastro legend + * { clear: both; }
+  .cadastro fieldset > p { margin: 0 0 14px; font-size: 14px; color: var(--suave); }
+  .cadastro .campos { clear: both; display: grid; gap: 14px; grid-template-columns: repeat(auto-fit, minmax(min(220px, 100%), 1fr)); }
+  .cadastro .campos > * { min-width: 0; }
+  .cadastro label { margin: 0; font-size: 15px; }
+  .cadastro input, .cadastro select { display: block; width: 100%; min-width: 0; max-width: 100%; margin-top: 6px; font-size: 16px; font-weight: 400; min-height: 48px; }
+  /* iOS desenha o input de data com largura própria e alinhamento central */
+  .cadastro input[type=date] { -webkit-appearance: none; appearance: none; text-align: left; }
+  .cadastro input[type=date]::-webkit-date-and-time-value { text-align: left; }
+  .cadastro input[type=file] { padding: 10px; border: 1px dashed var(--borda); border-radius: 12px; background: var(--campo); font-size: 14px; }
+  .cadastro .largo { grid-column: 1 / -1; }
+  .cadastro .cep-linha { display: flex; gap: 8px; align-items: stretch; margin-top: 6px; }
+  .cadastro .cep-linha input { margin-top: 0; flex: 1; }
+  .cadastro .cep-linha .botao { min-height: 48px; flex-shrink: 0; }
+  .cadastro .aviso-cep { margin: 6px 0 0; font-size: 14px; color: var(--suave); min-height: 0; }
+  .cadastro .aviso-cep:empty { display: none; }
+  .cadastro .aviso-cep.erro { color: var(--perigo); }
+  .cadastro .aviso-cep.ok { color: var(--ok); }
+  .cadastro .dupla { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  .cadastro .dupla.estreita { grid-template-columns: 2fr 1fr; }
+
+  .cadastro .familia { display: grid; grid-template-columns: 1fr 150px auto; gap: 10px; align-items: end;
+    padding: 12px; margin-bottom: 10px; border: 1px solid var(--linha); border-radius: 12px; background: var(--campo); }
+  .cadastro .familia .botao { min-height: 48px; }
+  #adicionar-familiar { width: 100%; }
+
+  .cadastro #termo { max-height: 220px; overflow: auto; -webkit-overflow-scrolling: touch; white-space: pre-wrap;
+    padding: 12px; margin-bottom: 14px; font-size: 14px; border: 1px solid var(--linha); border-radius: 12px; background: var(--campo); }
+  .cadastro .aceite { margin-top: 16px; padding: 12px; border-radius: 12px; background: var(--primaria-suave); font-weight: 600; }
+  .cadastro .aceite input { min-height: 0; margin: 2px 0 0; }
+
+  .cadastro #resultado:not(:empty) { padding: 12px; border-radius: 12px; background: #fbeeed; color: var(--perigo); font-weight: 500; }
+  .cadastro #obrigado { padding: 32px 8px; }
+
+  @media (max-width: 600px) {
+    .publico main.cadastro { padding-top: 16px; }
+    .cadastro fieldset { padding: 16px 14px 18px; margin-bottom: 12px; }
+    .cadastro .familia { grid-template-columns: 1fr 1fr; }
+    .cadastro .familia label { grid-column: 1 / -1; }
+  }
+  @media (max-width: 360px) {
+    .cadastro .dupla, .cadastro .dupla.estreita { grid-template-columns: 1fr; }
+  }
 </style>
 </head>
 <body class="publico">
 <main class="cadastro">
-  <header><img src="/logo.png" alt=""><h1>Cadastro de membros</h1>
-    <p>Preencha seus dados. A secretaria vai conferir a ficha e fazer os vínculos familiares antes da aprovação.</p></header>
-  <form id="ficha">
+  <header><img src="/logo.png" alt="" onerror="this.remove()"><h1>Cadastro de membros</h1>
+    <p>Preencha seus dados. A secretaria vai conferir a ficha e fazer os vínculos familiares antes da aprovação.</p>
+    <p class="obrigatorios">Campos com * são obrigatórios. Leva uns 5 minutos.</p></header>
+  <form id="ficha" novalidate>
     <fieldset><legend>Dados pessoais</legend><div class="campos">
-      <label>Nome completo *<input id="nome" name="nome" required maxlength="100" autocomplete="name"></label>
-      <label>Data de nascimento *<input id="aniversario" name="aniversario" type="date" required></label>
+      <label class="largo">Nome completo *<input id="nome" name="nome" required maxlength="100" autocomplete="name" autocapitalize="words"></label>
+      <label>Data de nascimento *<input id="aniversario" name="aniversario" type="date" required autocomplete="bday"></label>
       <label>Sexo<select id="sexo" name="sexo"><option value="">Não informado</option><option value="F">Feminino</option><option value="M">Masculino</option></select></label>
-      <label>Estado civil<input id="estadoCivil" name="estadoCivil" maxlength="60"></label>
-      <label>CPF<input id="cpf" name="cpf" inputmode="numeric" maxlength="14"></label>
-      <label>RG<input id="rg" name="rg" maxlength="30"></label>
-      <label>Foto (opcional, JPG ou PNG; até 15 MB)<input id="foto" type="file" accept="image/jpeg,image/png"></label>
+      <label>Estado civil<select id="estadoCivil" name="estadoCivil"><option value="">Não informado</option><option>Solteiro(a)</option><option>Casado(a)</option><option>União estável</option><option>Divorciado(a)</option><option>Viúvo(a)</option></select></label>
+      <div class="dupla">
+        <label>CPF<input id="cpf" name="cpf" inputmode="numeric" maxlength="14" placeholder="000.000.000-00"></label>
+        <label>RG<input id="rg" name="rg" maxlength="20" pattern="[0-9A-Za-z.\-/ ]*[0-9][0-9A-Za-z.\-/ ]*"></label>
+      </div>
+      <label class="largo">Foto (opcional, JPG ou PNG; até 15 MB)<input id="foto" type="file" accept="image/jpeg,image/png"></label>
     </div></fieldset>
-    <fieldset><legend>Contato e endereço</legend><p>Informe pelo menos um contato: telefone, WhatsApp ou e-mail.</p><div class="campos">
-      <label>Telefone<input id="telefone" name="telefone" type="tel" maxlength="20" autocomplete="tel"></label>
-      <label>WhatsApp<input id="whatsapp" name="whatsapp" type="tel" maxlength="20"></label>
-      <label>E-mail<input id="email" name="email" type="email" maxlength="120" autocomplete="email"></label>
-      <label>CEP<input id="cep" name="cep" maxlength="9" autocomplete="postal-code"></label>
-      <label>Rua<input id="rua" name="rua" maxlength="120" autocomplete="street-address"></label>
-      <label>Número<input id="numero" name="numero" maxlength="20"></label>
-      <label>Complemento<input id="complemento" name="complemento" maxlength="80"></label>
+    <fieldset><legend>Contato</legend><p>Informe pelo menos um: telefone, WhatsApp ou e-mail.</p><div class="campos">
+      <label>WhatsApp<input id="whatsapp" name="whatsapp" type="tel" inputmode="tel" maxlength="20" autocomplete="tel" placeholder="(00) 00000-0000"></label>
+      <label>Outro telefone<input id="telefone" name="telefone" type="tel" inputmode="tel" maxlength="20"></label>
+      <label class="largo">E-mail<input id="email" name="email" type="email" inputmode="email" maxlength="120" autocomplete="email" autocapitalize="off"></label>
+    </div></fieldset>
+    <fieldset><legend>Endereço</legend><p>Digite o CEP que a gente preenche o resto. Não sabe o CEP? Preencha à mão.</p><div class="campos">
+      <div class="largo">
+        <label for="cep">CEP</label>
+        <div class="cep-linha">
+          <input id="cep" name="cep" inputmode="numeric" maxlength="9" autocomplete="postal-code" placeholder="00000-000" pattern="\d{5}-?\d{3}">
+          <button type="button" class="botao secundario" id="buscar-cep">Buscar</button>
+        </div>
+        <p id="cep-aviso" class="aviso-cep" role="status"></p>
+      </div>
+      <label class="largo">Rua<input id="rua" name="rua" maxlength="120" autocomplete="address-line1"></label>
+      <div class="dupla">
+        <label>Número<input id="numero" name="numero" maxlength="10" placeholder="Ou S/N" pattern="[0-9A-Za-z /\-]+"></label>
+        <label>Complemento<input id="complemento" name="complemento" maxlength="60" autocomplete="address-line2" placeholder="Apto, bloco"></label>
+      </div>
       <label>Bairro<input id="bairro" name="bairro" maxlength="80"></label>
-      <label>Cidade<input id="cidade" name="cidade" maxlength="80"></label>
-      <label>Estado<input id="estado" name="estado" maxlength="2"></label>
+      <div class="dupla estreita">
+        <label>Cidade<input id="cidade" name="cidade" maxlength="80" autocomplete="address-level2"></label>
+        <label>UF<select id="estado" name="estado" autocomplete="address-level1"><option value="">—</option>
+          <option>AC</option><option>AL</option><option>AP</option><option>AM</option><option>BA</option><option>CE</option>
+          <option>DF</option><option>ES</option><option>GO</option><option>MA</option><option>MT</option><option>MS</option>
+          <option>MG</option><option>PA</option><option>PB</option><option>PR</option><option>PE</option><option>PI</option>
+          <option>RJ</option><option>RN</option><option>RS</option><option>RO</option><option>RR</option><option>SC</option>
+          <option>SP</option><option>SE</option><option>TO</option></select></label>
+      </div>
     </div></fieldset>
-    <fieldset><legend>Vida na igreja</legend><div class="campos">
+    <fieldset><legend>Vida na igreja</legend><p>Deixe em branco o que não souber.</p><div class="campos">
       <label>Data de chegada<input id="dataChegada" name="dataChegada" type="date"></label>
       <label>Data de batismo<input id="dataBatismo" name="dataBatismo" type="date"></label>
       <label>Data de membresia<input id="dataMembresia" name="dataMembresia" type="date"></label>
-      <label>Ministérios (separe por vírgula)<input id="ministerios" name="ministerios" maxlength="250"></label>
-      <label>Função<input id="funcao" name="funcao" maxlength="80"></label>
-      <label>Como conheceu a igreja?<input id="comoConheceu" name="comoConheceu" maxlength="200"></label>
+      <label>Função<input id="funcao" name="funcao" maxlength="60"></label>
+      <label class="largo">Ministérios (separe por vírgula)<input id="ministerios" name="ministerios" maxlength="250"></label>
+      <label class="largo">Como conheceu a igreja?<input id="comoConheceu" name="comoConheceu" maxlength="200"></label>
     </div></fieldset>
     <fieldset><legend>Família</legend><p>Informe nomes e parentesco. A secretaria fará os vínculos depois.</p>
-      <div id="familiares"></div><button type="button" class="botao secundario" id="adicionar-familiar">Adicionar familiar</button>
+      <div id="familiares"></div><button type="button" class="botao secundario" id="adicionar-familiar">+ Adicionar familiar</button>
     </fieldset>
     <fieldset><legend>Contato de emergência</legend><div class="campos">
-      <label>Nome<input id="emergenciaNome" name="emergenciaNome" maxlength="100"></label>
-      <label>Telefone<input id="emergenciaTelefone" name="emergenciaTelefone" type="tel" maxlength="20"></label>
-      <label>Vínculo<input id="emergenciaVinculo" name="emergenciaVinculo" maxlength="60"></label>
+      <label class="largo">Nome<input id="emergenciaNome" name="emergenciaNome" maxlength="100" autocapitalize="words"></label>
+      <label>Telefone<input id="emergenciaTelefone" name="emergenciaTelefone" type="tel" inputmode="tel" maxlength="20"></label>
+      <label>Vínculo<input id="emergenciaVinculo" name="emergenciaVinculo" maxlength="40" placeholder="Ex.: mãe, irmão"></label>
     </div></fieldset>
     <fieldset><legend>Autorização de uso dos dados</legend>
-      <div id="termo" aria-label="Termo LGPD">Carregando o termo…</div>
-      <label>Responsável legal (obrigatório para menores de 18 anos)<input id="responsavel" name="responsavel" maxlength="100"></label>
-      <label class="aceite"><input id="autorizo" type="checkbox" required> Li e autorizo o uso dos dados conforme o termo acima. *</label>
+      <div id="termo" tabindex="0" aria-label="Termo LGPD">Carregando o termo…</div>
+      <label>Responsável legal (obrigatório para menores de 18 anos)<input id="responsavel" name="responsavel" maxlength="100" autocapitalize="words"></label>
+      <label class="aceite marcar"><input id="autorizo" type="checkbox" required> <span>Li e autorizo o uso dos dados conforme o termo acima. *</span></label>
     </fieldset>
     <input name="website" class="escondido" tabindex="-1" autocomplete="off" aria-hidden="true">
     <p id="resultado" role="status"></p>
@@ -82,11 +149,101 @@
     $('enviar').disabled = false;
   }).catch(() => { $('termo').textContent = 'Não foi possível carregar o termo. Recarregue a página.'; });
 
+  // Máscaras leves: só formatam enquanto a pessoa digita, sem bloquear nada.
+  const digitos = (v) => v.replace(/\D/g, '');
+  const telefone = (v) => {
+    const d = digitos(v).slice(0, 11);
+    if (d.length <= 2) return d.length ? `(${d}` : '';
+    const meio = d.length === 11 ? 7 : 6;
+    return `(${d.slice(0, 2)}) ${d.slice(2, meio)}${d.length > meio ? '-' + d.slice(meio) : ''}`;
+  };
+  const mascaras = {
+    cpf: (v) => digitos(v).slice(0, 11).replace(/(\d{3})(\d)/, '$1.$2').replace(/(\d{3})(\d)/, '$1.$2').replace(/(\d{3})(\d{1,2})$/, '$1-$2'),
+    cep: (v) => digitos(v).slice(0, 8).replace(/(\d{5})(\d)/, '$1-$2'),
+    whatsapp: telefone, telefone, emergenciaTelefone: telefone,
+  };
+  for (const [id, formatar] of Object.entries(mascaras)) {
+    $(id).addEventListener('input', (e) => { e.target.value = formatar(e.target.value); });
+  }
+  // Nenhuma data da ficha pode estar no futuro.
+  const hoje = new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 10);
+  for (const campo of document.querySelectorAll('input[type=date]')) { campo.max = hoje; campo.min = '1900-01-01'; }
+
+  // Preenche o endereço pelo CEP (ViaCEP). Se não achar ou estiver sem internet, a pessoa digita.
+  let consultaCep = null, ultimoCep = '';
+  function avisoCep(texto, tipo = '') { $('cep-aviso').textContent = texto; $('cep-aviso').className = 'aviso-cep ' + tipo; }
+  async function buscarCep(manual) {
+    const cep = digitos($('cep').value);
+    if (cep.length !== 8) { if (manual) avisoCep('Digite os 8 números do CEP.', 'erro'); return; }
+    if (cep === ultimoCep && !manual) return;
+    ultimoCep = cep;
+    if (consultaCep) consultaCep.abort();
+    const controle = (consultaCep = new AbortController());
+    const tempo = setTimeout(() => controle.abort(), 8000);
+    avisoCep('Buscando o endereço…'); $('buscar-cep').disabled = true;
+    try {
+      const r = await fetch(`https://viacep.com.br/ws/${cep}/json/`, { signal: controle.signal });
+      const end = await r.json();
+      if (!r.ok || end.erro) { avisoCep('CEP não encontrado. Confira o número ou preencha o endereço à mão.', 'erro'); return; }
+      // O CEP mudou: o endereço anterior não vale mais, então sobrescreve o que veio.
+      // O "complemento" da ViaCEP é a faixa de números da rua, não o da pessoa: fica de fora.
+      if (end.logradouro) $('rua').value = end.logradouro;
+      if (end.bairro) $('bairro').value = end.bairro;
+      if (end.localidade) $('cidade').value = end.localidade;
+      if (end.uf) $('estado').value = end.uf;
+      avisoCep(end.logradouro ? 'Endereço encontrado. Falta o número.' : 'Cidade encontrada. Complete a rua e o bairro.', 'ok');
+      (end.logradouro ? $('numero') : $('rua')).focus();
+    } catch (_) {
+      if (controle !== consultaCep) return; // outra busca tomou o lugar
+      ultimoCep = '';
+      avisoCep('Não deu para buscar agora. Preencha o endereço à mão.', 'erro');
+    } finally {
+      clearTimeout(tempo);
+      if (controle === consultaCep) { consultaCep = null; $('buscar-cep').disabled = false; }
+    }
+  }
+  $('cep').addEventListener('input', () => {
+    if (digitos($('cep').value).length === 8) buscarCep(false); else avisoCep('');
+  });
+  $('cep').addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); buscarCep(true); } });
+  $('buscar-cep').addEventListener('click', () => buscarCep(true));
+
+  // Nomes: só letras, espaços, hífen, apóstrofo e ponto (como o servidor aceita).
+  const nomeValido = (s) => /^[\p{L}\p{M}]+(?:[ '’.\-]+[\p{L}\p{M}]+)*\.?$/u.test(s.trim().replace(/\s+/g, ' '));
+  function conferirNome(campo) {
+    const v = campo.value.trim();
+    campo.setCustomValidity(!v || nomeValido(v) ? '' : 'Use só letras, espaços, hífen e apóstrofo.');
+  }
+  for (const id of ['nome', 'emergenciaNome', 'responsavel']) $(id).addEventListener('input', (e) => conferirNome(e.target));
+  // Telefone: DDD + número; celular com 11 dígitos começa com 9.
+  function conferirTelefone(campo) {
+    const d = digitos(campo.value);
+    const ok = !d || ((d.length === 10 || (d.length === 11 && d[2] === '9')) && d[0] !== '0' && d[1] !== '0');
+    campo.setCustomValidity(ok ? '' : 'Informe DDD + número.');
+  }
+  for (const id of ['whatsapp', 'telefone', 'emergenciaTelefone']) $(id).addEventListener('input', (e) => conferirTelefone(e.target));
+  // CPF: confere os dígitos verificadores.
+  function cpfValido(d) {
+    if (d.length !== 11 || /^(\d)\1+$/.test(d)) return false;
+    for (const n of [9, 10]) {
+      let soma = 0;
+      for (let i = 0; i < n; i++) soma += Number(d[i]) * (n + 1 - i);
+      if ((soma * 10) % 11 % 10 !== Number(d[n])) return false;
+    }
+    return true;
+  }
+  $('cpf').addEventListener('input', (e) => {
+    const d = digitos(e.target.value);
+    e.target.setCustomValidity(!d || cpfValido(d) ? '' : 'CPF inválido: confira os números.');
+  });
+
   $('adicionar-familiar').addEventListener('click', () => {
     if ($('familiares').children.length >= 10) return;
     const linha = document.createElement('div'); linha.className = 'familia';
     const nome = document.createElement('input'); nome.placeholder = 'Nome completo'; nome.maxLength = 100; nome.required = true;
-    const parentesco = document.createElement('select');
+    nome.autocapitalize = 'words';
+    nome.addEventListener('input', () => conferirNome(nome));
+    const parentesco = document.createElement('select'); parentesco.setAttribute('aria-label', 'Parentesco');
     for (const [valor, texto] of [['conjuge','Cônjuge'],['pai','Pai'],['mae','Mãe'],['filho','Filho(a)'],['outro','Outro']]) {
       const opcao = document.createElement('option'); opcao.value = valor; opcao.textContent = texto; parentesco.append(opcao);
     }
@@ -94,14 +251,30 @@
     remover.textContent = 'Remover'; remover.addEventListener('click', () => linha.remove());
     const rotulo = document.createElement('label'); rotulo.textContent = 'Nome'; rotulo.append(nome);
     linha.append(rotulo, parentesco, remover); $('familiares').append(linha);
+    nome.focus();
   });
+
+  function erro(texto, campo) {
+    $('resultado').textContent = texto;
+    const alvo = campo || $('resultado');
+    alvo.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    if (campo) campo.focus({ preventScroll: true });
+  }
 
   $('ficha').addEventListener('submit', async (event) => {
     event.preventDefault();
     const form = event.currentTarget;
+    const invalido = form.querySelector(':invalid');
+    if (invalido) {
+      const rotulo = invalido.closest('label') || document.querySelector(`label[for="${invalido.id}"]`);
+      const nomeCampo = rotulo?.firstChild?.textContent?.replace('*', '').trim() || invalido.getAttribute('aria-label') || '';
+      const motivo = invalido.validity.customError ? ' ' + invalido.validationMessage : '';
+      return erro(invalido.type === 'checkbox' ? 'Marque a autorização de uso dos dados para enviar.'
+        : `Confira o campo ${nomeCampo}.${motivo}`, invalido);
+    }
     const dados = Object.fromEntries(new FormData(form));
     if (![dados.telefone, dados.whatsapp, dados.email].some((v) => v.trim())) {
-      $('resultado').textContent = 'Informe pelo menos um contato.'; return;
+      return erro('Informe pelo menos um contato: telefone, WhatsApp ou e-mail.', $('whatsapp'));
     }
     dados.autorizo = $('autorizo').checked;
     dados.ministerios = dados.ministerios ? dados.ministerios.split(',').map((s) => s.trim()).filter(Boolean) : [];
@@ -110,8 +283,8 @@
     }));
     for (const chave of Object.keys(dados)) if (dados[chave] === '') delete dados[chave];
     const foto = $('foto').files[0];
-    if (foto && foto.size > 15 * 1024 * 1024) { $('resultado').textContent = 'Foto maior que 15 MB.'; return; }
-    $('enviar').disabled = true; $('resultado').textContent = 'Enviando…';
+    if (foto && foto.size > 15 * 1024 * 1024) return erro('Foto maior que 15 MB.', $('foto'));
+    $('enviar').disabled = true; $('enviar').textContent = 'Enviando…'; $('resultado').textContent = '';
     try {
       const resposta = await fetch('/api/public/cadastro', {method: 'POST', headers: {'content-type': 'application/json'}, body: JSON.stringify(dados)});
       const envio = await resposta.json();
@@ -120,10 +293,11 @@
         const rf = await fetch(`/api/public/cadastro/${encodeURIComponent(envio.id)}/foto`, {
           method: 'POST', headers: {'x-chave-foto': envio.chaveFoto}, body: foto,
         });
-        if (!rf.ok) { $('resultado').textContent = 'Ficha recebida, mas a foto não foi enviada. Fale com a secretaria.'; return; }
+        if (!rf.ok) { form.hidden = true; $('obrigado').hidden = false;
+          $('obrigado').querySelector('p').textContent = 'Ficha recebida, mas a foto não foi enviada. Fale com a secretaria.'; window.scrollTo(0, 0); return; }
       }
-      form.hidden = true; $('obrigado').hidden = false;
-    } catch (e) { $('resultado').textContent = e.message; $('enviar').disabled = false; }
+      form.hidden = true; $('obrigado').hidden = false; window.scrollTo(0, 0);
+    } catch (e) { erro(e.message); $('enviar').disabled = false; $('enviar').textContent = 'Enviar cadastro'; }
   });
 </script>
 </body>

@@ -71,6 +71,7 @@ class Configuracoes {
       'smtpSenha': '',
       'smtpRemetente': '',
       'smtpDestinatario': '',
+      'emailCadastros': '',
       'siteAtivo': true,
       'siteAgenda': false,
       'sitePix': true,
@@ -248,6 +249,12 @@ class Configuracoes {
   String get smtpSenha => _s('smtpSenha');
   String get smtpRemetente => _s('smtpRemetente');
   String get smtpDestinatario => _s('smtpDestinatario');
+
+  /// Quem recebe o aviso de ficha nova no cadastro público (vários separados por vírgula).
+  /// Vazio usa o destinatário geral dos avisos.
+  String get destinatarioCadastros => _s('emailCadastros').isNotEmpty ? _s('emailCadastros') : smtpDestinatario;
+  bool get avisoCadastroConfigurado => smtpHost.isNotEmpty && smtpRemetente.isNotEmpty &&
+      destinatarioCadastros.isNotEmpty && (smtpUsuario.isEmpty || smtpSenha.isNotEmpty);
   bool get smtpConfigurado => smtpHost.isNotEmpty && smtpRemetente.isNotEmpty && smtpDestinatario.isNotEmpty &&
       (smtpUsuario.isEmpty || smtpSenha.isNotEmpty);
 
@@ -378,6 +385,15 @@ class Configuracoes {
             throw FormatException('E-mail inválido em "$k".');
           }
           novos[k] = v;
+        case 'emailCadastros':
+          final lista = texto(k, 400).split(RegExp(r'[,;\s]+')).where((e) => e.isNotEmpty).toList();
+          if (lista.length > 5) throw const FormatException('No máximo 5 e-mails para o aviso de cadastro.');
+          for (final e in lista) {
+            if (!RegExp(r'^[^\s@]+@[^\s@]+\.[^\s@]+$').hasMatch(e)) {
+              throw FormatException('E-mail inválido no aviso de cadastro: $e');
+            }
+          }
+          novos[k] = lista.join(', ');
         case 'termoLgpdTexto':
           // Vazio volta ao termo padrão. Texto diferente vira versão nova: as autorizações
           // já dadas continuam apontando para a versão que cada pessoa leu.
@@ -432,7 +448,7 @@ class Configuracoes {
       'nomeIgreja', 'urlPublica', 'pedidoTitulo', 'pedidoIntro', 'pedidoObrigado', 'chaveMural',
       'holyricsHost', 'holyricsPorta', 'motivosPorSlide', 'segundosPorSlide', 'diasRespondidas',
       'temaPadrao', 'horaBackup', 'backupsManter', 'agendaMostrarDescricao', 'agendaDiasMural', 'agendaCalendarioId',
-      'smtpHost', 'smtpPorta', 'smtpSsl', 'smtpUsuario', 'smtpRemetente', 'smtpDestinatario',
+      'smtpHost', 'smtpPorta', 'smtpSsl', 'smtpUsuario', 'smtpRemetente', 'smtpDestinatario', 'emailCadastros',
       'siteAtivo', 'siteAgenda', 'sitePix', 'siteGaleria', 'siteCultos', 'siteEndereco', 'sitePixChave', 'sitePixNome', 'sitePixCidade',
       'siteInstagram', 'siteYoutube', 'siteWhatsapp', 'diakoPlayerUrl', 'termoLgpdTexto', 'termoLgpdVersao', 'visitanteQrAtivo', 'muralBoasVindas',
       'textoMotivos', 'muralFundoCor', 'muralFundoImagem', 'muralFundoEscurecer',

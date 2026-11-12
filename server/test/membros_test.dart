@@ -9,6 +9,7 @@ import 'package:diako_server/backup.dart';
 import 'package:diako_server/cartazes.dart';
 import 'package:diako_server/config.dart';
 import 'package:diako_server/configuracoes.dart';
+import 'package:diako_server/email_mensagens.dart';
 import 'package:diako_server/historico.dart';
 import 'package:diako_server/holyrics.dart';
 import 'package:diako_server/store.dart';
@@ -29,6 +30,8 @@ void main() {
     late String token;
     late String pastaDados;
     var discoCheio = false;
+    final avisos = <(ResumoCadastro, String)>[];
+    var avisoFalha = false;
 
     setUp(() async {
       tmp = await Directory.systemTemp.createTemp('diako_membros');
@@ -57,7 +60,13 @@ void main() {
         cfg: cfg,
         restauracao: Restauracao(
             store: store, backup: backup, pastaDados: config.pastaDados, pastaCartazes: config.pastaCartazes),
+        enviarAvisoCadastro: (resumo, url) async {
+          if (avisoFalha) throw const SocketException('smtp fora');
+          avisos.add((resumo, url));
+        },
       ).handler;
+      avisos.clear();
+      avisoFalha = false;
       final r =
           await handler(Request('POST', Uri.parse('http://x/api/login'), body: jsonEncode({'senha': 'senha-teste'})));
       token = (jsonDecode(await r.readAsString()) as Map)['token'] as String;
@@ -176,6 +185,43 @@ void main() {
       final doc = ((await chamar('GET', '/api/solicitacoes-membros')).$2 as List).single;
       expect(doc['consentimento']['responsavel'], 'Maria');
       expect(doc['dados'].containsKey('consentimentoEm'), false);
+    });
+
+    test('ficha nova manda aviso por e-mail com resumo e link do painel', () async {
+      final envio = await chamar('POST', '/api/public/cadastro', login: false, json: {
+        'nome': 'Ana <b>Souza', 'aniversario': '05/03/1990', 'whatsapp': '(11) 98888-7777',
+        'cpf': '529.982.247-25', 'cidade': 'Tupã', 'estado': 'SP', 'autorizo': true,
+        'familiares': [{'nome': 'Bruno', 'parentesco': 'conjuge'}],
+      });
+      expect(envio.$1, 201);
+      await Future<void>.delayed(const Duration(milliseconds: 50));
+      final (resumo, url) = avisos.single;
+      expect(resumo.nome, 'Ana bSouza');
+      expect(resumo.whatsapp, '11988887777');
+      expect(resumo.cidade, 'Tupã, SP');
+      expect(resumo.familiares, 1);
+      expect(resumo.menor, false);
+      expect(url, endsWith('/painel?aba=membros'));
+      final lista = (await chamar('GET', '/api/solicitacoes-membros')).$2 as List;
+      expect(lista.single['avisoEmail'], 'enviado');
+
+      // E-mail fora do ar não impede o cadastro e fica registrado.
+      avisoFalha = true;
+      final outro = await chamar('POST', '/api/public/cadastro', login: false, json: {
+        'nome': 'Carlos Lima', 'aniversario': '01/01/1980', 'email': 'carlos@teste.com', 'autorizo': true,
+      });
+      expect(outro.$1, 201);
+      await Future<void>.delayed(const Duration(milliseconds: 50));
+      final doc = ((await chamar('GET', '/api/solicitacoes-membros')).$2 as List)
+          .firstWhere((s) => s['dados']['nome'] == 'Carlos Lima');
+      expect(doc['avisoEmail'], 'falhou');
+    });
+
+    test('admin manda aviso de cadastro de exemplo', () async {
+      expect((await chamar('POST', '/api/admin/testar-email-cadastro', login: false)).$1, 401);
+      expect((await chamar('POST', '/api/admin/testar-email-cadastro')).$1, 200);
+      expect(avisos.single.$1.exemplo, true);
+      expect(store.listar('solicitacoesMembros'), isEmpty);
     });
 
     test('contato informado precisa ser utilizável', () async {

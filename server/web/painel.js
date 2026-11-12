@@ -66,7 +66,8 @@ $('sair').addEventListener('click', sair);
 
 // ---------- Menu lateral ----------
 
-let abaAtual = 'inicio';
+// ?aba=membros abre direto numa aba (link do e-mail de aviso de cadastro); sem permissão volta ao início.
+let abaAtual = new URLSearchParams(location.search).get('aba') || 'inicio';
 $('menu-lateral').addEventListener('click', (e) => {
   const item = e.target.closest('button[data-aba]');
   if (item) mostrarAba(item.dataset.aba);
@@ -1068,6 +1069,39 @@ $('copiar-link-cadastro').addEventListener('click', async () => {
   try { await navigator.clipboard.writeText(new URL('/cadastro', location.href).href);
     mensagem($('resultado-solicitacoes'), 'Link copiado.', true);
   } catch (_) { mensagem($('resultado-solicitacoes'), 'Copie o endereço da página de cadastro.', false); }
+});
+
+// Convite pronto para o WhatsApp. O nome da igreja vem do termo LGPD; o texto só é
+// montado uma vez para não apagar o que a equipe editou.
+async function montarConviteCadastro() {
+  const caixa = $('texto-convite-cadastro');
+  if (caixa.value) return;
+  let igreja = 'nossa igreja';
+  try { igreja = (await carregarTermoLgpd()).igreja || igreja; } catch (_) { /* segue com o genérico */ }
+  const link = new URL('/cadastro', location.href).href;
+  caixa.value = `Olá, família ${igreja}! 👋\n\n`
+    + 'Estamos atualizando o cadastro de membros da igreja e contamos com você! 🙏\n\n'
+    + 'Leva uns 5 minutos e dá para fazer pelo celular:\n'
+    + `👉 ${link}\n\n`
+    + 'Ali você coloca seus dados de contato, endereço, datas importantes (batismo, membresia) e sua família. '
+    + 'Seus dados ficam guardados com segurança e só são usados pela igreja, conforme a LGPD.\n\n'
+    + 'Quem tiver filhos menores pode fazer a ficha deles também, indicando o responsável.\n\n'
+    + 'Qualquer dúvida, fale com a secretaria. Obrigado! 💙';
+  atualizarLinkConvite();
+}
+function atualizarLinkConvite() {
+  $('whatsapp-convite-cadastro').href = 'https://wa.me/?text=' + encodeURIComponent($('texto-convite-cadastro').value);
+}
+$('texto-convite-cadastro').addEventListener('input', atualizarLinkConvite);
+document.querySelector('.convite-cadastro').addEventListener('toggle', (e) => { if (e.target.open) montarConviteCadastro(); });
+$('copiar-convite-cadastro').addEventListener('click', async () => {
+  try {
+    await navigator.clipboard.writeText($('texto-convite-cadastro').value);
+    mensagem($('resultado-solicitacoes'), 'Mensagem copiada. Cole no WhatsApp.', true);
+  } catch (_) {
+    $('texto-convite-cadastro').select();
+    mensagem($('resultado-solicitacoes'), 'Não deu para copiar sozinho: o texto está selecionado, use Ctrl+C.', false);
+  }
 });
 
 function revisarSolicitacao(s) {

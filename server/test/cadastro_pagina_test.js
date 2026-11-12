@@ -22,3 +22,17 @@ test('painel mostra pendências e link compartilhável para o cadastro', () => {
   assert.match(script, /\/aprovar/);
   assert.match(script, /\/rejeitar/);
 });
+
+test('painel traz convite pronto para o WhatsApp com o link do cadastro', () => {
+  const pagina = fs.readFileSync(path.join(__dirname, '../web/painel.html'), 'utf8');
+  const script = fs.readFileSync(path.join(__dirname, '../web/painel.js'), 'utf8');
+  assert.match(pagina, /id="texto-convite-cadastro"/);
+  assert.match(pagina, /id="whatsapp-convite-cadastro"/);
+  assert.match(script, /wa\.me\/\?text=/);
+});
+
+test('formulário público não estoura a largura no celular', () => {
+  const pagina = fs.readFileSync(path.join(__dirname, '../web/cadastro.html'), 'utf8');
+  assert.match(pagina, /fieldset \{ min-width: 0/);
+  assert.match(pagina, /header \{ display: block/);
+});

@@ -774,6 +774,15 @@
           <a href="/cadastro" target="_blank" rel="noopener">Abrir link compartilhável</a>
           <button type="button" class="botao secundario pequeno" id="copiar-link-cadastro">Copiar link</button></div>
         <p class="dica">Os dados só entram no cadastro após revisão e aprovação. Confira a identidade antes de atualizar uma ficha existente.</p>
+        <details class="convite-cadastro">
+          <summary><strong>Texto pronto para convidar pelo WhatsApp</strong></summary>
+          <p class="dica">Envie no grupo da igreja ou para cada pessoa. Pode editar o texto antes de copiar.</p>
+          <textarea id="texto-convite-cadastro" rows="9" aria-label="Mensagem de convite para o cadastro"></textarea>
+          <div class="barra" style="margin-top:8px;gap:8px;flex-wrap:wrap">
+            <button type="button" class="botao pequeno" id="copiar-convite-cadastro">Copiar mensagem</button>
+            <a class="botao secundario pequeno" id="whatsapp-convite-cadastro" target="_blank" rel="noopener">Abrir no WhatsApp</a>
+          </div>
+        </details>
         <p id="resultado-solicitacoes" role="status"></p>
         <div id="solicitacoes-membros" class="lista"></div>
       </div>
@@ -1327,7 +1336,7 @@
 <script src="/form-visitante.js?v=2"></script>
 <script src="/menu-lateral.js?v=4"></script>
 <script src="/gestao-casa.js?v=1"></script>
-<script src="/painel.js?v=20"></script>
+<script src="/painel.js?v=21"></script>
 <script src="/acessos-escala.js?v=2"></script>
 <script src="/repertorio-busca.js?v=1"></script>
 <script src="/musica-youtube.js?v=1"></script>

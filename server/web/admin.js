@@ -123,7 +123,7 @@ function preencher() {
     : 'https://calendar.google.com/calendar/ical/…/basic.ics';
   if (document.activeElement !== $('agendaDiasMural')) $('agendaDiasMural').value = cfg.agendaDiasMural ?? 7;
   $('agendaMostrarDescricao').checked = cfg.agendaMostrarDescricao !== false;
-  for (const id of ['smtpHost', 'smtpPorta', 'smtpUsuario', 'smtpRemetente', 'smtpDestinatario']) {
+  for (const id of ['smtpHost', 'smtpPorta', 'smtpUsuario', 'smtpRemetente', 'smtpDestinatario', 'emailCadastros']) {
     if (document.activeElement !== $(id)) $(id).value = cfg[id] ?? '';
   }
   $('smtpSsl').checked = cfg.smtpSsl === true;
@@ -259,7 +259,14 @@ $('form-email').addEventListener('submit', (e) => {
   e.preventDefault();
   salvar({ smtpHost: valor('smtpHost'), smtpPorta: numero('smtpPorta'), smtpUsuario: valor('smtpUsuario'),
     smtpSenha: $('smtpSenha').value, smtpRemetente: valor('smtpRemetente'),
-    smtpDestinatario: valor('smtpDestinatario'), smtpSsl: $('smtpSsl').checked }, $('res-email'));
+    smtpDestinatario: valor('smtpDestinatario'), emailCadastros: valor('emailCadastros'),
+    smtpSsl: $('smtpSsl').checked }, $('res-email'));
+});
+$('testar-email-cadastro').addEventListener('click', async () => {
+  try {
+    const r = await api('POST', '/api/admin/testar-email-cadastro');
+    mensagem($('res-email'), `Aviso de exemplo enviado para ${r.para}.`);
+  } catch (e) { mensagem($('res-email'), e.message, false); }
 });
 $('testar-email').addEventListener('click', async () => {
   try { await api('POST', '/api/admin/testar-email'); mensagem($('res-email'), 'E-mail de teste enviado.'); }

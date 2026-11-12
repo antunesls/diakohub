@@ -376,7 +376,7 @@
       </section>
 
       <section class="cartao" id="email">
-        <h2>Avisos da caixa de mensagens por e-mail</h2>
+        <h2>Avisos por e-mail</h2>
         <p class="dica">O aviso não inclui o texto nem os dados de quem escreveu. As mensagens permanecem no painel e no tablet mesmo quando o e-mail falha. Use uma senha de aplicativo do provedor, se necessário.</p>
         <form id="form-email">
           <div class="grade2">
@@ -388,7 +388,11 @@
             <div class="campo"><label for="smtpDestinatario">Destinatário dos avisos</label><input id="smtpDestinatario" type="email" maxlength="200"></div>
           </div>
           <div class="campo"><label class="marcar"><input type="checkbox" id="smtpSsl"><span>SSL direto (normalmente porta 465). Desmarcado usa STARTTLS (normalmente porta 587).</span></label></div>
-          <div class="acoes"><button class="botao">Salvar</button><button type="button" class="botao secundario" id="testar-email">Enviar e-mail de teste</button><span id="res-email" role="status"></span></div>
+          <div class="campo"><label for="emailCadastros">Aviso de novo cadastro de membro</label>
+            <input id="emailCadastros" maxlength="400" placeholder="Vazio usa o destinatário dos avisos" autocomplete="off">
+            <p class="dica">Quem recebe o e-mail quando alguém preenche a ficha pelo link de cadastro. Até 5 e-mails, separados por vírgula. O aviso traz nome, contato e cidade, nunca CPF, RG ou endereço completo.</p></div>
+          <div class="acoes"><button class="botao">Salvar</button><button type="button" class="botao secundario" id="testar-email">Enviar e-mail de teste</button>
+            <button type="button" class="botao secundario" id="testar-email-cadastro">Testar aviso de cadastro</button><span id="res-email" role="status"></span></div>
         </form>
       </section>
 
@@ -510,6 +514,6 @@
 
 <script src="/comum.js?v=5"></script>
 <script src="/arte-qr.js?v=1"></script>
-<script src="/admin.js?v=13"></script>
+<script src="/admin.js?v=14"></script>
 </body>
 </html>
