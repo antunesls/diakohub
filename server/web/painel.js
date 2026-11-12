@@ -1019,15 +1019,6 @@ async function carregarMembros() {
   renderMembros();
 }
 
-const rotulosCadastro = {
-  nome: 'Nome', dia: 'Dia', mes: 'Mês', ano: 'Ano', sexo: 'Sexo', estadoCivil: 'Estado civil',
-  cpf: 'CPF', rg: 'RG', telefone: 'Telefone', whatsapp: 'WhatsApp', email: 'E-mail',
-  cep: 'CEP', rua: 'Rua', numero: 'Número', complemento: 'Complemento', bairro: 'Bairro',
-  cidade: 'Cidade', estado: 'Estado', dataChegada: 'Chegada', dataBatismo: 'Batismo',
-  dataMembresia: 'Membresia', ministerios: 'Ministérios', funcao: 'Função',
-  comoConheceu: 'Como conheceu', emergenciaNome: 'Contato de emergência',
-  emergenciaTelefone: 'Telefone de emergência', emergenciaVinculo: 'Vínculo de emergência',
-};
 
 async function carregarSolicitacoesMembros() {
   const solicitacoes = await api('GET', '/api/solicitacoes-membros');
@@ -1104,77 +1095,325 @@ $('copiar-convite-cadastro').addEventListener('click', async () => {
   }
 });
 
+// ----- Revisão do cadastro enviado pelo link -----
+
+const ESTADOS_CIVIS = ['Solteiro(a)', 'Casado(a)', 'União estável', 'Divorciado(a)', 'Viúvo(a)'];
+const UFS = 'AC AL AP AM BA CE DF ES GO MA MT MS MG PA PB PR PE PI RJ RN RS RO RR SC SP SE TO'.split(' ');
+const PARENTESCOS = { conjuge: 'Cônjuge', pai: 'Pai', mae: 'Mãe', filho: 'Filho(a)', outro: 'Outro' };
+
+/** Campos da revisão em grupos: [chave, rótulo, tipo]. "nascimento" junta dia, mês e ano. */
+const GRUPOS_REVISAO = [
+  ['Dados pessoais', [['nome', 'Nome', 'texto'], ['nascimento', 'Nascimento', 'data'], ['sexo', 'Sexo', 'sexo'],
+    ['estadoCivil', 'Estado civil', 'civil'], ['cpf', 'CPF', 'cpf'], ['rg', 'RG', 'texto']]],
+  ['Contato', [['whatsapp', 'WhatsApp', 'tel'], ['telefone', 'Telefone', 'tel'], ['email', 'E-mail', 'email']]],
+  ['Endereço', [['cep', 'CEP', 'cep'], ['rua', 'Rua', 'texto'], ['numero', 'Número', 'texto'], ['complemento', 'Complemento', 'texto'],
+    ['bairro', 'Bairro', 'texto'], ['cidade', 'Cidade', 'texto'], ['estado', 'UF', 'uf']]],
+  ['Vida na igreja', [['dataChegada', 'Chegada', 'data'], ['dataBatismo', 'Batismo', 'data'], ['dataMembresia', 'Membresia', 'data'],
+    ['ministerios', 'Ministérios', 'lista'], ['funcao', 'Função', 'texto'], ['comoConheceu', 'Como conheceu', 'texto']]],
+  ['Contato de emergência', [['emergenciaNome', 'Nome', 'texto'], ['emergenciaTelefone', 'Telefone', 'tel'],
+    ['emergenciaVinculo', 'Vínculo', 'texto']]],
+];
+
+/** Valor do campo numa ficha ou nos dados enviados, como texto. */
+function valorRevisao(obj, chave) {
+  if (!obj) return '';
+  if (chave === 'nascimento') return obj.ano && obj.mes && obj.dia ? `${obj.ano}-${doisDigitos(obj.mes)}-${doisDigitos(obj.dia)}` : '';
+  if (chave === 'ministerios') return (obj.ministerios || []).join(', ');
+  return obj[chave] == null ? '' : String(obj[chave]);
+}
+/** Forma de comparar e de gravar: telefone, CPF e CEP só com números; texto sem espaços sobrando. */
+function normalizarRevisao(tipo, v) {
+  const t = String(v ?? '').trim();
+  if (tipo === 'tel' || tipo === 'cpf' || tipo === 'cep') return soDigitos(t);
+  if (tipo === 'lista') return t.split(',').map((x) => x.trim()).filter(Boolean).join(', ');
+  return t.replace(/\s+/g, ' ');
+}
+const iguaisRevisao = (tipo, a, b) => normalizado(normalizarRevisao(tipo, a)) === normalizado(normalizarRevisao(tipo, b));
+function exibirRevisao(tipo, v) {
+  if (!v) return '—';
+  if (tipo === 'tel') return mascaraTelefone(v);
+  if (tipo === 'cpf') return mascaraCpf(v);
+  if (tipo === 'cep') return mascaraCep(v);
+  if (tipo === 'data') return dataBr(v);
+  if (tipo === 'sexo') return v === 'F' ? 'Feminino' : v === 'M' ? 'Masculino' : v;
+  return v;
+}
+function controleRevisao(tipo, valor) {
+  const opcoes = (lista, vazio) => {
+    const s = el('select', {}, el('option', { value: '' }, vazio), ...lista.map(([v, t]) => el('option', { value: v }, t)));
+    if (valor && ![...s.options].some((o) => o.value === valor)) s.append(el('option', { value: valor }, valor));
+    s.value = valor;
+    return s;
+  };
+  if (tipo === 'sexo') return opcoes([['F', 'Feminino'], ['M', 'Masculino']], 'Não informado');
+  if (tipo === 'civil') return opcoes(ESTADOS_CIVIS.map((x) => [x, x]), 'Não informado');
+  if (tipo === 'uf') return opcoes(UFS.map((x) => [x, x]), '—');
+  const mascara = { tel: mascaraTelefone, cpf: mascaraCpf, cep: mascaraCep }[tipo];
+  const campo = el('input', { type: tipo === 'data' ? 'date' : tipo === 'email' ? 'email' : 'text',
+    inputmode: mascara ? 'numeric' : null });
+  campo.value = mascara ? mascara(valor) : valor;
+  if (mascara) campo.addEventListener('input', () => { campo.value = mascara(campo.value); });
+  return campo;
+}
+
 function revisarSolicitacao(s) {
-  const dlg = document.createElement('dialog'); dlg.className = 'dialogo-largo';
-  const form = document.createElement('form'); form.className = 'dialogo-coluna';
-  const titulo = el('h2', {}, `Revisar: ${s.dados.nome}`);
-  const aviso = el('p', { class: 'dica' }, 'Compare os dados antes de atualizar outra pessoa. A ficha original não é alterada até a aprovação.');
-  form.append(titulo, aviso);
+  const enviados = s.dados || {};
+  const nomeEnviado = enviados.nome || 'Sem nome';
+  const possiveis = (s.possiveisMembros || []).map((p) => membros.find((m) => m.id === p.id)).filter(Boolean);
+  const ordenados = [...membros].sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
+  let alvo = null;              // ficha existente escolhida
+  let escolhida = !possiveis.length ? 'nova' : null; // 'nova' | 'existente' | null
+
+  const dlg = el('dialog', { class: 'dialogo-largo revisao', 'aria-labelledby': 'revisao-titulo' });
+  const casca = el('div', { class: 'revisao-casca' });
+
+  // Cabeçalho fixo: quem mandou, quando e como falar com a pessoa.
+  const avatar = el('div', { class: 'avatar' }, el('span', {}, inicialMembro({ nome: nomeEnviado })));
   if (s.foto) {
-    const img = document.createElement('img'); img.alt = `Foto enviada por ${s.dados.nome}`;
-    img.style.cssText = 'max-width:160px;max-height:180px;object-fit:cover';
-    urlAutenticada(`/api/solicitacoes-membros/${s.id}/foto`).then((url) => { if (url && img.isConnected) img.src = url; });
-    form.append(img);
+    urlAutenticada(`/api/solicitacoes-membros/${s.id}/foto`).then((url) => {
+      if (url && avatar.isConnected) avatar.append(el('img', { src: url, alt: `Foto enviada por ${nomeEnviado}` }));
+    });
   }
-  const pessoa = document.createElement('select');
-  pessoa.append(el('option', { value: '' }, 'Criar pessoa nova'));
-  for (const m of membros) pessoa.append(el('option', { value: m.id }, `${m.nome} — ${m.status}`));
-  const labelPessoa = el('label', {}, 'Ficha a aproveitar (confira a identidade)'); labelPessoa.append(pessoa);
-  const possiveis = (s.possiveisMembros || []).map((m) => m.nome).join(', ');
-  form.append(el('p', { class: 'dica' }, `Possíveis correspondências: ${possiveis || 'nenhuma'}`), labelPessoa);
-  const status = document.createElement('select');
-  for (const valor of ['congregado', 'membro']) status.append(el('option', { value: valor }, valor === 'membro' ? 'Membro' : 'Congregado'));
-  const labelStatus = el('label', {}, 'Situação após aprovação'); labelStatus.append(status); form.append(labelStatus);
-  pessoa.addEventListener('change', () => {
-    const atual = membros.find((m) => m.id === pessoa.value);
-    if (atual?.status === 'membro' || atual?.status === 'congregado') status.value = atual.status;
-  });
-  const campos = el('div', { class: 'grade-campos' });
-  const controles = {};
-  for (const [chave, rotulo] of Object.entries(rotulosCadastro)) {
-    const campo = document.createElement('input'); campo.value = Array.isArray(s.dados[chave]) ? s.dados[chave].join(', ') : s.dados[chave] ?? '';
-    const label = el('label', {}, rotulo); label.append(campo); campos.append(label); controles[chave] = campo;
+  const zap = soDigitos(enviados.whatsapp || enviados.telefone);
+  const contatos = el('div', { class: 'contato-rapido' },
+    zap.length >= 10 ? el('a', { href: `https://wa.me/55${zap}`, target: '_blank', rel: 'noopener' }, 'WhatsApp ' + mascaraTelefone(zap)) : null,
+    enviados.email ? el('a', { href: 'mailto:' + enviados.email }, enviados.email) : null);
+  const consent = s.consentimento || {};
+  const sub = [`Enviado em ${dataHoraBr(s.criadoEm)}`,
+    consent.em ? 'autorizou o uso dos dados (LGPD)' : null,
+    consent.responsavel ? `responsável: ${consent.responsavel}` : null].filter(Boolean).join(' · ');
+  const fechar = el('button', { type: 'button', class: 'fechar', 'aria-label': 'Fechar', onclick: () => dlg.close() }, '×');
+  casca.append(el('header', { class: 'revisao-topo' }, avatar,
+    el('div', { class: 'conteudo' }, el('p', { class: 'sobretitulo' }, 'Cadastro enviado pelo link'),
+      el('h2', { id: 'revisao-titulo' }, nomeEnviado), el('p', { class: 'sub' }, sub), contatos),
+    fechar));
+
+  const corpo = el('div', { class: 'dialogo-rolagem', tabindex: '-1' });
+
+  // Passo 1: a pessoa já tem ficha?
+  const nomeGrupo = 'ficha-' + s.id;
+  const escolhas = el('div', { class: 'escolhas-ficha', role: 'radiogroup' });
+  const opcaoFicha = (conteudo, valor, aoEscolher) => {
+    const radio = el('input', { type: 'radio', name: nomeGrupo, value: valor });
+    radio.addEventListener('change', aoEscolher);
+    return { label: el('label', { class: 'escolha-ficha' }, radio, el('div', { class: 'conteudo' }, ...conteudo)), radio };
+  };
+  const resumoMembro = (m) => [m.whatsapp || m.telefone ? mascaraTelefone(m.whatsapp || m.telefone) : null,
+    m.email, aniversarioDe(m) ? 'nasc. ' + aniversarioDe(m) : null, m.bairro].filter(Boolean).join(' · ');
+  for (const m of possiveis) {
+    const { label } = opcaoFicha([
+      el('div', {}, 'Atualizar a ficha de ', el('strong', {}, m.nome), ' ', pilulaStatus(m), ' ',
+        el('span', { class: 'etiqueta conflito' }, 'parecida')),
+      el('div', { class: 'sub' }, resumoMembro(m) || 'Sem contato na ficha')], m.id, () => escolherFicha(m));
+    escolhas.append(label);
   }
-  form.append(el('h3', {}, 'Dados enviados — revise antes de aprovar'), campos);
-  const familiares = el('div');
-  const escolhas = [];
-  for (const f of s.familiares || []) {
-    const select = document.createElement('select'); select.append(el('option', { value: '' }, 'Ainda não vincular'));
-    for (const m of membros) select.append(el('option', { value: m.id }, `${m.nome} — ${m.status}`));
-    const achado = membros.filter((m) => normalizado(m.nome) === normalizado(f.nome));
-    if (f.parentesco === 'outro') { select.disabled = true; select.title = 'O cadastro só vincula cônjuge, pais e filhos.'; }
-    else if (achado.length === 1) select.value = achado[0].id;
-    const label = el('label', {}, `${f.nome} (${f.parentesco})`); label.append(select); familiares.append(label);
-    escolhas.push({f, select});
-  }
-  form.append(el('h3', {}, 'Família — confirme cada correspondência'), familiares);
-  const erro = el('p', { role: 'alert' }); form.append(erro);
-  const acoes = el('div', { class: 'dialogo-acoes' });
-  const cancelar = botao('Fechar', () => dlg.close(), 'secundario');
-  const rejeitar = botao('Rejeitar', async () => {
-    const motivo = prompt('Motivo interno da rejeição (opcional):'); if (motivo === null) return;
-    try { await api('POST', `/api/solicitacoes-membros/${s.id}/rejeitar`, {motivo}); dlg.close(); await carregarSolicitacoesMembros(); }
-    catch (e) { erro.textContent = e.message; }
-  }, 'secundario');
-  const aprovar = botao('Aprovar cadastro', async () => {
-    const dados = {};
-    for (const [k, v] of Object.entries(controles)) {
-      const original = Array.isArray(s.dados[k]) ? s.dados[k].join(', ') : String(s.dados[k] ?? '');
-      if (v.value.trim() !== original) dados[k] = v.value.trim() || null;
+  const busca = el('input', { type: 'search', placeholder: 'Digite o nome para procurar outra ficha', 'aria-label': 'Procurar ficha' });
+  const resultadosBusca = el('div', { class: 'resultados-busca' });
+  const outra = opcaoFicha([el('div', {}, 'Atualizar ', el('strong', {}, 'outra ficha'), ' da lista'),
+    el('div', { class: 'sub' }, 'Use se a pessoa já está cadastrada com outro nome ou telefone.'), busca, resultadosBusca],
+  'outra', () => { busca.focus(); if (!alvo || possiveis.includes(alvo)) { alvo = null; escolhida = null; renderTudo(); } });
+  escolhas.append(outra.label);
+  const nova = opcaoFicha([el('div', {}, el('strong', {}, 'Criar ficha nova')),
+    el('div', { class: 'sub' }, 'A pessoa ainda não está no cadastro.')], 'nova', () => { alvo = null; escolhida = 'nova'; renderTudo(); });
+  escolhas.append(nova.label);
+  if (!possiveis.length) nova.radio.checked = true;
+
+  busca.addEventListener('focus', () => { outra.radio.checked = true; });
+  busca.addEventListener('input', () => {
+    const termo = normalizado(busca.value);
+    resultadosBusca.replaceChildren();
+    if (termo.length < 2) return;
+    const achados = ordenados.filter((m) => normalizado(m.nome).includes(termo)).slice(0, 8);
+    if (!achados.length) { resultadosBusca.append(el('p', { class: 'dica' }, 'Nenhuma ficha com esse nome.')); return; }
+    for (const m of achados) {
+      resultadosBusca.append(el('button', { type: 'button', class: 'resultado' + (alvo === m ? ' ativo' : ''),
+        onclick: () => { outra.radio.checked = true; busca.value = m.nome; resultadosBusca.replaceChildren(); escolherFicha(m); } },
+      el('strong', {}, m.nome), ' ', pilulaStatus(m), el('span', { class: 'sub' }, resumoMembro(m))));
     }
-    for (const k of ['dia', 'mes', 'ano']) if (k in dados) dados[k] = Number(dados[k]) || null;
-    if ('ministerios' in dados) dados.ministerios = (dados.ministerios || '').split(',').map((v) => v.trim()).filter(Boolean);
-    const familia = escolhas.filter(({select}) => select.value).map(({f, select}) => ({parentesco: f.parentesco, membroId: select.value}));
-    if (familia.some(({membroId}) => membroId === pessoa.value)) { erro.textContent = 'Uma pessoa não pode ser seu próprio familiar.'; return; }
-    if (!confirm(`Aprovar ${s.dados.nome} como ${status.value}${pessoa.value ? ' na ficha existente' : ' como pessoa nova'}?`)) return;
-    try {
-      await api('POST', `/api/solicitacoes-membros/${s.id}/aprovar`, {membroId: pessoa.value || undefined, status: status.value, dados, familia});
-      dlg.close(); await carregarMembros();
-    } catch (e) { erro.textContent = e.message; }
   });
-  acoes.append(cancelar, rejeitar, aprovar); form.append(acoes);
-  dlg.append(form); document.body.append(dlg);
-  dlg.addEventListener('close', () => dlg.remove(), {once: true}); dlg.showModal();
+  function escolherFicha(m) {
+    alvo = m; escolhida = 'existente';
+    if (m.status === 'membro' || m.status === 'congregado') statusEscolhido(m.status);
+    renderTudo();
+  }
+
+  const situacao = el('div', { class: 'segmentado', role: 'radiogroup', 'aria-label': 'Situação após aprovação' });
+  const radiosStatus = {};
+  for (const [valor, texto] of [['congregado', 'Congregado(a)'], ['membro', 'Membro']]) {
+    const r = el('input', { type: 'radio', name: 'status-' + s.id, value: valor });
+    r.addEventListener('change', atualizarResumo);
+    radiosStatus[valor] = r;
+    situacao.append(el('label', {}, r, texto));
+  }
+  const statusEscolhido = (v) => { radiosStatus[v].checked = true; };
+  statusEscolhido('congregado');
+  const statusAtual = () => (radiosStatus.membro.checked ? 'membro' : 'congregado');
+
+  corpo.append(el('section', { class: 'revisao-passo' },
+    el('h3', {}, el('span', { class: 'numero' }, '1'), 'Esta pessoa já tem ficha?'),
+    possiveis.length ? el('p', { class: 'dica' }, 'Encontramos fichas parecidas (mesmo nome, CPF ou telefone). Confira antes de escolher.') : null,
+    escolhas,
+    el('div', { class: 'linha-situacao' }, el('span', { class: 'rotulo' }, 'Situação depois de aprovar'), situacao)));
+
+  // Passo 2: dados, com comparação quando atualiza uma ficha.
+  const linhas = [];
+  const passoDados = el('section', { class: 'revisao-passo' });
+  const listaDados = el('div');
+  passoDados.append(el('h3', {}, el('span', { class: 'numero' }, '2'), 'Confira os dados enviados'),
+    el('p', { class: 'dica', id: 'dica-dados-' + s.id }), listaDados);
+  corpo.append(passoDados);
+  for (const [grupo, campos] of GRUPOS_REVISAO) {
+    const presentes = campos.filter(([chave]) => valorRevisao(enviados, chave));
+    if (!presentes.length) continue;
+    listaDados.append(el('h4', {}, grupo));
+    for (const [chave, rotulo, tipo] of presentes) {
+      const enviado = valorRevisao(enviados, chave);
+      const controle = controleRevisao(tipo, enviado);
+      const linha = { chave, tipo, enviado, controle, escolha: 'atual', editado: false,
+        no: el('div', { class: 'campo-revisao' }), comparacao: el('div', { class: 'comparacao' }), marca: el('span') };
+      const id = `rev-${s.id}-${chave}`;
+      controle.id = id;
+      controle.addEventListener('input', () => { linha.editado = true; if (linha.estado === 'conflito') linha.escolha = 'enviado'; renderLinha(linha); atualizarResumo(); });
+      controle.addEventListener('change', () => { linha.editado = true; if (linha.estado === 'conflito') linha.escolha = 'enviado'; renderLinha(linha); atualizarResumo(); });
+      linha.no.append(el('div', { class: 'rotulo' }, el('label', { for: id }, rotulo), linha.marca), controle, linha.comparacao);
+      listaDados.append(linha.no);
+      linhas.push(linha);
+    }
+  }
+  function renderLinha(l) {
+    const atual = valorRevisao(alvo, l.chave);
+    l.estado = !alvo ? 'nova' : !atual ? 'vazio' : iguaisRevisao(l.tipo, atual, l.controle.value) ? 'igual' : 'conflito';
+    l.no.classList.toggle('mantido', l.estado === 'conflito' && l.escolha === 'atual');
+    l.comparacao.replaceChildren();
+    l.marca.replaceChildren();
+    if (l.estado === 'vazio') l.marca.append(el('span', { class: 'etiqueta nova' }, 'novo na ficha'));
+    if (l.estado === 'igual') l.marca.append(el('span', { class: 'etiqueta' }, 'igual à ficha'));
+    if (l.estado === 'conflito') {
+      const alternar = el('div', { class: 'alternar' });
+      for (const [valor, texto] of [['atual', 'Manter da ficha'], ['enviado', 'Usar o enviado']]) {
+        alternar.append(el('button', { type: 'button', 'aria-pressed': String(l.escolha === valor),
+          onclick: () => { l.escolha = valor; renderLinha(l); atualizarResumo(); } }, texto));
+      }
+      l.comparacao.append(el('span', { class: 'etiqueta conflito' }, 'diferente'),
+        el('span', {}, 'Na ficha: ', el('strong', {}, exibirRevisao(l.tipo, atual))), alternar);
+    }
+  }
+
+  // Passo 3: familiares informados.
+  const vinculos = [];
+  if ((s.familiares || []).length) {
+    const lista = el('div');
+    for (const f of s.familiares) {
+      const select = el('select', { 'aria-label': `Ficha de ${f.nome}` }, el('option', { value: '' }, 'Não vincular agora'));
+      const sugeridos = membros.filter((m) => normalizado(m.nome) === normalizado(f.nome));
+      for (const m of sugeridos) select.append(el('option', { value: m.id }, `${m.nome} (sugerido) — ${rotuloStatus(m.status, m.sexo)}`));
+      for (const m of ordenados) if (!sugeridos.includes(m)) select.append(el('option', { value: m.id }, `${m.nome} — ${rotuloStatus(m.status, m.sexo)}`));
+      const nota = el('p', { class: 'dica' });
+      if (f.parentesco === 'outro') { select.disabled = true; nota.textContent = 'O cadastro só liga cônjuge, pais e filhos. Anote em observações, se precisar.'; }
+      else if (sugeridos.length === 1) select.value = sugeridos[0].id;
+      else if (!sugeridos.length) nota.textContent = 'Não achamos ficha com este nome. Cadastre depois e faça o vínculo na ficha.';
+      select.addEventListener('change', atualizarResumo);
+      lista.append(el('div', { class: 'familiar-revisao' },
+        el('div', {}, el('strong', {}, f.nome), ' ', el('span', { class: 'etiqueta' }, PARENTESCOS[f.parentesco] || f.parentesco)),
+        el('div', {}, select, nota)));
+      vinculos.push({ f, select });
+    }
+    corpo.append(el('section', { class: 'revisao-passo' },
+      el('h3', {}, el('span', { class: 'numero' }, '3'), 'Família informada'), lista));
+  }
+  casca.append(corpo);
+
+  // Rodapé fixo: o que vai acontecer e as ações.
+  const resumo = el('p', { class: 'resumo', 'aria-live': 'polite' });
+  const erro = el('p', { class: 'erro', role: 'alert' });
+  const aprovar = botao('Aprovar', aprovarCadastro, '');
+  const rejeitar = botao('Rejeitar…', () => { botoes.hidden = true; painelRejeicao.hidden = false; motivo.focus(); }, 'secundario');
+  const botoes = el('div', { class: 'botoes' }, botao('Fechar', () => dlg.close(), 'secundario'), rejeitar, aprovar);
+  const motivo = el('textarea', { rows: 2, maxlength: 300, placeholder: 'Motivo interno (opcional), ex.: ficha duplicada' });
+  const painelRejeicao = el('div', { class: 'revisao-rejeitar', hidden: true },
+    el('label', {}, 'Rejeitar este cadastro? Nada entra na ficha.', motivo),
+    el('div', { class: 'botoes' },
+      botao('Voltar', () => { painelRejeicao.hidden = true; botoes.hidden = false; }, 'secundario'),
+      botao('Confirmar rejeição', async (e) => {
+        e.currentTarget.disabled = true;
+        try {
+          await api('POST', `/api/solicitacoes-membros/${s.id}/rejeitar`, { motivo: motivo.value.trim() });
+          dlg.close(); await carregarSolicitacoesMembros();
+        } catch (err) { erro.textContent = err.message; e.currentTarget.disabled = false; }
+      }, 'perigo')));
+  casca.append(el('footer', { class: 'revisao-rodape' }, resumo, erro, botoes, painelRejeicao));
+
+  /** Dados para o servidor: só o que muda em relação ao que ele faria sozinho. */
+  function dadosRevisados() {
+    const dados = {};
+    for (const l of linhas) {
+      const final = normalizarRevisao(l.tipo, l.controle.value);
+      const enviado = normalizarRevisao(l.tipo, l.enviado);
+      let mandar;
+      if (l.estado === 'conflito') mandar = l.escolha === 'enviado';
+      else mandar = final !== enviado; // o servidor já aplica o enviado onde a ficha está vazia
+      if (!mandar) continue;
+      if (l.chave === 'nascimento') {
+        const [ano, mes, dia] = final ? final.split('-').map(Number) : [null, null, null];
+        Object.assign(dados, { ano, mes, dia });
+      } else if (l.chave === 'ministerios') dados.ministerios = final ? final.split(', ') : [];
+      else dados[l.chave] = final || null;
+    }
+    return dados;
+  }
+  function atualizarResumo() {
+    erro.textContent = '';
+    const ligados = vinculos.filter(({ select }) => select.value).length;
+    if (!escolhida) {
+      resumo.textContent = 'Escolha no passo 1 se a pessoa já tem ficha.';
+      aprovar.disabled = true; aprovar.textContent = 'Aprovar';
+      return;
+    }
+    aprovar.disabled = false;
+    const situacaoTexto = statusAtual() === 'membro' ? 'Membro' : 'Congregado(a)';
+    const partes = [];
+    if (alvo) {
+      const conta = (f) => linhas.filter(f).length;
+      const novos = conta((l) => l.estado === 'vazio');
+      const trocados = conta((l) => l.estado === 'conflito' && l.escolha === 'enviado');
+      const mantidos = conta((l) => l.estado === 'conflito' && l.escolha === 'atual');
+      partes.push(`Atualiza a ficha de ${alvo.nome} como ${situacaoTexto}`);
+      const detalhes = [novos && `${novos} campo(s) novo(s)`, trocados && `${trocados} substituído(s)`,
+        mantidos && `${mantidos} mantido(s) como estava`].filter(Boolean);
+      if (detalhes.length) partes.push(detalhes.join(', '));
+      aprovar.textContent = 'Aprovar e atualizar ficha';
+    } else {
+      partes.push(`Cria a ficha de ${nomeEnviado} como ${situacaoTexto}`);
+      aprovar.textContent = 'Aprovar e criar ficha';
+    }
+    if (vinculos.length) partes.push(`${ligados} de ${vinculos.length} familiar(es) ligado(s)`);
+    resumo.textContent = partes.join(' · ') + '.';
+  }
+  function renderTudo() {
+    for (const l of linhas) { if (!l.editado) l.escolha = 'atual'; renderLinha(l); }
+    $('dica-dados-' + s.id).textContent = alvo
+      ? `Comparando com a ficha de ${alvo.nome}. Onde a ficha está vazia, o dado enviado entra; onde está diferente, escolha o que fica. Você pode corrigir qualquer campo.`
+      : 'Corrija o que precisar. Campos que a pessoa não preencheu não aparecem.';
+    atualizarResumo();
+  }
+  async function aprovarCadastro() {
+    const familia = vinculos.filter(({ select }) => select.value).map(({ f, select }) => ({ parentesco: f.parentesco, membroId: select.value }));
+    if (alvo && familia.some(({ membroId }) => membroId === alvo.id)) { erro.textContent = 'A pessoa não pode ser familiar dela mesma.'; return; }
+    aprovar.disabled = true; const texto = aprovar.textContent; aprovar.textContent = 'Aprovando…';
+    try {
+      await api('POST', `/api/solicitacoes-membros/${s.id}/aprovar`,
+        { membroId: alvo?.id, status: statusAtual(), dados: dadosRevisados(), familia });
+      dlg.close(); await carregarMembros();
+      mensagem($('resultado-solicitacoes'), `Cadastro de ${nomeEnviado} aprovado.`, true);
+    } catch (e) { erro.textContent = e.message; aprovar.disabled = false; aprovar.textContent = texto; }
+  }
+
+  dlg.append(casca); document.body.append(dlg);
+  dlg.addEventListener('close', () => dlg.remove(), { once: true });
+  renderTudo();
+  dlg.showModal();
+  corpo.focus({ preventScroll: true }); // sem anel de foco no primeiro link do cabeçalho
+  corpo.scrollTop = 0;
 }
 
 function montarFiltroMinisterios() {
