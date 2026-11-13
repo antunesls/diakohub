@@ -5,6 +5,7 @@ import '../app_scope.dart';
 import '../data/modo_culto.dart';
 import 'agenda_panel.dart';
 import 'escala_panel.dart';
+import 'gestao/gestao_page.dart';
 import 'mensagem_panel.dart';
 import 'modo_culto_page.dart';
 import 'oracao_panel.dart';
@@ -122,6 +123,13 @@ class _HomePageState extends State<HomePage> {
     if (!mounted) return;
     await Navigator.of(context).push(MaterialPageRoute(builder: (_) => const SettingsPage()));
     _scope.status.atualizar();
+  }
+
+  /// Área pastoral (membros, Gestão da Casa, atas), fora do operacional do culto. Pede o PIN do app.
+  Future<void> _abrirGestao() async {
+    if (!await confirmarPin(context, _scope.settings.pin)) return;
+    if (!mounted) return;
+    await Navigator.of(context).push(MaterialPageRoute(builder: (_) => const GestaoPage()));
   }
 
   /// Abre o Modo Culto com os recados selecionados aqui (sem seleção, ele usa os que estão valendo).
@@ -259,13 +267,28 @@ class _HomePageState extends State<HomePage> {
                           ],
                         ),
                       ),
+                      // Gestão (fora do operacional do culto) ao lado de Configurações: o trilho
+                      // já usa toda a altura do A9+ deitado.
                       Padding(
                         padding: const EdgeInsets.only(bottom: 12),
-                        child: IconButton(
-                          tooltip: 'Configurações',
-                          iconSize: 28,
-                          icon: const Icon(Icons.settings_outlined),
-                          onPressed: _abrirConfiguracoes,
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                          children: [
+                            if (GestaoPage.disponivel(scope))
+                              IconButton(
+                                key: const Key('abrir-gestao'),
+                                tooltip: 'Gestão pastoral: membros, casa e atas',
+                                iconSize: 28,
+                                icon: const Icon(Icons.admin_panel_settings_outlined),
+                                onPressed: _abrirGestao,
+                              ),
+                            IconButton(
+                              tooltip: 'Configurações',
+                              iconSize: 28,
+                              icon: const Icon(Icons.settings_outlined),
+                              onPressed: _abrirConfiguracoes,
+                            ),
+                          ],
                         ),
                       ),
                     ],

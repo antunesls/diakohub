@@ -97,6 +97,12 @@ class ServerApi {
 
   Future<void> ordenarRecados(List<String> ids) => _req('PUT', '/api/recados/ordem', json: ids);
 
+  /// Chamada direta para as telas de gestão (membros, casa, atas), que não guardam cópia local.
+  Future<dynamic> pedir(String metodo, String caminho, {Object? json}) => _req(metodo, caminho, json: json);
+
+  /// Cabeçalho de login para imagens protegidas (ex.: foto do membro em Image.network).
+  Map<String, String> get autorizacao => {'Authorization': 'Bearer ${_config().sessao}'};
+
   Future<Map<String, dynamic>> aprovarMotivo(String id) async =>
       Map<String, dynamic>.from(await _req('POST', '/api/motivos/${Uri.encodeComponent(id)}/aprovar') as Map);
 

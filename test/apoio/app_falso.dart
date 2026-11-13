@@ -59,6 +59,35 @@ class ServidorFalso {
 
   late final hoje = diaIso(agora);
 
+  /// Escritas da área de Gestão (método + caminho) e seus corpos.
+  final gestao = <String>[];
+  final corposGestao = <Map<String, dynamic>>[];
+
+  late final membros = [
+    Membro(id: 'p1', nome: 'Ana Paula Souza', status: StatusMembro.membro, whatsapp: '11987654321',
+        dia: 30, mes: 10, ministerios: ['Louvor'], cpf: '12345678900', conjugeId: 'p2'),
+    Membro(id: 'p2', nome: 'Jorge Souza', status: StatusMembro.membro, conjugeId: 'p1'),
+    Membro(id: 'p3', nome: 'Caio Torres', status: StatusMembro.visitante),
+  ];
+
+  late final tarefasCasa = <Map<String, dynamic>>[
+    {'id': 't1', 'registro': 'tarefa', 'tipo': 'pendencia', 'titulo': 'Trocar lâmpada do salão', 'local': 'Salão',
+      'prazo': diaIso(agora.subtract(const Duration(days: 2))), 'prioridade': 'alta', 'responsavel': 'Sérgio',
+      'estado': 'aberta', 'historico': []},
+    {'id': 't2', 'registro': 'tarefa', 'tipo': 'compra', 'titulo': 'Café', 'local': '', 'prazo': diaIso(agora.add(const Duration(days: 20))),
+      'prioridade': 'normal', 'responsavel': '', 'estado': 'aberta', 'historico': []},
+  ];
+
+  late final atasGestao = <Map<String, dynamic>>[
+    {'id': 'a1', 'tipo': 'conselho', 'titulo': '', 'data': diaIso(agora.subtract(const Duration(days: 3))), 'numero': 4, 'ano': agora.year,
+      'status': 'finalizada', 'sigilosa': false, 'presidente': 'Pr. Marcos', 'secretario': 'Ana Paula Souza',
+      'presentes': [{'nome': 'Pr. Marcos'}, {'nome': 'Ana Paula Souza'}], 'ausentes': [],
+      'pauta': [{'titulo': 'Reforma do telhado', 'discussao': 'Três orçamentos.', 'deliberacao': 'Aprovado o orçamento B.'}],
+      'encaminhamentos': [{'id': 'e1', 'descricao': 'Contratar a empresa B', 'responsavel': 'Sérgio',
+        'prazo': diaIso(agora.subtract(const Duration(days: 1))), 'concluido': false}],
+      'anexos': [], 'retificacoes': []},
+  ];
+
   late final recados = [
     Recado(id: 'r1', titulo: 'Aniversariantes da semana', texto: 'Ana Paula (30/10), Jorge (31/10), Débora (2/11)', categoria: Categoria.aniversario, fixo: true),
     Recado(id: 'r2', titulo: 'Retiro de Jovens 2026', texto: 'De 14 a 16/11 no Sítio Boa Esperança. Inscrições com a Larissa até 7/11.', categoria: Categoria.evento, ordem: 1),
@@ -186,6 +215,15 @@ class ServidorFalso {
             }(),
           '/api/estado' => {'qrHolyrics': 'DiakoNews/qr.png', 'qrMensagensHolyrics': 'DiakoNews/qr-mensagens.png', 'qrPixHolyrics': 'DiakoNews/qr-pix.png'},
           '/api/projetar/boas-vindas' => {'status': 'ok'},
+          '/api/membros' => [for (final m in membros) m.toJson()],
+          '/api/casa' when req.method == 'GET' => {'tarefas': tarefasCasa, 'rotinas': const []},
+          '/api/casa/responsaveis' => const ['Administrador', 'Sérgio'],
+          '/api/atas' when req.method == 'GET' => atasGestao,
+          _ when caminho.startsWith('/api/casa/') || caminho.startsWith('/api/atas/') => () {
+              gestao.add('${req.method} $caminho');
+              corposGestao.add(req.body.isEmpty ? {} : Map<String, dynamic>.from(jsonDecode(req.body) as Map));
+              return <String, dynamic>{'ok': true};
+            }(),
           _ when caminho.startsWith('/api/holyrics/') => () {
               holyrics.add(caminho.substring('/api/holyrics/'.length));
               corpos.add(req.body.isEmpty ? {} : Map<String, dynamic>.from(jsonDecode(req.body) as Map));
