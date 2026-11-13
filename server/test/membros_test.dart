@@ -194,7 +194,20 @@ void main() {
         'familiares': [{'nome': 'Bruno', 'parentesco': 'conjuge'}],
       });
       expect(envio.$1, 201);
-      await Future<void>.delayed(const Duration(milliseconds: 50));
+      // O aviso sai em segundo plano: espera o resultado ser gravado (até 3 s), sem tempo fixo,
+      // que no Windows do CI às vezes não bastava.
+      Future<Map> solicitacao(String nome) async {
+        for (var i = 0; i < 60; i++) {
+          final s = ((await chamar('GET', '/api/solicitacoes-membros')).$2 as List)
+              .cast<Map>()
+              .firstWhere((s) => s['dados']['nome'] == nome);
+          if (s['avisoEmail'] != null) return s;
+          await Future<void>.delayed(const Duration(milliseconds: 50));
+        }
+        fail('O resultado do aviso de "$nome" não foi gravado.');
+      }
+
+      expect((await solicitacao('Ana bSouza'))['avisoEmail'], 'enviado');
       final (resumo, url) = avisos.single;
       expect(resumo.nome, 'Ana bSouza');
       expect(resumo.whatsapp, '11988887777');
@@ -202,8 +215,6 @@ void main() {
       expect(resumo.familiares, 1);
       expect(resumo.menor, false);
       expect(url, endsWith('/painel?aba=membros'));
-      final lista = (await chamar('GET', '/api/solicitacoes-membros')).$2 as List;
-      expect(lista.single['avisoEmail'], 'enviado');
 
       // E-mail fora do ar não impede o cadastro e fica registrado.
       avisoFalha = true;
@@ -211,10 +222,7 @@ void main() {
         'nome': 'Carlos Lima', 'aniversario': '01/01/1980', 'email': 'carlos@teste.com', 'autorizo': true,
       });
       expect(outro.$1, 201);
-      await Future<void>.delayed(const Duration(milliseconds: 50));
-      final doc = ((await chamar('GET', '/api/solicitacoes-membros')).$2 as List)
-          .firstWhere((s) => s['dados']['nome'] == 'Carlos Lima');
-      expect(doc['avisoEmail'], 'falhou');
+      expect((await solicitacao('Carlos Lima'))['avisoEmail'], 'falhou');
     });
 
     test('admin manda aviso de cadastro de exemplo', () async {
