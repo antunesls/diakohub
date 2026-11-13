@@ -120,6 +120,7 @@ const carregar = {
   galeria: carregarGaleria,
   membros: carregarMembros,
   gestaoCasa: carregarCasa,
+  atas: carregarAtas,
   resumo: carregarResumo,
   historico: carregarHistorico,
   status: carregarStatus,
@@ -2428,6 +2429,8 @@ async function iniciar() {
   mostrarAba(abaAtual);
   if (abaAtual !== 'motivos' && pode('motivosVer')) carregarMotivos();
   if (abaAtual !== 'mensagens' && pode('mensagens')) carregarMensagens();
+  // Badge de encaminhamentos vencidos das atas.
+  if (abaAtual !== 'atas' && pode('atas')) carregarAtas();
   conectarTempoReal();
 }
 

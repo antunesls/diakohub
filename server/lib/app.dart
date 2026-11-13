@@ -16,6 +16,8 @@ import 'agenda.dart';
 import 'agenda_google_api.dart';
 import 'anexos_casa.dart';
 import 'agente_hub.dart';
+import 'ata_pdf.dart';
+import 'atas.dart';
 import 'auth.dart';
 import 'backup.dart';
 import 'backup_cifrado.dart';
@@ -65,6 +67,7 @@ class Servidor {
     this.clienteAgenda,
     this.enviarAvisoMensagem,
     this.enviarAvisoCadastro,
+    this.enviarAta,
     this.senhaMinima = 6,
     DateTime Function()? relogio,
     LimiteTaxa? limitePedidos,
@@ -106,6 +109,8 @@ class Servidor {
   final Store store;
   late final GestaoCasa casa = GestaoCasa(store, agora: _agora);
   late final AnexosCasa anexosCasa = AnexosCasa(store.pasta);
+  late final Atas atas = Atas(store, agora: _agora);
+  late final AnexosCasa anexosAtas = AnexosCasa.atas(store.pasta);
   final Auth auth;
   final PonteHolyrics holyrics;
 
@@ -142,6 +147,9 @@ class Servidor {
 
   /// Envia o aviso de ficha nova do cadastro público (substituível nos testes).
   final Future<void> Function(ResumoCadastro resumo, String urlRevisar)? enviarAvisoCadastro;
+
+  /// Envia uma ata por e-mail (substituível nos testes; sem ele, usa o SMTP do /admin).
+  final Future<void> Function(EmailAta email)? enviarAta;
 
   /// Tamanho mínimo da senha ao trocar pelo painel (10 quando o servidor está na internet).
   final int senhaMinima;
@@ -200,6 +208,7 @@ class Servidor {
       ..get('/ajuda/usuarios', (Request _) => _pagina('ajuda-usuarios.html'))
       ..get('/ajuda/rede-local', (Request _) => _pagina('ajuda-rede-local.html'))
       ..get('/ajuda/visitantes', (Request _) => _pagina('ajuda-visitantes.html'))
+      ..get('/ajuda/atas', (Request _) => _pagina('ajuda-atas.html'))
       // Perfis e permissões (só a descrição da matriz, para a página de ajuda).
       ..get('/api/public/perfis', (Request _) => _json({
             'perfis': [for (final p in Perfil.values) p.toJson()],
@@ -275,6 +284,29 @@ class Servidor {
       ..get('/api/casa/anexos/<nome>', _verAnexoCasa)
       ..post('/api/casa/rotinas', _criarRotinaCasa)
       ..put('/api/casa/rotinas/<id>', _editarRotinaCasa)
+      // Atas de reunião (painel). As sigilosas só aparecem para quem tem atasSigilosas.
+      ..get('/api/atas', (Request req) => _json(atas.listar(podeSigilosas: _podeSigilosas(req))))
+      ..get('/api/atas/encaminhamentos', (Request req) => _json(atas.pendentes(podeSigilosas: _podeSigilosas(req))))
+      ..get('/api/atas/pessoas', _pessoasAtas)
+      ..get('/api/atas/anexos/<nome>', _verAnexoAta)
+      ..post('/api/atas', _criarAta)
+      ..get('/api/atas/<id>', _verAta)
+      ..put('/api/atas/<id>', _editarAta)
+      ..delete('/api/atas/<id>', _excluirAta)
+      ..post('/api/atas/<id>/finalizar', (Request req, String id) =>
+          _operacaoAta(() => atas.finalizar(id, por: _autorCasa(req), podeSigilosas: _podeSigilosas(req))))
+      ..post('/api/atas/<id>/reabrir', (Request req, String id) =>
+          _operacaoAta(() => atas.reabrir(id, por: _autorCasa(req), podeSigilosas: _podeSigilosas(req))))
+      ..post('/api/atas/<id>/aprovar', (Request req, String id) async => _operacaoAta(() async =>
+          atas.aprovar(id, await _corpo(req), por: _autorCasa(req), podeSigilosas: _podeSigilosas(req))))
+      ..post('/api/atas/<id>/retificar', (Request req, String id) async => _operacaoAta(() async =>
+          atas.retificar(id, await _corpo(req), por: _autorCasa(req), podeSigilosas: _podeSigilosas(req))))
+      ..put('/api/atas/<id>/encaminhamentos/<eid>', (Request req, String id, String eid) async => _operacaoAta(() async =>
+          atas.marcarEncaminhamento(id, eid, await _corpo(req), por: _autorCasa(req), podeSigilosas: _podeSigilosas(req))))
+      ..get('/api/atas/<id>/pdf', _pdfAta)
+      ..post('/api/atas/<id>/email', _emailAta)
+      ..post('/api/atas/<id>/anexos', _enviarAnexoAta)
+      ..delete('/api/atas/<id>/anexos/<nome>', _excluirAnexoAta)
       ..get('/api/solicitacoes-membros', _listarSolicitacoesMembros)
       ..get('/api/solicitacoes-membros/<id>/foto', _fotoSolicitacaoMembro)
       ..post('/api/solicitacoes-membros/<id>/aprovar', _aprovarSolicitacaoMembro)
@@ -1043,6 +1075,180 @@ class Servidor {
     if (tarefa == null || !atuais.contains(nome)) return _erro(404, 'Anexo não encontrado.');
     await store.salvar('gestaoCasa', {...tarefa, 'anexos': atuais.where((e) => e != nome).toList()});
     await anexosCasa.excluir(nome);
+    return _json({'ok': true});
+  }
+
+  // ---------- Atas de reunião ----------
+
+  bool _podeSigilosas(Request req) => Auth.contaDa(req)?.pode(Permissao.atasSigilosas) ?? false;
+
+  /// Ata que a conta pode ver; sigilosa sem permissão responde como inexistente (404).
+  Map<String, dynamic>? _ataVisivel(Request req, String id) => atas.ata(id, podeSigilosas: _podeSigilosas(req));
+
+  Future<Response> _operacaoAta(Future<Map<String, dynamic>> Function() executar, {int status = 200}) async {
+    try {
+      return _json(await executar(), status: status);
+    } on FormatException catch (e) {
+      return _erro(400, e.message);
+    } on StateError catch (e) {
+      return _erro(409, e.message);
+    } on ArgumentError catch (e) {
+      return _erro(404, '${e.message}');
+    }
+  }
+
+  Response _verAta(Request req, String id) {
+    final a = _ataVisivel(req, id);
+    return a == null ? _erro(404, 'Ata não encontrada.') : _json(a);
+  }
+
+  Future<Response> _criarAta(Request req) async => _operacaoAta(() async =>
+      atas.criar(await _corpo(req), por: _autorCasa(req), podeSigilosas: _podeSigilosas(req)), status: 201);
+
+  Future<Response> _editarAta(Request req, String id) async => _operacaoAta(() async =>
+      atas.editar(id, await _corpo(req), por: _autorCasa(req), podeSigilosas: _podeSigilosas(req)));
+
+  Future<Response> _excluirAta(Request req, String id) async {
+    try {
+      final anexos = await atas.excluir(id, podeSigilosas: _podeSigilosas(req));
+      for (final nome in anexos) {
+        await anexosAtas.excluir(nome);
+      }
+      return _json({'ok': true});
+    } on StateError catch (e) {
+      return _erro(409, e.message);
+    } on ArgumentError catch (e) {
+      return _erro(404, '${e.message}');
+    }
+  }
+
+  /// Pessoas ativas para marcar presença: só id, nome e se há e-mail (o endereço não sai daqui).
+  Response _pessoasAtas(Request _) {
+    final lista = [
+      for (final m in _listaMembros())
+        if (m.status.ativo) {'id': m.id, 'nome': m.nome, 'temEmail': (m.email ?? '').trim().isNotEmpty},
+    ]..sort((a, b) => (a['nome'] as String).toLowerCase().compareTo((b['nome'] as String).toLowerCase()));
+    return _json(lista);
+  }
+
+  Future<Uint8List> _gerarPdfAta(Map<String, dynamic> ata) {
+    final logo = File(p.join(pastaWeb, 'logo.png'));
+    return gerarAtaPdf(ata, igreja: nomeIgreja, logo: logo.existsSync() ? logo.readAsBytesSync() : null);
+  }
+
+  String _nomePdfAta(Map<String, dynamic> a) => a['numero'] is int
+      ? 'ata-${a['tipo']}-${a['ano']}-${a['numero'].toString().padLeft(3, '0')}.pdf'
+      : 'ata-${a['tipo']}-${a['data']}.pdf';
+
+  Future<Response> _pdfAta(Request req, String id) async {
+    final a = _ataVisivel(req, id);
+    if (a == null) return _erro(404, 'Ata não encontrada.');
+    return Response.ok(await _gerarPdfAta(a), headers: {
+      'content-type': 'application/pdf',
+      'content-disposition': 'attachment; filename="${_nomePdfAta(a)}"',
+    });
+  }
+
+  static final _emailValido = RegExp(r'^[^@\s,;<>"]+@[^@\s,;<>"]+\.[^@\s,;<>"]+$');
+
+  /// POST {incluirPresentes, outros: [e-mails], mensagem, confirmarSigilo}
+  /// Os e-mails dos presentes saem do cadastro de membros, no servidor.
+  Future<Response> _emailAta(Request req, String id) async {
+    final a = _ataVisivel(req, id);
+    if (a == null) return _erro(404, 'Ata não encontrada.');
+    if (a['status'] == 'rascunho') return _erro(409, 'Finalize a ata antes de enviar.');
+    final enviar = enviarAta ??
+        (cfg?.smtpConfigurado == true
+            ? (EmailAta e) => enviarEmailAta(cfg!, e, arquivoLogo: p.join(pastaWeb, 'logo.png'))
+            : null);
+    if (enviar == null) return _erro(400, 'Configure o envio de e-mails (SMTP) em /admin primeiro.');
+    final corpo = await _corpo(req);
+    if (a['sigilosa'] == true && corpo['confirmarSigilo'] != true) {
+      return _erro(409, 'Ata sigilosa: confirme que os destinatários podem recebê-la.');
+    }
+    final outros = corpo['outros'] ?? const [];
+    final mensagem = corpo['mensagem'] ?? '';
+    if (outros is! List || outros.length > 30 || outros.any((e) => e is! String || !_emailValido.hasMatch(e.trim()))) {
+      return _erro(400, 'Confira os e-mails informados.');
+    }
+    if (mensagem is! String || mensagem.length > 2000) return _erro(400, 'Recado longo demais.');
+    final destinatarios = <String>{for (final e in outros.cast<String>()) e.trim().toLowerCase()};
+    if (corpo['incluirPresentes'] == true) {
+      final membros = {for (final m in _listaMembros()) m.id: m};
+      for (final pessoa in (a['presentes'] as List? ?? const []).cast<Map>()) {
+        final email = membros[pessoa['membroId']]?.email?.trim() ?? '';
+        if (_emailValido.hasMatch(email)) destinatarios.add(email.toLowerCase());
+      }
+    }
+    if (destinatarios.isEmpty) return _erro(400, 'Nenhum destinatário com e-mail.');
+    final situacao = a['status'] == 'aprovada'
+        ? 'aprovada em ${_dataCurtaAta(a['aprovadaEm'] as String)}'
+        : Atas.formal(a) ? 'aguardando aprovação' : 'finalizada';
+    final autor = _autorCasa(req);
+    try {
+      await enviar(EmailAta(
+        destinatarios: destinatarios.toList(),
+        titulo: Atas.titulo(a),
+        dataReuniao: _dataCurtaAta(a['data'] as String),
+        situacao: situacao,
+        pdf: await _gerarPdfAta(a),
+        nomePdf: _nomePdfAta(a),
+        mensagem: mensagem.trim(),
+        remetente: autor,
+      )).timeout(const Duration(seconds: 30));
+    } catch (e) {
+      stderr.writeln('Falha ao enviar ata $id por e-mail: ${e.runtimeType}');
+      return _erro(502, 'Não foi possível enviar o e-mail. Confira o SMTP em /admin.');
+    }
+    await atas.anotarEnvio(id, destinatarios.length, autor);
+    return _json({'ok': true, 'destinatarios': destinatarios.length});
+  }
+
+  static String _dataCurtaAta(String iso) =>
+      iso.length < 10 ? iso : '${iso.substring(8, 10)}/${iso.substring(5, 7)}/${iso.substring(0, 4)}';
+
+  Future<Response> _enviarAnexoAta(Request req, String id) async {
+    final a = _ataVisivel(req, id);
+    if (a == null) return _erro(404, 'Ata não encontrada.');
+    final atuais = (a['anexos'] as List? ?? const []).cast<String>();
+    if (atuais.length >= Atas.maximoAnexos) return _erro(400, 'No máximo ${Atas.maximoAnexos} anexos por ata.');
+    final bytes = await _lerBytes(req, AnexosCasa.tamanhoMaximo);
+    if (bytes == null) return _erro(413, 'Arquivo maior que 15 MB.');
+    try {
+      final nome = await anexosAtas.salvar(bytes);
+      try {
+        final atual = store.buscar(Atas.colecao, id)!;
+        await store.salvar(Atas.colecao, {...atual,
+          'anexos': [...(atual['anexos'] as List? ?? const []).cast<String>(), nome],
+          'historico': [...atual['historico'] as List,
+            {'acao': 'anexo incluído', 'em': _agora().toIso8601String(), 'por': _autorCasa(req)}]});
+      } catch (_) {
+        await anexosAtas.excluir(nome);
+        rethrow;
+      }
+      return _json({'nome': nome}, status: 201);
+    } on FormatException catch (e) {
+      return _erro(400, e.message);
+    }
+  }
+
+  /// O anexo só sai para quem pode ver a ata a que ele pertence.
+  Response _verAnexoAta(Request req, String nome) {
+    final vinculado = atas.listar(podeSigilosas: _podeSigilosas(req))
+        .any((a) => (a['anexos'] as List? ?? const []).contains(nome));
+    final arquivo = vinculado ? anexosAtas.arquivo(nome) : null;
+    return arquivo == null ? _erro(404, 'Anexo não encontrado.') : _arquivo(arquivo);
+  }
+
+  Future<Response> _excluirAnexoAta(Request req, String id, String nome) async {
+    final a = _ataVisivel(req, id);
+    final atuais = (a?['anexos'] as List? ?? const []).cast<String>();
+    if (a == null || !atuais.contains(nome)) return _erro(404, 'Anexo não encontrado.');
+    if (a['status'] == 'aprovada') return _erro(409, 'Ata aprovada: os anexos não podem ser removidos.');
+    await store.salvar(Atas.colecao, {...a, 'anexos': atuais.where((e) => e != nome).toList(),
+      'historico': [...a['historico'] as List,
+        {'acao': 'anexo removido', 'em': _agora().toIso8601String(), 'por': _autorCasa(req)}]});
+    await anexosAtas.excluir(nome);
     return _json({'ok': true});
   }
 

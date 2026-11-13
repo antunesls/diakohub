@@ -54,5 +54,5 @@ test('painel carrega o script das Palavras e o menu na versão nova', () => {
   const html = fs.readFileSync(path.join(__dirname, '../web/painel.html'), 'utf8');
   assert.match(html, /data-painel="palavras"/);
   assert.match(html, /<script src="\/palavras-pdf\.js\?v=1"><\/script>\s*<script src="\/palavras-ensaio\.js\?v=1"><\/script>\s*<script src="\/palavras\.js\?v=7"><\/script>\s*<script src="\/palavras-ensaio-tela\.js\?v=1"><\/script>/);
-  assert.match(html, /<script src="\/menu-lateral\.js\?v=4"><\/script>/);
+  assert.match(html, /<script src="\/menu-lateral\.js\?v=5"><\/script>/);
 });

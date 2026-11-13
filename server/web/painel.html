@@ -132,6 +132,31 @@
   dialog.dialogo-largo form.casa-form { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); height:auto; overflow-y:auto; flex:1; min-height:0; align-content:start; }
   @media (max-width:760px) { .casa-linha { grid-template-columns:1fr auto; } .casa-linha > * { grid-column:1/-1; } .casa-linha .casa-acoes { justify-content:start; } }
   @media (max-width:520px) { dialog.dialogo-largo form.casa-form { grid-template-columns:1fr; } .casa-form .largo { grid-column:1; } }
+  /* Atas de reunião */
+  .ata-linha { grid-template-columns:110px minmax(180px,1fr) minmax(150px,210px) auto; }
+  .ata-status { display:inline-block; padding:3px 8px; border-radius:6px; background:var(--neutro); font-size:13px; }
+  .ata-status.ata-rascunho { background:#fdf3e1; color:#7a4b00; }
+  .ata-status.ata-aprovada { background:#dcf0dd; color:#22592b; }
+  .ata-sigilosa { display:inline-block; margin-left:6px; padding:3px 8px; border-radius:6px; background:#fae7e0; color:#8a3525; font-size:13px; font-weight:700; }
+  .ata-pessoas { display:flex; flex-wrap:wrap; gap:6px; margin:8px 0 4px; }
+  .ata-chip { display:inline-flex; align-items:center; gap:4px; padding:4px 6px 4px 10px; border-radius:999px; background:var(--neutro); font-size:14px; }
+  .ata-chip .link { padding:0 6px; font-size:18px; line-height:1; }
+  .ata-linha-entrada { display:flex; flex-wrap:wrap; gap:6px; margin-top:6px; }
+  .ata-linha-entrada input { flex:1; min-width:180px; }
+  .ata-blocos { display:flex; flex-direction:column; gap:10px; margin-bottom:8px; }
+  .ata-bloco { border:1px solid var(--linha); border-radius:10px; padding:12px; display:grid; gap:8px; }
+  .ata-encaminhamento { grid-template-columns:repeat(2,minmax(0,1fr)); }
+  .ata-encaminhamento .largo, .ata-encaminhamento .botao, .ata-encaminhamento p { grid-column:1/-1; }
+  .ata-check { display:flex !important; gap:8px; align-items:flex-start; font-weight:400 !important; margin:4px 0; }
+  .ata-check input { width:auto !important; margin-top:4px; }
+  .ata-dados { display:grid; grid-template-columns:max-content 1fr; gap:4px 12px; margin:8px 0; }
+  .ata-dados dt { font-weight:700; color:var(--suave); }
+  .ata-dados dd { margin:0; }
+  .ata-texto { white-space:pre-line; }
+  .ata-deliberacao { border-left:3px solid var(--primaria); padding-left:10px; font-weight:600; }
+  .ata-item { margin:10px 0; }
+  .ata-acoes { flex-wrap:wrap; }
+  @media (max-width:520px) { .ata-encaminhamento { grid-template-columns:1fr; } }
   /* Status: fundo claro + texto escuro (contraste ≥ 4,5:1); --cor é o tom da barra de composição. */
   .st-visitante { --st-fundo: #dbeafb; --st-texto: #1c4f86; --st-cor: #3b82c4; }
   .st-congregado { --st-fundo: #d6f0ec; --st-texto: #17594f; --st-cor: #2a9d8f; }
@@ -842,6 +867,26 @@
       <div id="casa-rotinas" class="lista"></div>
     </section>
 
+    <section data-painel="atas" hidden>
+      <div class="casa-topo">
+        <div><h1>Atas de reunião</h1><p class="dica">Livro de atas do conselho, diretoria, assembleia e das reuniões dos ministérios. <a href="/ajuda/atas" target="_blank">Como funciona</a></p></div>
+        <div class="acoes-lista">
+          <button type="button" class="botao pequeno" id="atas-nova">+ Nova ata</button>
+        </div>
+      </div>
+      <div class="casa-filtros">
+        <label>Buscar<input id="atas-busca" type="search" placeholder="Título, assunto da pauta ou local"></label>
+        <label>Tipo<select id="atas-tipo"><option value="">Todos</option><option value="conselho">Conselho</option><option value="diretoria">Diretoria</option><option value="assembleia">Assembleia</option><option value="ministerio">Ministério / equipe</option><option value="outra">Outra reunião</option></select></label>
+        <label>Situação<select id="atas-status"><option value="">Todas</option><option value="rascunho">Rascunho</option><option value="finalizada">Finalizada</option><option value="aprovada">Aprovada</option></select></label>
+        <label>Ano<select id="atas-ano"><option value="">Todos</option></select></label>
+      </div>
+      <p id="atas-resultado" role="status"></p>
+      <div class="casa-lista" id="atas-lista"></div>
+      <h2>Encaminhamentos pendentes</h2>
+      <p class="dica">Tudo o que foi decidido nas atas finalizadas e ainda não foi feito, do prazo mais próximo ao mais distante.</p>
+      <div id="atas-pendentes" class="lista"></div>
+    </section>
+
     <section data-painel="membros" hidden>
       <div class="cartao" style="padding:16px;margin-bottom:16px">
         <div class="barra"><h2>Cadastros enviados pelo link <span id="solicitacoes-contagem" class="badge" hidden></span></h2><span class="espaco"></span>
@@ -1408,9 +1453,10 @@
 
 <script src="/comum.js?v=5"></script>
 <script src="/form-visitante.js?v=2"></script>
-<script src="/menu-lateral.js?v=4"></script>
+<script src="/menu-lateral.js?v=5"></script>
 <script src="/gestao-casa.js?v=1"></script>
-<script src="/painel.js?v=22"></script>
+<script src="/atas.js?v=1"></script>
+<script src="/painel.js?v=23"></script>
 <script src="/acessos-escala.js?v=2"></script>
 <script src="/repertorio-busca.js?v=1"></script>
 <script src="/musica-youtube.js?v=1"></script>

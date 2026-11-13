@@ -17,6 +17,8 @@ enum Permissao {
   galeria('Galeria do site'),
   membros('Cadastro de membros'),
   gestaoCasa('Gestão da Casa: pendências, compras e manutenção'),
+  atas('Atas de reunião'),
+  atasSigilosas('Ver e escrever atas sigilosas'),
   visitantes('Ver os visitantes do dia e dar as boas-vindas'),
   visitantesCadastrar('Cadastrar visitantes (recepção)'),
   resumo('Resumo da semana'),
@@ -45,17 +47,18 @@ enum Perfil {
     Permissao.galeria, Permissao.membros, Permissao.gestaoCasa, Permissao.resumo, Permissao.projetar, Permissao.admin, Permissao.usuarios,
     Permissao.visitantes, Permissao.visitantesCadastrar, Permissao.escalasVer, Permissao.escalaPastoral, Permissao.escalaLouvor,
     Permissao.minhaEscala, Permissao.acessosEscala, Permissao.palavras, Permissao.palavrasTodas,
+    Permissao.atas, Permissao.atasSigilosas,
   }),
   pastor('Pastor', 'Todo o conteúdo, inclusive pedidos particulares. Sem configurações técnicas.', {
     ..._base, Permissao.motivosParticulares, Permissao.motivosEditar, Permissao.mensagens, Permissao.agendaEditar,
     Permissao.galeria, Permissao.membros, Permissao.gestaoCasa, Permissao.resumo, Permissao.projetar,
     Permissao.visitantes, Permissao.visitantesCadastrar, Permissao.escalasVer, Permissao.escalaPastoral, Permissao.escalaLouvor,
-    Permissao.minhaEscala, Permissao.palavras, Permissao.palavrasTodas,
+    Permissao.minhaEscala, Permissao.palavras, Permissao.palavrasTodas, Permissao.atas, Permissao.atasSigilosas,
   }),
   secretaria('Secretaria', 'Recados, agenda, mensagens, aniversariantes e pedidos públicos.', {
     ..._base, Permissao.motivosEditar, Permissao.mensagens, Permissao.agendaEditar, Permissao.membros, Permissao.gestaoCasa, Permissao.resumo,
     Permissao.visitantes, Permissao.visitantesCadastrar, Permissao.escalasVer,
-    Permissao.minhaEscala, Permissao.acessosEscala,
+    Permissao.minhaEscala, Permissao.acessosEscala, Permissao.atas,
   }),
   midia('Mídia', 'Cartazes, galeria do site, recados e projeção no telão.', {
     ..._base, Permissao.galeria, Permissao.projetar, Permissao.escalasVer,
@@ -123,6 +126,8 @@ Permissao permissaoDaRota(String metodo, String caminho) {
   if (comeca('api/membros')) return Permissao.membros;
   if (comeca('api/solicitacoes-membros')) return Permissao.membros;
   if (comeca('api/casa')) return Permissao.gestaoCasa;
+  // Atas sigilosas: cada handler confere atasSigilosas antes de mostrar ou alterar.
+  if (comeca('api/atas')) return Permissao.atas;
   if (comeca('api/visitas')) {
     // Contato pós-visita mexe com telefone e anotações: só quem cuida do cadastro.
     if (caminho.endsWith('/contato')) return Permissao.membros;

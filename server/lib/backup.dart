@@ -170,6 +170,15 @@ class Backup {
         }
       }
     }
+    final dirAnexosAtas = Directory(AnexosCasa.atas(pastaDados).pasta);
+    if (await dirAnexosAtas.exists()) {
+      await for (final e in dirAnexosAtas.list()) {
+        final nome = p.basename(e.path);
+        if (e is File && AnexosCasa.nomeValido(nome)) {
+          arquivo.add(ArchiveFile.bytes('anexos-atas/$nome', await e.readAsBytes()));
+        }
+      }
+    }
     // Termos da LGPD assinados: são a prova da autorização, precisam ir junto.
     final dirTermos = Directory(TermosAssinados(pastaDados).pasta);
     if (await dirTermos.exists()) {
@@ -424,6 +433,12 @@ class Restauracao {
                   (doc['anexos'] is List && (doc['anexos'] as List).any((a) => a is! String || !AnexosCasa.nomeValido(a)))) {
                 throw const FormatException('Registro da Gestão da Casa inválido.');
               }
+            case 'atas':
+              if (doc['id'] is! String || doc['tipo'] is! String || doc['data'] is! String ||
+                  !{'rascunho', 'finalizada', 'aprovada'}.contains(doc['status']) ||
+                  (doc['anexos'] is List && (doc['anexos'] as List).any((a) => a is! String || !AnexosCasa.nomeValido(a)))) {
+                throw const FormatException('Ata inválida.');
+              }
           }
         }
         colecoes[nome] = lista;
@@ -488,6 +503,14 @@ class Restauracao {
       temPastaAnexosCasa = true;
       final nome = f.name.substring('anexos-casa/'.length);
       if (AnexosCasa.nomeValido(nome)) anexosCasa[nome] = f.content;
+    }
+    final anexosAtas = <String, List<int>>{};
+    var temPastaAnexosAtas = false;
+    for (final f in arquivo.files) {
+      if (!f.isFile || !f.name.startsWith('anexos-atas/')) continue;
+      temPastaAnexosAtas = true;
+      final nome = f.name.substring('anexos-atas/'.length);
+      if (AnexosCasa.nomeValido(nome)) anexosAtas[nome] = f.content;
     }
     final historico = arquivo.findFile('data/historico.jsonl');
     Map<String, dynamic>? cfg;
@@ -594,6 +617,17 @@ class Restauracao {
         if (e is File && AnexosCasa.nomeValido(p.basename(e.path))) await e.delete();
       }
       for (final a in anexosCasa.entries) {
+        await File(p.join(dir.path, a.key)).writeAsBytes(a.value, flush: true);
+      }
+    }
+    // Anexos das atas (backups de antes delas mantêm os atuais).
+    if (temPastaAnexosAtas) {
+      final dir = Directory(AnexosCasa.atas(pastaDados).pasta);
+      await dir.create(recursive: true);
+      await for (final e in dir.list()) {
+        if (e is File && AnexosCasa.nomeValido(p.basename(e.path))) await e.delete();
+      }
+      for (final a in anexosAtas.entries) {
         await File(p.join(dir.path, a.key)).writeAsBytes(a.value, flush: true);
       }
     }

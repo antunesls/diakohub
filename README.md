@@ -34,7 +34,7 @@ Menu organizado por área; cada pessoa vê só o que o seu perfil permite.
 | Acompanhamento | Motivos de oração (aprovação, testemunhos), Mensagens (*Nova*, *Em análise*, *Resolvida*), Membros (cadastro completo, família, visitantes, acompanhamento, LGPD) |
 | Cultos | Escalas pastoral e do louvor, Repertório, Roteiros do Modo Culto, Palavras (sermões) |
 | Comunicação | Agenda (Google), Recados, Cartazes, Galeria do site, Resumo da semana para o WhatsApp |
-| Operação | Gestão da Casa, Histórico do que foi projetado, Status (Holyrics, agente, QR codes), Acessos às escalas, Administração |
+| Operação | Gestão da Casa, Atas de reunião, Histórico do que foi projetado, Status (Holyrics, agente, QR codes), Acessos às escalas, Administração |
 
 ### Tablet do pastor (app Android)
 Opera o telão durante o culto: recados, cartazes, motivos de oração, boas-vindas aos visitantes, agenda, escala do dia, **Modo Culto** com o roteiro passo a passo e a leitura da **Palavra** com versículos e frases de destaque. Funciona com a última cópia salva se a internet cair. Detalhes em [Funções do app](#funções-do-app).
@@ -54,6 +54,14 @@ Opera o telão durante o culto: recados, cartazes, motivos de oração, boas-vin
 - **Compras planejadas:** quantidade e valor previsto, sem controle de estoque nem aprovação de compras.
 - **Manutenção preventiva:** rotinas com periodicidade em dias, semanas, meses ou anos. A próxima tarefa é criada ao concluir a atual; cada rotina escolhe se conserva a data programada ou conta da execução. É possível pausar e retomar.
 - **Acesso:** perfil próprio *Gestão da Casa* (também disponível para administração, pastor e secretaria). Equipe do painel e pessoas externas podem ser indicadas como responsáveis, mas isso não cria acesso para terceiros. Prazos vencidos aparecem no menu.
+
+### Atas de reunião
+- **Livro de atas:** Conselho, Diretoria e Assembleia recebem número por tipo e ano ao serem finalizadas (rascunho apagado não deixa buraco). Reuniões de ministério ou equipe são registradas sem número nem aprovação.
+- **Fluxo:** rascunho → finalizada → aprovada. Depois de aprovada, a ata fica travada e correções entram como retificação, sem alterar o texto original.
+- **Conteúdo:** presentes e ausentes (do cadastro ou nome livre), pauta com discussão e deliberação, encaminhamentos com responsável e prazo, observações e anexos privados (fotos/PDF, no backup).
+- **Encaminhamentos pendentes** de todas as atas numa lista só; os vencidos aparecem no menu.
+- **PDF e e-mail:** PDF com o logo e linhas de assinatura; envio pelo SMTP do /admin aos presentes com e-mail e a outros endereços, em cópia oculta.
+- **Acesso:** permissão *Atas* para administração, pastor e secretaria. Atas **sigilosas** só para pastor e administração. Ajuda em `/ajuda/atas`.
 
 ### Escalas, repertório e PDF
 - **Escalas pastoral e do louvor:** cultos do mês gerados pelos horários cadastrados, sugestão de pessoas por ministério, avisos de conflito e de indisponibilidade, texto pronto para o WhatsApp.

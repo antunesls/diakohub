@@ -9,9 +9,13 @@ import 'cartazes.dart';
 import 'galeria.dart' show processarFoto;
 import 'lgpd.dart' show TermosAssinados;
 
-/// Fotos e comprovantes da Gestão da Casa. Só a API autenticada entrega arquivos.
+/// Fotos e comprovantes da Gestão da Casa (e, em outra pasta, os anexos das atas).
+/// Só a API autenticada entrega arquivos.
 class AnexosCasa {
-  AnexosCasa(String pastaDados) : pasta = p.join(pastaDados, 'anexos-casa');
+  AnexosCasa(String pastaDados, {String subpasta = 'anexos-casa'}) : pasta = p.join(pastaDados, subpasta);
+
+  /// Anexos das atas de reunião (data/anexos-atas).
+  AnexosCasa.atas(String pastaDados) : this(pastaDados, subpasta: 'anexos-atas');
 
   final String pasta;
   static const tamanhoMaximo = 15 * 1024 * 1024;

@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Ajuda: atas de reunião — DiakoHub</title>
+<link rel="stylesheet" href="/estilo.css?v=5">
+<style>
+  main { max-width: 760px; margin: 0 auto; padding: 32px 16px 64px; }
+  .topo-ajuda { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 20px; padding-bottom: 18px; margin-bottom: 28px; border-bottom: 1px solid var(--linha); }
+  .topo-ajuda img { height: 40px; width: auto; }
+  .topo-ajuda .espaco { flex: 1; }
+  h1 { font-size: 34px; margin-bottom: 8px; }
+  .lead { font-size: 18px; color: var(--suave); margin: 0 0 24px; }
+  h2 { font-size: 25px; margin: 40px 0 10px; scroll-margin-top: 16px; }
+  p, li { line-height: 1.6; }
+  ol li, ul li { margin-bottom: 6px; }
+  .nota { padding: 14px 18px; border-radius: 14px; background: var(--primaria-suave); color: var(--primaria-escura); margin: 16px 0; }
+  .nota p { margin: 0; }
+  .indice { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 8px; }
+  .indice a { padding: 4px 12px; border-radius: 16px; border: 1px solid var(--borda); text-decoration: none; font-size: 14px; font-weight: 600; }
+  @media (max-width: 520px) { h1 { font-size: 28px; } h2 { font-size: 22px; } }
+</style>
+</head>
+<body>
+<main>
+  <header class="topo-ajuda">
+    <a href="/painel"><img src="/logo.png" alt="DiakoHub"></a>
+    <span class="espaco"></span>
+    <a class="botao secundario pequeno" href="/painel?aba=atas">Voltar às atas</a>
+  </header>
+
+  <p class="sobretitulo">Ajuda</p>
+  <h1>Atas de reunião</h1>
+  <p class="lead">O livro de atas da igreja no DiakoHub: do rascunho escrito durante a reunião até a ata aprovada, em PDF e enviada por e-mail.</p>
+  <nav class="indice" aria-label="Nesta página">
+    <a href="#tipos">Tipos e numeração</a><a href="#fluxo">Rascunho, finalizada, aprovada</a><a href="#retificacao">Retificação</a>
+    <a href="#encaminhamentos">Encaminhamentos</a><a href="#sigilo">Atas sigilosas</a><a href="#pdf">PDF e e-mail</a><a href="#acesso">Quem acessa</a>
+  </nav>
+
+  <h2 id="tipos">1. Tipos de reunião e numeração</h2>
+  <ul>
+    <li><strong>Conselho, Diretoria e Assembleia</strong> são reuniões formais. Cada uma tem a própria numeração, que recomeça a cada ano: "Ata nº 1/2026 — Conselho", "Ata nº 2/2026 — Conselho"…</li>
+    <li><strong>Ministério / equipe</strong> e <strong>Outra reunião</strong> são operacionais: não têm número nem aprovação. Basta um título (ex.: "Planejamento do louvor — dezembro").</li>
+  </ul>
+  <div class="nota"><p>O número só é dado quando a ata é <strong>finalizada</strong>. Assim, um rascunho apagado não deixa buraco na sequência do livro.</p></div>
+
+  <h2 id="fluxo">2. Rascunho → finalizada → aprovada</h2>
+  <ol>
+    <li><strong>Rascunho:</strong> crie a ata em <em>Atas de reunião › + Nova ata</em>. Dá para escrever durante a reunião e salvar quantas vezes quiser. Marque presentes e ausentes (escolhendo do cadastro de membros ou digitando o nome), registre cada assunto da pauta com o que foi discutido e o que foi decidido, e os encaminhamentos.</li>
+    <li><strong>Finalizada:</strong> quando o texto estiver pronto, clique em <em>Finalizar</em>. As atas formais recebem o número nesse momento. Ainda dá para corrigir: <em>Voltar para rascunho</em> mantém o número.</li>
+    <li><strong>Aprovada</strong> (só as formais): normalmente a ata é lida e aprovada na reunião seguinte. Clique em <em>Registrar aprovação</em> e informe a data (e, se quiser, em qual ata a aprovação foi registrada). A partir daí o texto fica <strong>travado</strong>.</li>
+  </ol>
+  <p>Só rascunhos que nunca foram numerados podem ser excluídos. O que foi finalizado faz parte do livro.</p>
+
+  <h2 id="retificacao">3. Retificação</h2>
+  <p>Achou um erro numa ata já aprovada? Use <em>Retificar</em> e escreva a correção (ex.: "No item 2, onde se lê R$ 5.000, leia-se R$ 5.500"). O texto original não muda: a retificação aparece no fim da ata, no painel e no PDF, com data e autor.</p>
+
+  <h2 id="encaminhamentos">4. Encaminhamentos</h2>
+  <p>São as tarefas que saem da reunião: <em>o que fazer, quem faz e até quando</em>. Os encaminhamentos de todas as atas finalizadas aparecem juntos em <strong>Encaminhamentos pendentes</strong>, no fim da página de atas, e o menu mostra quantos estão com o prazo vencido. Marque como concluído pela lista ou pela ficha da ata (vale também para atas aprovadas).</p>
+
+  <h2 id="sigilo">5. Atas sigilosas</h2>
+  <p>Assuntos delicados (disciplina, casos pessoais, questões trabalhistas) podem ficar numa ata <strong>sigilosa</strong>. Só os perfis <strong>Pastor</strong> e <strong>Administrador</strong> veem, criam e editam atas sigilosas e os anexos delas. Para os outros perfis, elas simplesmente não aparecem.</p>
+  <div class="nota"><p>Para enviar uma ata sigilosa por e-mail, o painel pede uma confirmação extra.</p></div>
+
+  <h2 id="pdf">6. PDF, e-mail e anexos</h2>
+  <ul>
+    <li><strong>Baixar PDF:</strong> gera a ata com o logo da igreja, presença, pauta, deliberações, encaminhamentos, retificações e linhas de assinatura para presidente e secretário(a). Rascunhos saem marcados como "RASCUNHO".</li>
+    <li><strong>Enviar por e-mail:</strong> manda o PDF anexo para os presentes que têm e-mail no cadastro e para outros endereços que você digitar. Todos vão em <strong>cópia oculta</strong>: ninguém vê o e-mail dos outros. Usa o mesmo servidor de e-mail (SMTP) configurado em <strong>Administração</strong> para os avisos.</li>
+    <li><strong>Anexos:</strong> fotos ou PDFs (orçamentos, documentos apresentados, lista de presença assinada), até 15 MB cada e 10 por ata. Eles entram no backup. Depois que a ata é aprovada, anexos podem ser incluídos, mas não removidos.</li>
+  </ul>
+
+  <h2 id="acesso">7. Quem acessa</h2>
+  <ul>
+    <li><strong>Administrador</strong> e <strong>Pastor:</strong> todas as atas, inclusive as sigilosas.</li>
+    <li><strong>Secretaria:</strong> todas as atas que não são sigilosas.</li>
+    <li>Os demais perfis não veem a página de atas.</li>
+  </ul>
+  <p>Cada ata guarda um histórico de quem criou, editou, finalizou, aprovou, retificou ou enviou.</p>
+</main>
+</body>
+</html>
