@@ -14,6 +14,7 @@ import 'package:diako_server/configuracoes.dart';
 import 'package:diako_server/email_mensagens.dart';
 import 'package:diako_server/historico.dart';
 import 'package:diako_server/holyrics.dart';
+import 'package:diako_server/limpeza_escalas.dart';
 import 'package:diako_server/store.dart';
 import 'package:diako_server/tablets_locais.dart';
 import 'package:diako_server/usuarios.dart';
@@ -38,6 +39,10 @@ Future<void> main(List<String> args) async {
 
   final store = Store(config.pastaDados);
   await store.carregar();
+  // Quem foi excluído do cadastro antes de a exclusão limpar as escalas ainda aparecia nelas
+  // como "(pessoa removida)". Não faz nada quando não há sobras.
+  final orfas = await limparEscalasOrfas(store);
+  if (orfas > 0) stdout.writeln('Escalas: pessoas já excluídas do cadastro retiradas de $orfas culto(s).');
 
   // Configurações editáveis pelo painel (/admin); o config.json vale como padrão.
   final ip = await ipLocal() ?? '127.0.0.1';

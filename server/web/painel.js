@@ -2081,7 +2081,7 @@ $('b-remover-foto').addEventListener('click', () => {
 });
 
 async function excluirMembro(m) {
-  if (!confirm(`Excluir ${m.nome}? A foto e os vínculos de família também saem.`)) return false;
+  if (!confirm(`Excluir ${m.nome}? A foto e os vínculos de família também saem, e a pessoa é tirada de todas as escalas (inclusive cultos passados).`)) return false;
   try {
     await api('DELETE', '/api/membros/' + m.id);
     await carregarMembros();

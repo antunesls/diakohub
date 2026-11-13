@@ -35,6 +35,7 @@ import 'fundos_tv.dart';
 import 'galeria.dart';
 import 'gestao_casa.dart';
 import 'lgpd.dart';
+import 'limpeza_escalas.dart';
 import 'pagina_inicial.dart';
 import 'palavras.dart';
 import 'permissoes.dart';
@@ -598,11 +599,14 @@ class Servidor {
   }
 
   Future<Response> _excluirUsuario(Request _, String id) async {
+    // Lido antes de excluir: a conta vinculada a um membro leva a pessoa para fora das escalas.
+    final membroId = _usuarios?.buscar(id)?.membroId;
     if (!(await _usuarios?.excluir(id) ?? false)) return _erro(404, 'Usuário não encontrado.');
     await auth.encerrarDoUsuario(id);
     await tabletsLocais.removerDoUsuario(id);
     agente?.enviarTablets();
-    return _json({'ok': true});
+    final escalas = membroId == null || membroId.isEmpty ? 0 : await _tirarDasEscalas(membroId);
+    return _json({'ok': true, 'escalasAlteradas': escalas});
   }
 
   // A Secretaria administra somente contas de integrantes e pode vincular uma
@@ -1843,8 +1847,13 @@ class Servidor {
     for (final v in store.listar('visitas').where((v) => v['membroId'] == id).toList()) {
       await store.excluir('visitas', v['id'] as String);
     }
-    return _json({'ok': true});
+    final escalas = await _tirarDasEscalas(id);
+    return _json({'ok': true, 'escalasAlteradas': escalas});
   }
+
+  /// Tira a pessoa de todas as escalas e indisponibilidades (ao excluir o membro ou o usuário
+  /// vinculado a ele). Retorna quantos cultos mudaram.
+  Future<int> _tirarDasEscalas(String membroId) => tirarDasEscalas(store, (id) => id == membroId);
 
   Future<void> _apagarFotoMembro(String arquivo) =>
       fotosMembros.excluir([arquivo, arquivo.replaceFirst('.jpg', '-m.jpg')]);

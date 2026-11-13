@@ -780,7 +780,8 @@ function linhaUsuario(u) {
       await carregarUsuarios();
     }),
     botao('Excluir', async () => {
-      if (!await confirmar('Excluir usuário?', `${u.nome} perde o acesso. O histórico do que foi feito com esse usuário continua registrado.`, 'Excluir')) return;
+      const escala = u.membroId ? ' Como a conta está ligada a um membro, a pessoa também sai de todas as escalas (inclusive cultos passados) e as indisponibilidades dela são apagadas; o cadastro de membro continua.' : '';
+      if (!await confirmar('Excluir usuário?', `${u.nome} perde o acesso. O histórico do que foi feito com esse usuário continua registrado.${escala}`, 'Excluir')) return;
       await api('DELETE', '/api/admin/usuarios/' + u.id);
       await carregarUsuarios();
     }, 'perigo pequeno'));
