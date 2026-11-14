@@ -4138,6 +4138,7 @@ class Servidor {
             'id': e.id,
             'titulo': e.titulo,
             'inicio': e.inicio.toIso8601String(),
+            'fim': e.fim.toIso8601String(),
             'diaInteiro': e.diaInteiro,
             'horario': horario(e),
             'local': e.local,

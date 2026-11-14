@@ -20,7 +20,42 @@
   .urgente svg { flex-shrink: 0; margin-top: 2px; }
   .urgente p { margin: 0; }
   .conteudo { max-width: 1120px; margin: 0 auto; padding: 28px 20px 48px; display: grid; gap: 28px; }
+  .conteudo > .largura-toda { grid-column: 1 / -1; }
   .coluna { display: flex; flex-direction: column; gap: 28px; min-width: 0; }
+  /* Destaque do dia: eventos de hoje (ou o próximo encontro, se hoje não tem nada). */
+  .destaque { border-radius: 22px; padding: 22px 24px; display: flex; flex-direction: column; gap: 14px; background: var(--primaria); color: #fff; }
+  .destaque.proximo { background: var(--primaria-suave); color: var(--primaria-escura); }
+  .destaque .rotulo { margin: 0; font-size: 13px; font-weight: 600; letter-spacing: .12em; text-transform: uppercase; color: #bfdcd7; }
+  .destaque.proximo .rotulo { color: var(--primaria); }
+  .destaque h2 { margin: 0; font-size: 26px; color: inherit; }
+  .itens-dia { display: grid; gap: 12px; }
+  .item-dia { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 4px 18px; align-items: center; padding: 16px 18px; border-radius: 16px; background: rgba(255, 255, 255, .1); }
+  .destaque.proximo .item-dia { background: var(--superficie); }
+  .item-dia .hora { font-family: var(--fonte-titulo); font-size: 34px; font-weight: 600; line-height: 1; font-variant-numeric: tabular-nums; }
+  .item-dia .hora small { display: block; margin-top: 6px; font-family: var(--fonte); font-size: 13px; font-weight: 500; opacity: .8; }
+  .item-dia .info { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+  .item-dia .info strong { font-size: 18px; overflow-wrap: anywhere; }
+  .item-dia .info span { font-size: 14px; opacity: .85; }
+  .item-dia .info .selo { align-self: flex-start; margin-top: 4px; padding: 2px 10px; border-radius: 12px; font-size: 13px; font-weight: 600; opacity: 1; background: rgba(255, 255, 255, .18); }
+  .item-dia .info .selo.agora { background: #fff; color: var(--primaria-escura); }
+  .selo.agora::before { content: ''; display: inline-block; width: 8px; height: 8px; margin-right: 6px; border-radius: 4px; background: #2e9d63; vertical-align: 1px; }
+  .destaque.proximo .item-dia .info .selo { background: var(--neutro); color: var(--texto); }
+  .item-dia .botoes { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+  .destaque:not(.proximo) .botao.secundario { background: transparent; color: #fff; border-color: rgba(255, 255, 255, .5); }
+  .destaque:not(.proximo) .botao.secundario:hover { background: rgba(255, 255, 255, .12); }
+  .destaque .botao.claro { background: #fff; color: var(--primaria-escura); }
+  .destaque.proximo .botao.claro { background: var(--primaria); color: #fff; }
+  @media (min-width: 700px) {
+    .item-dia { grid-template-columns: 110px minmax(0, 1fr) auto; }
+    .item-dia .botoes { grid-column: auto; margin-top: 0; justify-content: flex-end; }
+  }
+  @media (prefers-reduced-motion: no-preference) {
+    .selo.agora::before { animation: pulsar 2s ease-in-out infinite; }
+    @keyframes pulsar { 50% { opacity: .35; } }
+  }
+  .mes { margin: 0; padding: 14px 0 4px; font-size: 12px; font-weight: 600; letter-spacing: .12em; text-transform: uppercase; color: var(--primaria); }
+  .detalhes-pix summary { cursor: pointer; font-size: 14px; font-weight: 600; color: var(--primaria); }
+  .detalhes-pix[open] summary { margin-bottom: 6px; }
   section > h1, section > h2 { margin: 0 0 12px; }
   h1 { font-size: 30px; }
   h2 { font-size: 23px; }
@@ -31,14 +66,14 @@
   .aviso strong { display: block; font-size: 17px; }
   .aviso p { margin: 4px 0 0; color: var(--suave); white-space: pre-line; }
   .aviso .ate { font-size: 13px; color: var(--suave); margin-top: 6px; }
-  .acoes-site { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
-  .acao { display: flex; flex-direction: column; gap: 8px; padding: 18px; border-radius: 18px; text-decoration: none; background: var(--superficie); border: 1px solid var(--linha); color: var(--texto); }
+  .acoes-site { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; }
+  .acao { display: grid; grid-template-columns: auto minmax(0, 1fr); column-gap: 14px; row-gap: 2px; align-items: center; padding: 16px 18px; border-radius: 18px; text-decoration: none; background: var(--superficie); border: 1px solid var(--linha); color: var(--texto); }
   .acao.principal { background: var(--primaria); border-color: var(--primaria); color: #fff; }
   .acao strong { font-size: 17px; }
   .acao span { font-size: 14px; color: var(--suave); }
   .acao.principal span { color: #d6e8e5; }
   .acao:hover { border-color: var(--borda); }
-  .icone-acao { width: 46px; height: 46px; border-radius: 14px; display: flex; align-items: center; justify-content: center; background: var(--primaria-suave); margin-bottom: 2px; }
+  .icone-acao { grid-row: span 2; width: 46px; height: 46px; border-radius: 14px; display: flex; align-items: center; justify-content: center; background: var(--primaria-suave); }
   .acao.principal .icone-acao { background: rgba(255, 255, 255, .16); }
   .icone-acao svg { width: 26px; height: 26px; }
   .acao.principal:hover { background: var(--primaria-escura); color: #fff; }
@@ -105,10 +140,14 @@
   @media (max-width: 600px) { .seta { display: none; } .capa { margin-top: 14px; padding: 0 16px; } }
   @media (prefers-reduced-motion: reduce) { .trilho { scroll-behavior: auto; } .pontos button::before { transition: none; } }
   @media (min-width: 960px) {
-    .conteudo { grid-template-columns: minmax(0, 1.8fr) minmax(0, 1fr); gap: 32px; }
+    .conteudo { grid-template-columns: minmax(0, 1.7fr) minmax(0, 1fr); gap: 28px 32px; align-items: start; }
     .avisos { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     .aviso.com-imagem { grid-row: span 2; }
-    .acoes-site { grid-template-columns: 1fr; }
+    .destaque { padding: 26px 30px; }
+    .destaque h2 { font-size: 30px; }
+    .itens-dia.varios { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .itens-dia.varios .item-dia { grid-template-columns: auto minmax(0, 1fr); }
+    .itens-dia.varios .botoes { grid-column: 1 / -1; justify-content: flex-start; margin-top: 10px; }
     h1 { font-size: 34px; }
   }
   @media (max-width: 600px) {
@@ -132,7 +171,9 @@
 <section class="capa" id="capa" aria-roledescription="carrossel" aria-label="Fotos da igreja" hidden></section>
 
 <main class="conteudo" id="conteudo">
-  <p class="carregando" id="carregando">Carregando…</p>
+  <p class="carregando largura-toda" id="carregando">Carregando…</p>
+  <section class="destaque largura-toda" id="hoje" aria-labelledby="hoje-t" hidden></section>
+  <nav class="acoes-site largura-toda" id="atalhos" aria-label="Fale com a igreja" hidden></nav>
   <div class="coluna" id="principal" hidden></div>
   <aside class="coluna" id="lateral" hidden></aside>
 </main>
@@ -194,20 +235,34 @@
             a.validoAte ? el('div', { class: 'ate' }, 'Até ' + dataCurta(a.validoAte)) : null))))));
     }
 
+    // Destaque no topo: os eventos de hoje ou, sem nada hoje, o próximo encontro. Esses saem da lista abaixo.
+    let restantes = [];
     if (s.agenda && s.eventos.length) {
-      const hoje = diaIso(new Date());
-      principal.push(secao('agenda', 'Próximos eventos', el('div', { class: 'lista' }, s.eventos.map((e) => {
+      const doDia = s.eventos.filter((e) => diaIso(new Date(e.inicio)) === diaIso(new Date()));
+      const destacados = doDia.length ? doDia : s.eventos.slice(0, 1);
+      montarDestaque(destacados, doDia.length > 0, s.mapa);
+      setInterval(() => montarDestaque(destacados, doDia.length > 0, s.mapa), 60000);
+      restantes = s.eventos.filter((e) => !destacados.includes(e));
+    }
+    if (restantes.length) {
+      let mesAtual = '';
+      const linhas = [];
+      for (const e of restantes) {
         const d = new Date(e.inicio);
-        return el('div', { class: 'evento' },
-          el('span', { class: 'data' + (diaIso(d) === hoje ? ' hoje' : '') },
+        const mes = d.toLocaleDateString('pt-BR',
+          d.getFullYear() === new Date().getFullYear() ? { month: 'long' } : { month: 'long', year: 'numeric' });
+        if (mes !== mesAtual) linhas.push(el('p', { class: 'mes' }, (mesAtual = mes)));
+        linhas.push(el('div', { class: 'evento' },
+          el('span', { class: 'data' },
             d.toLocaleDateString('pt-BR', { weekday: 'short' }).replace('.', ''), el('b', {}, String(d.getDate()))),
           el('div', { class: 'info' }, el('strong', {}, e.titulo), el('span', {}, [e.horario, e.local].filter(Boolean).join(' · '))),
-          el('a', { href: e.ics, 'aria-label': 'Adicionar "' + e.titulo + '" ao meu calendário' }, '+ Agenda'));
-      }))));
+          el('a', { href: e.ics, 'aria-label': 'Adicionar "' + e.titulo + '" ao meu calendário' }, '+ Agenda')));
+      }
+      principal.push(secao('agenda', 'Próximos eventos', el('div', { class: 'lista' }, linhas)));
     }
 
-    const lateral = [
-      el('div', { class: 'acoes-site' },
+    // Atalhos em faixa, logo abaixo do destaque, em vez de empilhados na coluna da direita.
+    $('atalhos').replaceChildren(
         el('a', { class: 'acao principal', href: '/oracao' },
           // Mão segurando um coração: o mesmo símbolo dos motivos de oração no app do tablet.
           el('span', { class: 'icone-acao' }, svg(
@@ -221,9 +276,15 @@
           el('span', { class: 'icone-acao' }, svg(
             '<path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path><path d="M13 8H7"></path><path d="M17 12H7"></path>',
             'var(--primaria)')),
-          el('strong', {}, 'Fale com a igreja'), el('span', {}, 'Dúvidas, sugestões, críticas'))),
-    ];
+          el('strong', {}, 'Fale com a igreja'), el('span', {}, 'Dúvidas, sugestões, críticas')),
+        s.pix ? el('a', { class: 'acao', href: '#contribuir' },
+          el('span', { class: 'icone-acao' }, svg(
+            '<path d="M12 21s-7-4.5-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 11c0 5.5-7 10-7 10z"></path>',
+            'var(--primaria)')),
+          el('strong', {}, 'Dízimos e ofertas'), el('span', {}, 'Contribua pelo Pix')) : null);
+    $('atalhos').hidden = false;
 
+    const lateral = [];
     if (s.cultos.length || s.endereco) {
       lateral.push(el('section', { class: 'caixa', id: 'cultos', 'aria-labelledby': 'cultos-t' },
         el('h2', { id: 'cultos-t' }, 'Nossos cultos'),
@@ -253,10 +314,12 @@
         el('h2', { id: 'contribuir-t' }, 'Dízimos e ofertas (PIX)'),
         el('button', { class: 'botao', type: 'button', style: 'width:100%',
           onclick: () => copiar(s.pix.copiaECola, 'Código copiado! Agora é só colar no app do banco.') }, 'Copiar código Pix'),
-        el('ol', { class: 'passos-pix' },
-          el('li', {}, 'Toque em ', el('strong', {}, 'Copiar código Pix'), '.'),
-          el('li', {}, 'No app do seu banco, abra ', el('strong', {}, 'Pix › Pix copia e cola'), '.'),
-          el('li', {}, 'Cole o código, digite o valor e confirme.')),
+        el('details', { class: 'detalhes-pix' },
+          el('summary', {}, 'Como usar o código'),
+          el('ol', { class: 'passos-pix' },
+            el('li', {}, 'Toque em ', el('strong', {}, 'Copiar código Pix'), '.'),
+            el('li', {}, 'No app do seu banco, abra ', el('strong', {}, 'Pix › Pix copia e cola'), '.'),
+            el('li', {}, 'Cole o código, digite o valor e confirme.'))),
         resultado, manual,
         el('div', { class: 'pix' },
           el('img', { src: s.pix.qr, alt: 'QR code do PIX da igreja', loading: 'lazy' }),
@@ -272,9 +335,9 @@
     $('principal').replaceChildren(...principal);
     $('lateral').replaceChildren(...lateral);
     $('principal').hidden = principal.length === 0;
-    $('lateral').hidden = false;
-    if (!principal.length) $('conteudo').style.gridTemplateColumns = 'minmax(0, 560px)';
-    if (!principal.length) $('conteudo').style.justifyContent = 'center';
+    $('lateral').hidden = lateral.length === 0;
+    if (!principal.length || !lateral.length) $('conteudo').style.gridTemplateColumns = 'minmax(0, 760px)';
+    if (!principal.length || !lateral.length) $('conteudo').style.justifyContent = 'center';
 
     // Faixa "Acompanhe a igreja" com as redes cadastradas; sem redes, fica só o rodapé simples.
     const botoes = [
@@ -300,6 +363,51 @@
       $('rodape').hidden = false;
     }
     $('carregando').remove();
+  }
+
+  /** "Hoje · sábado, 14 de novembro", "Amanhã · …" ou "Sábado, 21 de novembro". */
+  function rotuloDia(d) {
+    const agora = new Date();
+    const amanha = new Date(agora.getFullYear(), agora.getMonth(), agora.getDate() + 1);
+    const longo = d.toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long' });
+    if (diaIso(d) === diaIso(agora)) return 'Hoje · ' + longo;
+    if (diaIso(d) === diaIso(amanha)) return 'Amanhã · ' + longo;
+    return longo.charAt(0).toUpperCase() + longo.slice(1);
+  }
+
+  /** Situação do evento agora: [texto, acontecendo?]. Sem horário de fim, vale o início. */
+  function situacao(e) {
+    if (e.diaInteiro) return ['O dia todo', false];
+    const agora = Date.now();
+    const ini = new Date(e.inicio).getTime();
+    const fim = e.fim ? new Date(e.fim).getTime() : null;
+    if (ini <= agora) return fim === null || agora < fim ? ['Acontecendo agora', true] : ['Encerrado', false];
+    const min = Math.round((ini - agora) / 60000);
+    if (diaIso(new Date(ini)) !== diaIso(new Date())) return null;
+    if (min < 60) return ['Começa em ' + min + ' min', false];
+    return ['Começa em ' + Math.round(min / 60) + ' h', false];
+  }
+
+  function montarDestaque(eventos, ehHoje, mapa) {
+    const primeiro = new Date(eventos[0].inicio);
+    $('hoje').className = 'destaque largura-toda' + (ehHoje ? '' : ' proximo');
+    $('hoje').replaceChildren(
+      el('p', { class: 'rotulo' }, ehHoje ? (eventos.length > 1 ? 'Hoje na igreja · ' + eventos.length + ' eventos' : 'Hoje na igreja') : 'Próximo encontro'),
+      el('h2', { id: 'hoje-t' }, rotuloDia(primeiro)),
+      el('div', { class: 'itens-dia' + (eventos.length > 1 ? ' varios' : '') }, eventos.map((e) => {
+        const [inicio, fim] = (e.horario || '').split('–');
+        const sit = situacao(e);
+        return el('article', { class: 'item-dia' },
+          el('div', { class: 'hora' }, e.diaInteiro ? 'Dia todo' : inicio, fim ? el('small', {}, 'até ' + fim) : null),
+          el('div', { class: 'info' },
+            el('strong', {}, e.titulo),
+            e.local ? el('span', {}, e.local) : null,
+            sit ? el('span', { class: 'selo' + (sit[1] ? ' agora' : '') }, sit[0]) : null),
+          el('div', { class: 'botoes' },
+            el('a', { class: 'botao claro pequeno', href: e.ics, 'aria-label': 'Adicionar "' + e.titulo + '" ao meu calendário' }, '+ Agenda'),
+            mapa ? el('a', { class: 'botao secundario pequeno', href: mapa, target: '_blank', rel: 'noopener' }, 'Como chegar') : null));
+      })));
+    $('hoje').hidden = false;
   }
 
   /** Carrossel de fotos no topo: arrastar no celular, setas e bolinhas, passa sozinho a cada 6 s. */
