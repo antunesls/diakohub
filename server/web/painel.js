@@ -123,6 +123,7 @@ const carregar = {
   atas: carregarAtas,
   resumo: carregarResumo,
   historico: carregarHistorico,
+  auditoria: carregarAuditoria,
   status: carregarStatus,
 };
 
@@ -475,6 +476,54 @@ async function carregarHistorico() {
       : [el('p', { class: 'vazio' }, 'Nada projetado ainda.')]));
 }
 document.querySelectorAll('input[name=filtro-motivo]').forEach((r) => r.addEventListener('change', carregarMotivos));
+
+// ---------- Auditoria ----------
+
+const TIPOS_AUDITORIA = {
+  escala: 'Escala',
+  musicas: 'Músicas',
+  repertorio: 'Repertório',
+  roteiro: 'Roteiro',
+  indisponibilidade: 'Indisponibilidade',
+};
+
+const ACOES_AUDITORIA = {
+  'culto-criado': 'Culto criado',
+  'culto-alterado': 'Culto alterado',
+  'culto-excluido': 'Culto excluído',
+  'cultos-gerados': 'Cultos gerados',
+  'escala-repetida': 'Escala repetida',
+  'funcao-alterada': 'Função alterada',
+  'escalas-limpas': 'Escala limpa',
+  'musicas-alteradas': 'Músicas alteradas',
+  'musicas-escolhidas': 'Músicas escolhidas',
+  'musica-cadastrada': 'Música cadastrada',
+  'musica-editada': 'Música editada',
+  'repertorio-importado': 'Repertório importado',
+  'roteiro-criado': 'Roteiro criado',
+  'roteiro-editado': 'Roteiro editado',
+  'roteiro-excluido': 'Roteiro excluído',
+  'indisponibilidade-criada': 'Indisponibilidade criada',
+  'indisponibilidade-removida': 'Indisponibilidade removida',
+};
+
+async function carregarAuditoria() {
+  if (!pode('admin')) return; // a aba só existe para a administração, mas não custa conferir
+  const filtro = document.querySelector('input[name=filtro-auditoria]:checked');
+  const tipo = filtro ? filtro.value : '';
+  const lista = await api('GET', '/api/auditoria?limite=300' + (tipo ? '&tipo=' + encodeURIComponent(tipo) : ''));
+  $('lista-auditoria').replaceChildren(
+    ...(lista.length
+      ? lista.map((e) => el('div', { class: 'item' },
+          el('div', { class: 'conteudo' },
+            el('div', { class: 'titulo' }, e.alvo, el('span', { class: 'etiqueta' }, TIPOS_AUDITORIA[e.tipo] || e.tipo)),
+            el('div', { class: 'sub' }, (ACOES_AUDITORIA[e.acao] || e.acao) + (e.detalhe ? ' — ' + e.detalhe : '')),
+            el('div', { class: 'sub' },
+              new Date(e.quando).toLocaleString('pt-BR', { weekday: 'short', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) +
+              ' · ' + e.usuario + (e.perfil ? ' · perfil ' + e.perfil : '')))))
+      : [el('p', { class: 'vazio' }, 'Nenhuma alteração registrada ainda.')]));
+}
+document.querySelectorAll('input[name=filtro-auditoria]').forEach((r) => r.addEventListener('change', carregarAuditoria));
 
 function atualizarBadge() {
   const n = motivos.filter((m) => m.status === 'aguardando').length;

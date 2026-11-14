@@ -814,6 +814,20 @@
       <div class="lista" id="lista-historico"></div>
     </section>
 
+    <section data-painel="auditoria" hidden>
+      <div class="barra">
+        <div class="chips" role="radiogroup" aria-label="Filtro de auditoria">
+          <label><input type="radio" name="filtro-auditoria" value="" checked>Tudo</label>
+          <label><input type="radio" name="filtro-auditoria" value="escala">Escalas</label>
+          <label><input type="radio" name="filtro-auditoria" value="musicas">Músicas</label>
+          <label><input type="radio" name="filtro-auditoria" value="repertorio">Repertório</label>
+          <label><input type="radio" name="filtro-auditoria" value="roteiro">Roteiros</label>
+          <label><input type="radio" name="filtro-auditoria" value="indisponibilidade">Indisponibilidades</label>
+        </div>
+      </div>
+      <div class="lista" id="lista-auditoria"></div>
+    </section>
+
     <section data-painel="recados" hidden>
       <div class="barra">
         <span class="dica">Os recados aparecem no tablet na mesma ordem. Fixos ficam sempre no topo.</span>
@@ -1453,10 +1467,10 @@
 
 <script src="/comum.js?v=5"></script>
 <script src="/form-visitante.js?v=2"></script>
-<script src="/menu-lateral.js?v=5"></script>
+<script src="/menu-lateral.js?v=6"></script>
 <script src="/gestao-casa.js?v=1"></script>
 <script src="/atas.js?v=1"></script>
-<script src="/painel.js?v=24"></script>
+<script src="/painel.js?v=25"></script>
 <script src="/acessos-escala.js?v=2"></script>
 <script src="/repertorio-busca.js?v=1"></script>
 <script src="/musica-youtube.js?v=1"></script>

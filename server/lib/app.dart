@@ -18,6 +18,7 @@ import 'anexos_casa.dart';
 import 'agente_hub.dart';
 import 'ata_pdf.dart';
 import 'atas.dart';
+import 'auditoria.dart';
 import 'auth.dart';
 import 'backup.dart';
 import 'backup_cifrado.dart';
@@ -59,6 +60,7 @@ class Servidor {
     required this.historico,
     this.versao = 'dev',
     this.agente,
+    Auditoria? auditoria,
     String chaveAgente = '',
     String chaveMural = '',
     this.confiarProxy = false,
@@ -77,7 +79,8 @@ class Servidor {
     TermosAssinados? termosAssinados,
     TabletsLocais? tabletsLocais,
     SenhaBackup? senhaBackup,
-  })  : galeria = galeria ?? Galeria(store.pasta),
+  })  : auditoria = auditoria ?? Auditoria(store.pasta),
+        galeria = galeria ?? Galeria(store.pasta),
         senhaBackup = senhaBackup ?? SenhaBackup(backup.pastaDados),
         fotosMembros = fotosMembros ?? FotosMembros(store.pasta),
         termosAssinados = termosAssinados ?? TermosAssinados(store.pasta),
@@ -106,6 +109,9 @@ class Servidor {
   final SenhaBackup senhaBackup;
 
   final Historico historico;
+
+  /// Trilha de quem alterou escalas, repertório, músicas, roteiros e indisponibilidades.
+  final Auditoria auditoria;
   final String versao;
   final Store store;
   late final GestaoCasa casa = GestaoCasa(store, agora: _agora);
@@ -389,6 +395,7 @@ class Servidor {
        ..get('/api/admin/temas', _adminTemas)
       ..post('/api/projetar/oracoes-respondidas', _projetarRespondidas)
       ..get('/api/historico', _historico)
+      ..get('/api/auditoria', _listarAuditoria)
       ..get('/api/resumo-semanal', _resumoSemanal)
       ..post('/api/backup', _backupAgora)
       ..put('/api/backup/senha', _definirSenhaBackup)
@@ -598,7 +605,7 @@ class Servidor {
     return _json({'senhaTemporaria': senha});
   }
 
-  Future<Response> _excluirUsuario(Request _, String id) async {
+  Future<Response> _excluirUsuario(Request req, String id) async {
     // Lido antes de excluir: a conta vinculada a um membro leva a pessoa para fora das escalas.
     final membroId = _usuarios?.buscar(id)?.membroId;
     if (!(await _usuarios?.excluir(id) ?? false)) return _erro(404, 'Usuário não encontrado.');
@@ -606,6 +613,10 @@ class Servidor {
     await tabletsLocais.removerDoUsuario(id);
     agente?.enviarTablets();
     final escalas = membroId == null || membroId.isEmpty ? 0 : await _tirarDasEscalas(membroId);
+    if (escalas > 0) {
+      await _auditar(req, tipo: 'escala', acao: 'escalas-limpas', alvo: _nomeMembro(membroId!),
+          detalhe: 'Usuário vinculado excluído: saiu de $escalas culto(s)');
+    }
     return _json({'ok': true, 'escalasAlteradas': escalas});
   }
 
@@ -1820,7 +1831,7 @@ class Servidor {
     if (docs.isNotEmpty) await store.salvarVarios('membros', docs);
   }
 
-  Future<Response> _excluirMembro(Request _, String id) async {
+  Future<Response> _excluirMembro(Request req, String id) async {
     final atual = store.buscar('membros', id);
     if (atual == null) return _erro(404, 'Membro não encontrado.');
     final m = Membro.fromJson(atual);
@@ -1848,6 +1859,10 @@ class Servidor {
       await store.excluir('visitas', v['id'] as String);
     }
     final escalas = await _tirarDasEscalas(id);
+    if (escalas > 0) {
+      await _auditar(req, tipo: 'escala', acao: 'escalas-limpas', alvo: m.nome,
+          detalhe: 'Membro excluído do cadastro: saiu de $escalas culto(s)');
+    }
     return _json({'ok': true, 'escalasAlteradas': escalas});
   }
 
@@ -2916,6 +2931,8 @@ class Servidor {
           for (final m in outros)
             if (m.padrao) ModeloRoteiro(id: m.id, nome: m.nome, itens: m.itens, cultos: m.cultos).toJson(),
       ]);
+      await _auditar(req, tipo: 'roteiro', acao: novo ? 'roteiro-criado' : 'roteiro-editado',
+          alvo: modelo.nome, detalhe: '${modelo.itens.length} item(ns)${modelo.padrao ? ' · modelo padrão' : ''}');
       return _json(modelo.toJson(), status: novo ? 201 : 200);
     } on FormatException catch (e) {
       return _erro(400, e.message);
@@ -2929,7 +2946,10 @@ class Servidor {
 
   Future<Response> _excluirRoteiro(Request req, String id) async {
     if (!_podeEditarRoteiros(req)) return _erro(403, 'Só quem monta a escala pastoral altera os roteiros.');
+    final atual = store.buscar('roteiros', id);
     if (!await store.excluir('roteiros', id)) return _erro(404, 'Modelo não encontrado.');
+    await _auditar(req, tipo: 'roteiro', acao: 'roteiro-excluido',
+        alvo: atual?['nome'] as String? ?? id, detalhe: 'Modelo excluído');
     return _json({'ok': true});
   }
 
@@ -2961,6 +2981,8 @@ class Servidor {
         return _erro(409, 'Esta música já está no repertório.');
       }
       await store.salvar('repertorio', musica.toJson());
+      await _auditar(req, tipo: 'repertorio', acao: 'musica-cadastrada',
+          alvo: _alvoMusica(musica.titulo, musica.cantor), detalhe: 'Música cadastrada no repertório');
       return _json(musica.toJson(), status: 201);
     } on FormatException catch (e) {
       return _erro(400, e.message);
@@ -2979,6 +3001,11 @@ class Servidor {
         return _erro(409, 'Esta música já está no repertório.');
       }
       await store.salvar('repertorio', musica.toJson());
+      final detalhe = Auditoria.diffRepertorio(atual, musica.toJson());
+      if (detalhe != null) {
+        await _auditar(req, tipo: 'repertorio', acao: 'musica-editada',
+            alvo: _alvoMusica(musica.titulo, musica.cantor), detalhe: detalhe);
+      }
       return _json(musica.toJson());
     } on FormatException catch (e) {
       return _erro(400, e.message);
@@ -3016,6 +3043,9 @@ class Servidor {
       }
       if (salvar && (novas.isNotEmpty || comLink.isNotEmpty)) {
         await store.salvarVarios('repertorio', [for (final m in novas) m.toJson(), ...comLink]);
+        await _auditar(req, tipo: 'repertorio', acao: 'repertorio-importado', alvo: 'Importação de planilha',
+            detalhe: '${novas.length} música(s) nova(s), ${comLink.length} link(s) preenchido(s), '
+                '$repetidas já no repertório');
       }
       return _json({
         if (salvar) 'importadas': novas.length else 'novas': novas.length,
@@ -3220,7 +3250,11 @@ class Servidor {
         if (!existentes.contains('${c.data} ${c.hora}'))
           CultoEscala(id: novoId(), data: c.data, hora: c.hora, nome: c.nome, ceia: c.ceia).toJson(),
     ];
-    if (novos.isNotEmpty) await store.salvarVarios('escalas', novos);
+    if (novos.isNotEmpty) {
+      await store.salvarVarios('escalas', novos);
+      await _auditar(req, tipo: 'escala', acao: 'cultos-gerados', alvo: _nomeMes(mes.ano, mes.mes),
+          detalhe: '${novos.length} culto(s) criado(s) a partir dos horários da página inicial');
+    }
     return _json({'criados': novos.length});
   }
 
@@ -3256,7 +3290,12 @@ class Servidor {
       }
       if (mudou) alterados.add((tipo == TipoEscala.pastoral ? c.copiar(pastoral: escala) : c.copiar(louvor: escala)).toJson());
     }
-    if (alterados.isNotEmpty) await store.salvarVarios('escalas', alterados);
+    if (alterados.isNotEmpty) {
+      await store.salvarVarios('escalas', alterados);
+      await _auditar(req, tipo: 'escala', acao: 'escala-repetida',
+          alvo: 'Escala ${tipo == TipoEscala.pastoral ? 'pastoral' : 'do louvor'} — ${_nomeMes(mes.ano, mes.mes)}',
+          detalhe: '$preenchidas função(ões) preenchida(s) com quem serviu em ${_nomeMes(anterior.year, anterior.month)}');
+    }
     return _json({'preenchidas': preenchidas});
   }
 
@@ -3274,16 +3313,20 @@ class Servidor {
       return _erro(409, 'Já existe um culto nesse dia e horário.');
     }
     await store.salvar('escalas', culto.toJson());
+    await _auditar(req, tipo: 'escala', acao: 'culto-criado', alvo: _alvoCulto(culto.toJson()),
+        detalhe: 'Culto extra criado (${culto.nome}${culto.ceia ? ', com Santa Ceia' : ''})');
     return _json(_cultoParaTela(culto, _membrosPorId(), _indisponibilidades()), status: 201);
   }
 
   /// PUT /api/escalas/<id> — {tipo, funcao, membros: [ids]} (quem serve numa função), {musicas} (louvor)
-  /// ou {nome, hora, ceia, tema} (dados do culto: pastoral). Cada parte confere a permissão da sua escala.
+  /// ou {nome, hora, ceia, tema} (dados do culto: pastoral). Cada parte confere a permissão da sua
+  /// escala e só entra na auditoria quando muda alguma coisa.
   Future<Response> _atualizarCulto(Request req, String id) async {
     final atual = store.buscar('escalas', id);
     if (atual == null) return _erro(404, 'Culto não encontrado.');
     final corpo = await _corpo(req);
     final doc = {...atual};
+    final eventos = <({String tipo, String acao, String detalhe})>[];
     if (corpo.containsKey('funcao')) {
       final tipo = TipoEscala.porNome(corpo['tipo']);
       if (tipo == null) return _erro(400, 'Escala inválida.');
@@ -3291,7 +3334,12 @@ class Servidor {
       final membros = corpo['membros'];
       final existentes = _membrosPorId();
       if (membros is! List || membros.any((m) => !existentes.containsKey(m))) return _erro(400, 'Pessoa não encontrada no cadastro.');
-      doc[tipo.name] = {...Map<String, dynamic>.from(doc[tipo.name] as Map? ?? const {}), corpo['funcao'] as String: membros};
+      final funcao = corpo['funcao'] as String;
+      doc[tipo.name] = {...Map<String, dynamic>.from(doc[tipo.name] as Map? ?? const {}), funcao: membros};
+      final detalhe = Auditoria.diffFuncao(funcao,
+          [for (final i in ((atual[tipo.name] as Map?)?[funcao] as List? ?? const []).cast<String>()) existentes[i]?.nome ?? '(pessoa removida)'],
+          [for (final i in membros.cast<String>()) existentes[i]?.nome ?? '(pessoa removida)']);
+      if (detalhe != null) eventos.add((tipo: 'escala', acao: 'funcao-alterada', detalhe: detalhe));
     }
     if (corpo.containsKey('musicas')) {
       if (!_podeEscala(req, TipoEscala.louvor)) return _semPermissaoEscala(TipoEscala.louvor);
@@ -3300,6 +3348,10 @@ class Servidor {
       } on FormatException catch (e) {
         return _erro(400, e.message);
       }
+      final detalhe = Auditoria.diffMusicas(
+          [for (final m in CultoEscala.fromJson(atual).musicas) m.toJson()],
+          [for (final m in doc['musicas'] as List) Map<String, dynamic>.from(m as Map)]);
+      if (detalhe != null) eventos.add((tipo: 'musicas', acao: 'musicas-alteradas', detalhe: detalhe));
     }
     for (final k in const ['nome', 'hora', 'ceia', 'tema']) {
       if (!corpo.containsKey(k)) continue;
@@ -3312,13 +3364,38 @@ class Servidor {
     } on FormatException catch (e) {
       return _erro(400, e.message);
     }
-    await store.salvar('escalas', culto.toJson());
+    // Dados do culto que o pedido incluiu e que realmente mudaram em relação ao que estava salvo.
+    final salvo = culto.toJson();
+    final detalhesDados = <String>[];
+    for (final k in const ['nome', 'hora', 'ceia', 'tema']) {
+      if (!corpo.containsKey(k)) continue;
+      final padrao = k == 'ceia' ? false : (k == 'nome' ? 'Culto' : '');
+      final antes = atual[k] ?? padrao, depois = salvo[k] ?? padrao;
+      if (antes == depois) continue;
+      String valor(Object? v) => switch (k) {
+            'ceia' => v == true ? 'com Santa Ceia' : 'sem Santa Ceia',
+            _ => v is String && v.isNotEmpty ? v : '—',
+          };
+      detalhesDados.add('${k == 'hora' ? 'horário' : k}: ${valor(antes)} → ${valor(depois)}');
+    }
+    if (detalhesDados.isNotEmpty) {
+      eventos.add((tipo: 'escala', acao: 'culto-alterado', detalhe: detalhesDados.join(' · ')));
+    }
+    await store.salvar('escalas', salvo);
+    for (final e in eventos) {
+      await _auditar(req, tipo: e.tipo, acao: e.acao, alvo: _alvoCulto(atual), detalhe: e.detalhe);
+    }
     return _json(_cultoParaTela(culto, _membrosPorId(), _indisponibilidades()));
   }
 
   Future<Response> _excluirCulto(Request req, String id) async {
     if (!_podeEscala(req, TipoEscala.pastoral)) return _semPermissaoEscala(TipoEscala.pastoral);
-    return _excluir('escalas', id);
+    final atual = store.buscar('escalas', id);
+    final r = await _excluir('escalas', id);
+    if (r.statusCode == 200 && atual != null) {
+      await _auditar(req, tipo: 'escala', acao: 'culto-excluido', alvo: _alvoCulto(atual), detalhe: 'Culto excluído');
+    }
+    return r;
   }
 
   /// POST /api/escalas/indisponibilidades {membroId, de, ate, motivo?} — avisado à secretaria ou ao líder.
@@ -3379,12 +3456,21 @@ class Servidor {
     final doc = {...ind.toJson(), 'enviadoEm': _agora().toUtc().toIso8601String(),
       'enviadoPor': Auth.contaDa(req)?.nome ?? ''};
     await store.salvar('indisponibilidades', doc);
+    await _auditar(req, tipo: 'indisponibilidade', acao: 'indisponibilidade-criada', alvo: _nomeMembro(membroId),
+        detalhe: 'Indisponível de ${ind.de} a ${ind.ate}${ind.motivo.isEmpty ? '' : ' — ${ind.motivo}'}');
     return _json(doc, status: 201);
   }
 
   Future<Response> _excluirIndisponibilidade(Request req, String id) async {
     if (!_podeAlgumaEscala(req)) return _semPermissaoEscala(null);
-    return _excluir('indisponibilidades', id);
+    final atual = store.buscar('indisponibilidades', id);
+    final r = await _excluir('indisponibilidades', id);
+    if (r.statusCode == 200 && atual != null) {
+      await _auditar(req, tipo: 'indisponibilidade', acao: 'indisponibilidade-removida',
+          alvo: _nomeMembro(atual['membroId'] as String),
+          detalhe: 'Aviso de ${atual['de']} a ${atual['ate']} removido');
+    }
+    return r;
   }
 
   /// Identifica o membro exclusivamente pela sessão; IDs enviados pelo cliente são ignorados.
@@ -3412,6 +3498,12 @@ class Servidor {
       final doc = {...atual, 'musicas': _selecionarMusicas(atual, corpo['musicas'])};
       final editado = CultoEscala.fromJson(doc);
       await store.salvar('escalas', editado.toJson());
+      final detalhe = Auditoria.diffMusicas(
+          [for (final m in culto.musicas) m.toJson()],
+          [for (final m in editado.musicas) m.toJson()]);
+      if (detalhe != null) {
+        await _auditar(req, tipo: 'musicas', acao: 'musicas-escolhidas', alvo: _alvoCulto(atual), detalhe: detalhe);
+      }
       return _json({'musicas': [for (final m in editado.musicas) m.toJson()]});
     } on FormatException catch (e) {
       return _erro(400, e.message);
@@ -3484,6 +3576,8 @@ class Servidor {
     final ind = store.buscar('indisponibilidades', corpo['id'] as String? ?? '');
     if (ind == null || ind['membroId'] != id) return _erro(404, 'Aviso não encontrado.');
     await store.excluir('indisponibilidades', ind['id'] as String);
+    await _auditar(req, tipo: 'indisponibilidade', acao: 'indisponibilidade-removida', alvo: _nomeMembro(id),
+        detalhe: 'Aviso de ${ind['de']} a ${ind['ate']} removido pela própria pessoa');
     return _json({'ok': true});
   }
 
@@ -3727,6 +3821,36 @@ class Servidor {
     final limite = int.tryParse(req.url.queryParameters['limite'] ?? '') ?? 300;
     return _json(await historico.listar(limite: limite.clamp(1, 2000)));
   }
+
+  /// GET /api/auditoria?tipo=escala|musicas|repertorio|roteiro|indisponibilidade&limite=n
+  /// — trilha de quem alterou escalas, repertório, músicas escolhidas, roteiros e
+  /// indisponibilidades (permissão admin, conferida em [permissaoDaRota]).
+  Future<Response> _listarAuditoria(Request req) async {
+    final tipo = req.url.queryParameters['tipo'] ?? '';
+    if (tipo.isNotEmpty && !Auditoria.tipos.contains(tipo)) return _erro(400, 'Tipo inválido.');
+    final limite = int.tryParse(req.url.queryParameters['limite'] ?? '') ?? 300;
+    return _json(await auditoria.listar(tipo: tipo, limite: limite.clamp(1, 2000)));
+  }
+
+  /// Registra na auditoria a alteração feita nesta requisição (quem fez vem da sessão).
+  Future<void> _auditar(Request req,
+      {required String tipo, required String acao, required String alvo, String detalhe = ''}) {
+    final conta = Auth.contaDa(req);
+    return auditoria.registrar(
+        tipo: tipo, acao: acao, alvo: alvo, detalhe: detalhe,
+        usuario: conta?.nome ?? '', perfil: conta?.perfil.id ?? '');
+  }
+
+  /// "Dom 15/11 · 19h" — cabeçalho dos eventos de auditoria de um culto.
+  static String _alvoCulto(Map<String, dynamic> doc) =>
+      '${rotuloDia(doc['data'] as String)} · ${horaCurtaEscala(doc['hora'] as String)}';
+
+  static String _alvoMusica(String titulo, String cantor) => '$titulo — $cantor';
+
+  /// "novembro de 2026" para os eventos de gerar/repetir escalas.
+  static String _nomeMes(int ano, int mes) => '${nomesMeses[mes - 1]} de $ano';
+
+  String _nomeMembro(String id) => store.buscar('membros', id)?['nome'] as String? ?? '(pessoa removida)';
 
   Response _resumoSemanal(Request _) => _json({
         'texto': montarResumoSemanal(

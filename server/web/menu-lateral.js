@@ -28,6 +28,7 @@ const MENU_GRUPOS = [
     { id: 'gestaoCasa', titulo: 'Gestão da Casa', permissao: 'gestaoCasa', badge: 'badge-casa' },
     { id: 'atas', titulo: 'Atas de reunião', permissao: 'atas', badge: 'badge-atas' },
     { id: 'historico', titulo: 'Histórico', permissao: 'painel' },
+    { id: 'auditoria', titulo: 'Auditoria', permissao: 'admin' },
     { id: 'status', titulo: 'Status', permissao: 'painel' },
     { id: 'acessos', titulo: 'Acessos às escalas', permissao: 'acessosEscala' },
     { id: 'admin', titulo: 'Administração', permissao: 'admin', href: '/admin' },

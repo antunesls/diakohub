@@ -137,6 +137,8 @@ Permissao permissaoDaRota(String metodo, String caminho) {
   if (caminho == 'api/resumo-semanal') return Permissao.resumo;
   if (comeca('api/minha-escala')) return Permissao.minhaEscala;
   if (comeca('api/acessos-escala')) return Permissao.acessosEscala;
+  // A trilha de auditoria (escalas, repertório, músicas, roteiros e indisponibilidades) é só da administração.
+  if (comeca('api/auditoria')) return Permissao.admin;
   // Ver basta para entrar; cada alteração confere no handler se é da pastoral ou do louvor.
   if (comeca('api/escalas')) return Permissao.escalasVer;
   if (comeca('api/repertorio')) return Permissao.escalasVer;

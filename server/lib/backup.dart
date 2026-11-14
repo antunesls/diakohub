@@ -117,7 +117,7 @@ class Backup {
   Future<Uint8List> gerarZip({DateTime? agora}) async {
     final quando = agora ?? _agora();
     final arquivo = Archive();
-    for (final nome in [for (final c in Store.colecoes) '$c.json', 'historico.jsonl']) {
+    for (final nome in [for (final c in Store.colecoes) '$c.json', 'historico.jsonl', 'auditoria.jsonl']) {
       final f = File(p.join(pastaDados, nome));
       if (await f.exists()) arquivo.add(ArchiveFile.bytes('data/$nome', await f.readAsBytes()));
     }
@@ -338,6 +338,7 @@ class ResumoRestauracao {
   int fotosMembros = 0;
   int termosLgpd = 0;
   bool historico = false;
+  bool auditoria = false;
   bool configuracoes = false;
   String? backupSeguranca;
 
@@ -348,6 +349,7 @@ class ResumoRestauracao {
         'fotosMembros': fotosMembros,
         'termosLgpd': termosLgpd,
         'historico': historico,
+        'auditoria': auditoria,
         'configuracoes': configuracoes,
         'backupSeguranca': backupSeguranca,
       };
@@ -513,6 +515,7 @@ class Restauracao {
       if (AnexosCasa.nomeValido(nome)) anexosAtas[nome] = f.content;
     }
     final historico = arquivo.findFile('data/historico.jsonl');
+    final auditoria = arquivo.findFile('data/auditoria.jsonl');
     Map<String, dynamic>? cfg;
     final cfgArquivo = arquivo.findFile('configuracoes.json');
     if (configuracoes && cfgArquivo != null) {
@@ -536,6 +539,11 @@ class Restauracao {
       await File(p.join(pastaDados, 'historico.jsonl')).writeAsBytes(historico.content, flush: true);
       resumo.historico = true;
       store.avisar('historico');
+    }
+    if (auditoria != null) {
+      await File(p.join(pastaDados, 'auditoria.jsonl')).writeAsBytes(auditoria.content, flush: true);
+      resumo.auditoria = true;
+      store.avisar('auditoria');
     }
     // Backups antigos (sem a pasta cartazes/) mantêm os cartazes atuais.
     if (temPastaCartazes) {

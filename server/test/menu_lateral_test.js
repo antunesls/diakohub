@@ -5,14 +5,23 @@ const path = require('node:path');
 
 const menu = require('../web/menu-lateral.js');
 
-test('organiza as catorze páginas nos grupos aprovados, com Agenda em Comunicação', () => {
+test('organiza as quinze páginas nos grupos aprovados, com Agenda em Comunicação', () => {
   const grupos = menu.gruposPermitidos(['painel', 'motivosVer', 'mensagens', 'membros', 'escalasVer',
     'agendaVer', 'recados', 'cartazes', 'galeria', 'resumo', 'admin']);
   assert.deepEqual(grupos.map((g) => g.nome), ['Início', 'Acompanhamento', 'Cultos', 'Comunicação', 'Operação']);
   assert.deepEqual(grupos.find((g) => g.nome === 'Cultos').itens.map((i) => i.id), ['escalas', 'repertorio', 'roteiros']);
   assert.deepEqual(grupos.find((g) => g.nome === 'Comunicação').itens.map((i) => i.id),
     ['agenda', 'recados', 'cartazes', 'galeria', 'resumo']);
-  assert.equal(grupos.flatMap((g) => g.itens).filter((i) => i.id !== 'admin').length, 14);
+  assert.deepEqual(grupos.find((g) => g.nome === 'Operação').itens.map((i) => i.id),
+    ['historico', 'auditoria', 'status', 'admin']);
+  assert.equal(grupos.flatMap((g) => g.itens).filter((i) => i.id !== 'admin').length, 15);
+});
+
+test('a Auditoria aparece só para a administração', () => {
+  const comAdmin = menu.gruposPermitidos(['painel', 'admin']);
+  assert.ok(comAdmin.flatMap((g) => g.itens).some((i) => i.id === 'auditoria'));
+  const semAdmin = menu.gruposPermitidos(['painel', 'escalasVer', 'escalaLouvor']);
+  assert.ok(!semAdmin.flatMap((g) => g.itens).some((i) => i.id === 'auditoria'));
 });
 
 test('perfil Louvor só vê suas páginas e grupos sem permissão desaparecem', () => {
@@ -39,7 +48,7 @@ test('painel oferece menu lateral, botão móvel e preserva as páginas existent
   assert.match(html, /id="fechar-menu"/);
   assert.doesNotMatch(html, /<nav class="abas"/);
   for (const id of ['inicio', 'motivos', 'mensagens', 'membros', 'escalas', 'repertorio', 'agenda',
-    'recados', 'cartazes', 'galeria', 'resumo', 'historico', 'status', 'acessos']) {
+    'recados', 'cartazes', 'galeria', 'resumo', 'historico', 'auditoria', 'status', 'acessos']) {
     assert.ok(html.includes(`data-painel="${id}"`), `página ${id} desapareceu`);
   }
 });
@@ -54,5 +63,5 @@ test('painel carrega o script das Palavras e o menu na versão nova', () => {
   const html = fs.readFileSync(path.join(__dirname, '../web/painel.html'), 'utf8');
   assert.match(html, /data-painel="palavras"/);
   assert.match(html, /<script src="\/palavras-pdf\.js\?v=1"><\/script>\s*<script src="\/palavras-ensaio\.js\?v=1"><\/script>\s*<script src="\/palavras\.js\?v=7"><\/script>\s*<script src="\/palavras-ensaio-tela\.js\?v=1"><\/script>/);
-  assert.match(html, /<script src="\/menu-lateral\.js\?v=5"><\/script>/);
+  assert.match(html, /<script src="\/menu-lateral\.js\?v=6"><\/script>/);
 });
