@@ -114,6 +114,12 @@
   .rede:focus-visible { outline: 3px solid #fff; outline-offset: 2px; }
   .assinatura { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px 18px; padding-top: 8px; font-size: 14px; color: #d6e8e5; }
   .assinatura .equipe { color: #fff; }
+  /* Link discreto para o cadastro de membros, junto da assinatura. */
+  .botao-membro { display: inline-flex; align-items: center; gap: 6px; padding: 3px 12px; border-radius: 14px; border: 1px solid var(--linha); color: var(--suave); font-size: 13px; text-decoration: none; }
+  .botao-membro:hover { color: var(--primaria); border-color: var(--borda); }
+  .botao-membro svg { width: 14px; height: 14px; }
+  .assinatura .botao-membro { color: #d6e8e5; border-color: rgba(255, 255, 255, .35); }
+  .assinatura .botao-membro:hover { color: #fff; border-color: rgba(255, 255, 255, .7); }
   @media (min-width: 960px) { .faixa-redes .dentro { padding: 44px 20px 30px; } .faixa-redes h2 { font-size: 34px; } }
   .carregando { text-align: center; color: var(--suave); padding: 48px 0; }
   /* Carrossel de fotos (capa) */
@@ -348,7 +354,9 @@
       s.redes.whatsapp && botaoRede(s.redes.whatsapp, 'Chamar no WhatsApp', 'fale com a secretaria',
         '<path d="M4 20l1.5-4A8 8 0 1 1 9 19.5z"></path>', '#fff', true),
     ].filter(Boolean);
-    const assinatura = [el('span', {}, s.igreja), el('a', { class: 'equipe', href: '/painel' }, 'Área da equipe')];
+    const assinatura = [el('span', {}, s.igreja), el('a', { class: 'equipe', href: '/painel' }, 'Área da equipe'),
+      el('a', { class: 'botao-membro', href: '/cadastro' },
+        svg('<circle cx="12" cy="8" r="4"></circle><path d="M4 21a8 8 0 0 1 16 0"></path>'), 'Cadastro de membro')];
     if (botoes.length) {
       $('redes').replaceChildren(el('div', { class: 'dentro' },
         el('h2', { id: 'redes-t' }, 'Acompanhe a igreja durante a semana'),

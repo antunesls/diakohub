@@ -14,3 +14,9 @@ test('menu do site oferece acessos à Recepção e ao Louvor, sem substituir as 
   assert.doesNotMatch(html, /menu\.push\(\['agenda', 'Agenda'\]\)/);
   assert.doesNotMatch(html, /menu\.push\(\['cultos', 'Cultos'\]\)/);
 });
+
+test('rodapé da página inicial tem um link discreto para o cadastro de membros', () => {
+  const html = fs.readFileSync(path.join(__dirname, '../web/inicio.html'), 'utf8');
+  assert.match(html, /el\('a', \{ class: 'botao-membro', href: '\/cadastro' \}/);
+  assert.match(html, /'Cadastro de membro'\)\];/);
+});
