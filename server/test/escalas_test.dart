@@ -26,6 +26,11 @@ void main() {
     expect(Perfil.comissaoLouvor.permissoes, containsAll([Permissao.escalasVer, Permissao.escalaLouvor]));
     expect(Perfil.comissaoLouvor.pode(Permissao.escalaPastoral), isFalse);
     expect(Perfil.comissaoLouvor.pode(Permissao.membros), isFalse);
+    // Visão geral, Histórico e Status não são da comissão, da gestão da casa nem do pregador.
+    for (final p in [Perfil.comissaoLouvor, Perfil.gestaoCasa, Perfil.pregador]) {
+      expect(p.pode(Permissao.painel), isFalse, reason: p.name);
+    }
+    expect(Perfil.secretaria.pode(Permissao.painel), isTrue);
     expect(Perfil.porNome('louvor'), Perfil.louvor);
     expect(Usuario.fromJson({'id': 'x', 'login': 'x', 'perfil': 'louvor'}).toJson()['perfil'], 'louvor');
     expect(Perfil.louvor.permissoes, {Permissao.sessao, Permissao.minhaEscala});

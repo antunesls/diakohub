@@ -39,6 +39,8 @@ enum Permissao {
   static Permissao? porNome(String nome) => values.where((p) => p.name == nome).firstOrNull;
 }
 
+// Visão geral, Histórico e Status (permissão painel) ficam com a equipe do telão e a administração;
+// os perfis de uma área só (comissão, gestão da casa, pregador) entram direto na própria aba.
 const _base = {Permissao.sessao, Permissao.painel, Permissao.motivosVer, Permissao.recados, Permissao.agendaVer, Permissao.cartazes};
 
 enum Perfil {
@@ -70,10 +72,10 @@ enum Perfil {
     Permissao.sessao, Permissao.visitantes, Permissao.visitantesCadastrar,
   }),
   gestaoCasa('Gestão da Casa', 'Cuida das pendências, compras planejadas e manutenções preventivas.', {
-    Permissao.sessao, Permissao.painel, Permissao.gestaoCasa,
+    Permissao.sessao, Permissao.gestaoCasa,
   }),
   comissaoLouvor('Comissão do Louvor', 'Membros da comissão: montam a escala e as músicas do louvor e veem a escala pastoral e a agenda.', {
-    Permissao.sessao, Permissao.painel, Permissao.agendaVer, Permissao.escalasVer, Permissao.escalaLouvor, Permissao.minhaEscala,
+    Permissao.sessao, Permissao.agendaVer, Permissao.escalasVer, Permissao.escalaLouvor, Permissao.minhaEscala,
   }),
   louvor('Louvor', 'Consulta somente a própria escala e as músicas dos cultos em que serve.', {
     Permissao.sessao, Permissao.minhaEscala,
@@ -82,7 +84,7 @@ enum Perfil {
     Permissao.sessao, Permissao.minhaEscala,
   }),
   pregador('Pregador', 'Prepara as próprias Palavras (sermões) no painel e consulta a própria escala.', {
-    Permissao.sessao, Permissao.painel, Permissao.palavras, Permissao.escalasVer, Permissao.minhaEscala,
+    Permissao.sessao, Permissao.palavras, Permissao.escalasVer, Permissao.minhaEscala,
   }),
   integrante('Integrante', 'Consulta a própria escala e avisa indisponibilidades.', {
     Permissao.sessao, Permissao.minhaEscala,

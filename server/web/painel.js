@@ -98,8 +98,12 @@ window.matchMedia('(max-width: 800px)').addEventListener('change', () => fecharM
 fecharMenu();
 
 function mostrarAba(nome) {
-  const botaoAba = [...$('menu-lateral').querySelectorAll('button[data-aba]')].find((b) => b.dataset.aba === nome);
-  if (!botaoAba) nome = 'inicio';
+  const botoes = [...$('menu-lateral').querySelectorAll('button[data-aba]')];
+  // Aba fora do perfil (a comissão, por exemplo, não tem Visão geral): abre a primeira que a pessoa pode ver.
+  if (!botoes.some((b) => b.dataset.aba === nome)) {
+    nome = botoes.some((b) => b.dataset.aba === 'inicio') ? 'inicio' : botoes[0]?.dataset.aba;
+  }
+  if (!nome) return;
   abaAtual = nome;
   $('menu-lateral').querySelectorAll('button[data-aba]').forEach((b) => {
     if (b.dataset.aba === nome) b.setAttribute('aria-current', 'page');
