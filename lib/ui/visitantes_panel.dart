@@ -34,7 +34,7 @@ class _VisitantesPanelState extends State<VisitantesPanel> {
     OrigemVisita.painel: 'pela secretaria'
   };
 
-  /// O servidor só manda a recepção ver os visitantes de hoje.
+  /// Servidores antigos (sem perfis configuráveis) só mandam a recepção ver os visitantes de hoje.
   static const _perfilSoHoje = 'Recepção';
 
   Future<void> _projetar() async {
@@ -72,7 +72,9 @@ class _VisitantesPanelState extends State<VisitantesPanel> {
     final scope = AppScope.of(context);
     final repo = scope.visitas;
     final podeProjetar = scope.conta.pode('projetar');
-    final podeOutroDia = scope.conta.perfil != _perfilSoHoje;
+    final podeOutroDia = scope.conta.perfisConfiguraveis
+        ? scope.conta.pode('visitantesHistorico')
+        : scope.conta.perfil != _perfilSoHoje;
     return ListenableBuilder(
       listenable: repo,
       builder: (context, _) {

@@ -20,6 +20,12 @@ async function api(metodo, caminho, corpo, { bruto = false, tipo, cabecalhos = {
     throw new Error('Sessão expirada. Entre novamente.');
   }
   const j = await r.json().catch(() => ({}));
+  // Senha temporária ainda não trocada (ex.: redefinida enquanto a página estava aberta):
+  // recarrega, e a tela de primeiro acesso aparece.
+  if (r.status === 403 && j.codigo === 'trocar-senha') {
+    location.reload();
+    throw new Error(j.erro);
+  }
   if (!r.ok) {
     const erro = new Error(j.erro || 'Erro ' + r.status);
     erro.ajuda = j.ajuda; // página de ajuda que explica como resolver (ex.: agenda do Google)
@@ -127,4 +133,40 @@ function abrirDialogo(dialogo, erroEl, salvar) {
     }
   };
   dialogo.showModal();
+}
+
+/**
+ * Cartão com a senha temporária e o texto para entregar o acesso pelo WhatsApp (prévia editável,
+ * Copiar e Abrir no WhatsApp, como no texto da escala). O sistema não manda mensagens sozinho.
+ * [r]: resposta do servidor ao criar a conta ou gerar senha (senhaTemporaria, mensagemAcesso, whatsapp).
+ */
+function cartaoEntregaAcesso(nome, login, r) {
+  const texto = el('textarea', { rows: 8, 'aria-label': 'Mensagem com o acesso de ' + nome, style: 'min-height:170px;font-family:inherit' });
+  texto.value = r.mensagemAcesso || `Usuário: ${login}\nSenha temporária: ${r.senhaTemporaria}`;
+  const abrir = el('a', { class: 'botao pequeno', target: '_blank', rel: 'noopener' },
+    r.whatsapp ? 'Abrir conversa no WhatsApp' : 'Abrir no WhatsApp');
+  const atualizar = () => {
+    abrir.href = 'https://wa.me/' + (r.whatsapp || '') + '?text=' + encodeURIComponent(texto.value);
+  };
+  texto.addEventListener('input', atualizar);
+  atualizar();
+  const status = el('span', { role: 'status' });
+  const copiarTexto = botao('Copiar', async () => {
+    try {
+      await navigator.clipboard.writeText(texto.value);
+      mensagem(status, 'Texto copiado.');
+    } catch {
+      texto.select();
+      mensagem(status, 'Selecione o texto e copie.', false);
+    }
+  });
+  return el('div', { class: 'entrega-acesso', style: 'display:flex;flex-direction:column;gap:8px' },
+    el('p', { style: 'margin:0' }, el('strong', {}, `Acesso de ${nome}`), ' · usuário ', el('code', {}, login),
+      ' · senha temporária ', el('code', {}, r.senhaTemporaria)),
+    el('p', { class: 'dica', style: 'margin:0' },
+      'A senha só aparece agora e vale por 7 dias. Revise o texto e envie para a pessoa; no primeiro acesso ela cria a própria senha. ',
+      r.whatsapp ? 'O botão abre a conversa com o WhatsApp do cadastro de membros.'
+        : 'Sem WhatsApp no cadastro de membros: o botão abre o WhatsApp para você escolher o contato.'),
+    texto,
+    el('div', { style: 'display:flex;flex-wrap:wrap;gap:8px;align-items:center' }, copiarTexto, abrir, status));
 }

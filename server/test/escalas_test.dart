@@ -28,7 +28,7 @@ void main() {
     expect(Perfil.comissaoLouvor.pode(Permissao.membros), isFalse);
     // Visão geral, Histórico e Status não são da comissão, da gestão da casa nem do pregador.
     for (final p in [Perfil.comissaoLouvor, Perfil.gestaoCasa, Perfil.pregador]) {
-      expect(p.pode(Permissao.painel), isFalse, reason: p.name);
+      expect(p.pode(Permissao.painel), isFalse, reason: p.id);
     }
     expect(Perfil.secretaria.pode(Permissao.painel), isTrue);
     expect(Perfil.porNome('louvor'), Perfil.louvor);
@@ -73,6 +73,8 @@ void main() {
       final (_, j) = await chamar('POST', '/api/admin/usuarios',
           token: admin, json: {'nome': 'Usuário $login', 'login': login, 'perfil': perfil.id});
       final (_, l) = await chamar('POST', '/api/login', json: {'usuario': login, 'senha': j['senhaTemporaria']});
+      // Primeiro acesso: a senha temporária só serve para criar a própria.
+      await chamar('POST', '/api/eu/senha', token: l['token'] as String, json: {'atual': j['senhaTemporaria'], 'nova': 'senha-propria-1'});
       return l['token'] as String;
     }
 
@@ -345,6 +347,7 @@ void main() {
       expect(st, 201);
       final (_, login) = await chamar('POST', '/api/login', json: {'usuario': 'bruno.reis', 'senha': criado['senhaTemporaria']});
       final acesso = login['token'] as String;
+      await chamar('POST', '/api/eu/senha', token: acesso, json: {'atual': criado['senhaTemporaria'], 'nova': 'senha-propria-1'});
       expect((await chamar('GET', '/api/escalas', token: acesso)).$1, 403);
       expect((await chamar('GET', '/api/minha-escala', token: secretaria)).$1, 403);
       expect((await chamar('POST', '/api/acessos-escala', token: secretaria,
@@ -458,6 +461,7 @@ void main() {
       final (_, login) = await chamar('POST', '/api/login',
           json: {'usuario': 'bruno.louvor', 'senha': criado['senhaTemporaria']});
       final acesso = login['token'] as String;
+      await chamar('POST', '/api/eu/senha', token: acesso, json: {'atual': criado['senhaTemporaria'], 'nova': 'senha-propria-1'});
       expect((await chamar('GET', '/api/minha-escala', token: acesso)).$1, 403); // falta vínculo
       expect((await chamar('POST', '/api/acessos-escala/vincular', token: admin,
           json: {'usuarioId': criado['usuario']['id'], 'membroId': bruno})).$1, 200);

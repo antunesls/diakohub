@@ -107,9 +107,11 @@ void main() {
     /// Cria o usuário pelo /admin e já entra com a senha temporária.
     Future<(String id, String token)> criar(String login, Perfil perfil) async {
       final (st, j) = await chamar('POST', '/api/admin/usuarios',
-          token: admin, json: {'nome': 'Pessoa $login', 'login': login, 'perfil': perfil.name});
+          token: admin, json: {'nome': 'Pessoa $login', 'login': login, 'perfil': perfil.id});
       expect(st, 201, reason: '$j');
       final token = await entrar(login, j['senhaTemporaria'] as String);
+      // Primeiro acesso: a senha temporária só serve para criar a própria.
+      await chamar('POST', '/api/eu/senha', token: token, json: {'atual': j['senhaTemporaria'], 'nova': 'senha-propria-1'});
       return (j['usuario']['id'] as String, token!);
     }
 

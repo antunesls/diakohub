@@ -51,4 +51,36 @@ void main() {
     expect(conta.pode('mensagens'), isTrue);
     expect(conta.pode('admin'), isTrue);
   });
+
+  test('perfis configuráveis: as regras vêm das permissões; servidor anterior segue pelo nome do perfil', () async {
+    final novo = ContaRepo(
+        api: api((_) => json({'nome': 'Obreiro', 'perfilNome': 'Obreiro', 'permissoes': ['visitantes'], 'entrada': '/recepcao'})),
+        cache: () async => File('${tmp.path}/conta-nova.json'));
+    await novo.sincronizar();
+    expect(novo.perfisConfiguraveis, isTrue);
+    expect(novo.pode('visitantesHistorico'), isFalse);
+
+    final antigo = ContaRepo(
+        api: api((_) => json({'nome': 'Recepção', 'perfilNome': 'Recepção', 'permissoes': ['visitantes']})),
+        cache: () async => File('${tmp.path}/conta-antiga.json'));
+    await antigo.sincronizar();
+    expect(antigo.perfisConfiguraveis, isFalse);
+    await antigo.limpar();
+    expect(novo.perfisConfiguraveis, isTrue);
+  });
+
+  test('login avisa quando a senha é temporária', () async {
+    final servidor = api((req) {
+      if (req.url.path == '/api/login') return json({'token': 'abc', 'trocarSenha': true});
+      expect(req.url.path, '/api/eu/senha');
+      expect(req.headers['Authorization'], 'Bearer abc');
+      expect(jsonDecode(req.body), {'atual': 'temp12345', 'nova': 'minha-senha'});
+      return json({'ok': true});
+    });
+    final r = await servidor.entrar('http://srv:8080', 'temp12345', usuario: 'ana');
+    expect(r.token, 'abc');
+    expect(r.trocarSenha, isTrue);
+    await servidor.criarMinhaSenha('http://srv:8080', r.token, atual: 'temp12345', nova: 'minha-senha');
+    expect(await servidor.login('http://srv:8080', 'temp12345'), 'abc');
+  });
 }

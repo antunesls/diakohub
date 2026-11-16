@@ -34,26 +34,52 @@
   <header class="topo-ajuda">
     <a href="/painel"><img src="/logo.png" alt="Igreja Diakonia Tulipas"></a>
     <span class="espaco"></span>
-    <a class="botao secundario pequeno" href="/admin#usuarios">Ir para Usuários e perfis</a>
+    <a class="botao secundario pequeno" href="/admin#usuarios">Ir para Usuários</a>
   </header>
 
   <p class="sobretitulo">Ajuda</p>
   <h1>Usuários e perfis de acesso</h1>
-  <p class="lead">Cada pessoa da equipe entra no painel e no tablet com o próprio usuário e senha. O <strong>perfil</strong> define o que ela vê e pode fazer.</p>
+  <p class="lead">Cada pessoa da equipe entra no painel e no tablet com o próprio usuário e senha. O <strong>perfil</strong> define o que ela vê e pode fazer. Os perfis são da igreja: dá para ajustar os que vêm prontos e criar novos.</p>
 
-  <h2 id="perfis">Os perfis</h2>
+  <h2 id="criar">Cadastrar uma pessoa e entregar o acesso pelo WhatsApp</h2>
+  <ol>
+    <li>Em <a href="/admin#usuarios">Administração › Usuários</a>, preencha o nome, o usuário (ex.: <code>maria.silva</code>) e escolha o perfil.</li>
+    <li>Clique em <strong>Adicionar pessoa</strong>. Aparece a <strong>senha temporária</strong> e, logo abaixo, o texto pronto para o WhatsApp, com o endereço certo para o perfil (painel, Minha escala ou recepção), o usuário e a senha.</li>
+    <li>Revise o texto (dá para editar) e clique em <strong>Abrir no WhatsApp</strong>. Se a conta estiver ligada a um cadastro de membro com WhatsApp, abre direto a conversa da pessoa; senão, você escolhe o contato. Também dá para <strong>Copiar</strong> e colar onde quiser. O sistema nunca manda mensagens sozinho.</li>
+  </ol>
+  <p>Em <strong>Acessos às escalas</strong> (no painel), a criação da conta de um integrante funciona do mesmo jeito, já com o WhatsApp do cadastro de membros.</p>
+
+  <h2 id="primeiro-acesso">Primeiro acesso: a pessoa cria a própria senha</h2>
+  <p>A senha temporária só serve para o primeiro acesso. Ao entrar com ela (no painel, na Minha escala, na recepção ou no app do tablet), a pessoa vê a tela <strong>Crie a sua senha</strong> e só continua depois de escolher uma senha própria. Até lá, nada mais funciona com essa conta.</p>
+  <ul>
+    <li>A senha temporária <strong>vale 7 dias</strong>. Depois disso, o login é recusado e é preciso gerar outra.</li>
+    <li>Na lista de usuários aparece <strong>Aguardando primeiro acesso</strong> enquanto a pessoa não criar a senha, ou <strong>Senha temporária vencida</strong>.</li>
+    <li>Esqueceu a senha? Clique em <strong>Nova senha e enviar</strong>: a pessoa sai dos aparelhos, recebe uma nova senha temporária e cria outra no primeiro acesso.</li>
+  </ul>
+
+  <h2 id="perfis">Criar e ajustar perfis</h2>
+  <p>Em <a href="/admin#perfis">Administração › Perfis</a> ficam todos os perfis, com quantas pessoas usam cada um.</p>
+  <ul>
+    <li><strong>Novo perfil</strong>: dê um nome (ex.: <em>Líder de jovens</em>) e marque o que ele pode. O mais fácil é escolher <strong>Começar a partir de</strong> um perfil parecido, ou clicar em <strong>Duplicar</strong>, e só ajustar.</li>
+    <li><strong>Editar</strong>: as permissões ficam agrupadas por área (painel e telão, oração, pessoas, escalas, comunicação, gestão e administração), cada uma com uma explicação curta. Algumas trazem outras junto: quem edita pedidos também os vê, por exemplo. Essas aparecem marcadas como <em>Incluída por…</em>.</li>
+    <li><strong>A mudança vale na hora</strong> para todas as pessoas do perfil, sem precisar entrar de novo (o tablet atualiza sozinho).</li>
+    <li><strong>Restaurar padrão</strong>: os perfis que vêm prontos e foram alterados podem voltar ao original. Um perfil padrão excluído também pode ser trazido de volta.</li>
+    <li><strong>Excluir</strong>: só perfis que ninguém usa. Troque antes o perfil das pessoas. O perfil <strong>Integrante</strong> não pode ser excluído, porque as contas criadas em Acessos às escalas usam ele.</li>
+  </ul>
+  <div class="nota"><p>O <strong>Administrador</strong> é travado (não pode ser alterado nem excluído), para ninguém perder o acesso à administração por engano. Todas as mudanças de perfil e as senhas geradas ficam registradas na <strong>Auditoria</strong> do painel (filtro <em>Acessos</em>).</p></div>
+  <p>Algumas permissões mudam o que a pessoa vê fora do painel:</p>
+  <ul>
+    <li><strong>Ver visitantes de outros dias</strong>: sem ela (como na Recepção), só aparecem os visitantes de hoje, e o cadastro conta como feito na recepção.</li>
+    <li><strong>Avisar indisponibilidade</strong> e <strong>Escolher as músicas dos cultos em que ministra</strong>: valem na Minha escala.</li>
+    <li>Quem não tem nenhuma aba do painel entra direto na página dele: <strong>Minha escala</strong> (só escala) ou <strong>recepção</strong> (só cadastro de visitantes).</li>
+  </ul>
+
+  <h2 id="lista">Os perfis desta igreja</h2>
   <div class="perfis" id="lista-perfis"><p class="dica">Carregando…</p></div>
 
   <h2 id="matriz">O que cada perfil pode fazer</h2>
   <div class="rolagem"><table id="matriz-perfis"></table></div>
-  <div class="nota"><p><strong>Pedidos de oração particulares</strong> (e o nome de quem pediu) aparecem só para Pastor e Administrador, como o formulário promete. Os outros perfis veem apenas os pedidos públicos, sem o nome de quem enviou.</p></div>
-
-  <h2 id="criar">Cadastrar uma pessoa</h2>
-  <ol>
-    <li>Em <a href="/admin#usuarios">Administração › Usuários e perfis</a>, preencha o nome, o usuário (ex.: <code>maria.silva</code>) e escolha o perfil.</li>
-    <li>Clique em <strong>Adicionar pessoa</strong>. Aparece uma <strong>senha temporária</strong>: anote e entregue à pessoa. Ela não aparece de novo.</li>
-    <li>A pessoa entra no painel com o usuário e essa senha, e troca em <strong>Minha senha</strong> (no topo do painel).</li>
-  </ol>
+  <div class="nota"><p><strong>Pedidos de oração particulares</strong> (e o nome de quem pediu) aparecem só para quem tem a permissão de vê-los (nos perfis prontos, Pastor e Administrador), como o formulário promete. Os outros veem apenas os pedidos públicos, sem o nome de quem enviou.</p></div>
 
   <h2>Ministro do louvor</h2>
   <p>Crie a conta com o perfil <strong>Ministro</strong> e, no painel em <strong>Acessos às escalas</strong>, vincule essa conta ao cadastro de membro da pessoa. Escale esse membro na função <strong>Ministro</strong> do culto. Em <a href="/minha-escala">Minha escala</a>, a pessoa poderá escolher, ordenar e definir o tom das músicas dos cultos em que ministra, sem poder editar os integrantes ou as músicas do repertório.</p>
@@ -62,8 +88,8 @@
 
   <h2 id="dia-a-dia">No dia a dia</h2>
   <ul>
-    <li><strong>Trocar o perfil</strong>: escolha outro na lista. A pessoa sai dos aparelhos e entra de novo já com o novo acesso.</li>
-    <li><strong>Esqueceu a senha</strong>: o administrador clica em <strong>Nova senha</strong> e entrega a senha temporária.</li>
+    <li><strong>Trocar o perfil de alguém</strong>: escolha outro na lista. A pessoa sai dos aparelhos e entra de novo já com o novo acesso.</li>
+    <li><strong>Esqueceu a senha</strong>: o administrador clica em <strong>Nova senha e enviar</strong> e manda o texto pelo WhatsApp.</li>
     <li><strong>Alguém saiu da equipe</strong>: <strong>Desativar</strong> (pode reativar depois) ou <strong>Excluir</strong>. O acesso acaba na hora, em todos os aparelhos.</li>
     <li><strong>Quem fez o quê</strong>: o Histórico mostra quem projetou cada coisa, e os pedidos aprovados guardam quem aprovou.</li>
   </ul>

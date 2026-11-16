@@ -1238,7 +1238,8 @@ class SlideDoPasso extends StatelessWidget {
         ]),
       AcaoPasso.telaVazia => icone(Icons.crop_square, 'Tela vazia'),
       AcaoPasso.telaPreta => Text('Tela preta', style: branco.copyWith(color: Colors.white24)),
-      AcaoPasso.qrOracao || AcaoPasso.qrMensagens || AcaoPasso.qrPix => icone(Icons.qr_code_2, passo.rotulo),
+      AcaoPasso.qrOracao || AcaoPasso.qrMensagens || AcaoPasso.qrPix || AcaoPasso.qrVisitante =>
+        icone(Icons.qr_code_2, passo.rotulo),
     };
 
     // QR: a imagem real do telão (com a arte do /admin), quando o servidor a entrega.
@@ -1246,6 +1247,7 @@ class SlideDoPasso extends StatelessWidget {
       AcaoPasso.qrOracao => 'oracao',
       AcaoPasso.qrMensagens => 'mensagens',
       AcaoPasso.qrPix => 'pix',
+      AcaoPasso.qrVisitante => 'visitante',
       _ => null,
     };
     final api = qr == null ? null : AppScope.maybeOf(context)?.api;

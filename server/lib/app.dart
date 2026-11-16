@@ -37,7 +37,9 @@ import 'galeria.dart';
 import 'gestao_casa.dart';
 import 'lgpd.dart';
 import 'limpeza_escalas.dart';
+import 'mensagem_acesso.dart';
 import 'pagina_inicial.dart';
+import 'perfis.dart';
 import 'palavras.dart';
 import 'permissoes.dart';
 import 'repertorio.dart';
@@ -217,12 +219,10 @@ class Servidor {
       ..get('/ajuda/visitantes', (Request _) => _pagina('ajuda-visitantes.html'))
       ..get('/ajuda/atas', (Request _) => _pagina('ajuda-atas.html'))
       // Perfis e permissões (só a descrição da matriz, para a página de ajuda).
+      // Público (página de ajuda): só nome, descrição e permissões, sem quantas contas usam cada perfil.
       ..get('/api/public/perfis', (Request _) => _json({
-            'perfis': [for (final p in Perfil.values) p.toJson()],
-            'permissoes': [
-              for (final p in Permissao.values)
-                if (p != Permissao.sessao) {'id': p.name, 'descricao': p.descricao}
-            ],
+            'perfis': [for (final p in _perfis) p.toJson()],
+            'permissoes': _catalogoPermissoes(),
           }))
       ..get('/painel', (Request _) => _pagina('painel.html'))
       ..get('/mural', (Request req) => _chaveMuralOk(req) ? _pagina('mural.html') : _semChaveMural())
@@ -247,6 +247,11 @@ class Servidor {
       ..put('/api/admin/usuarios/<id>', _atualizarUsuario)
       ..post('/api/admin/usuarios/<id>/senha', _redefinirSenhaUsuario)
       ..delete('/api/admin/usuarios/<id>', _excluirUsuario)
+      ..get('/api/admin/perfis', _listarPerfis)
+      ..post('/api/admin/perfis', _criarPerfil)
+      ..put('/api/admin/perfis/<id>', _atualizarPerfil)
+      ..post('/api/admin/perfis/<id>/restaurar', _restaurarPerfil)
+      ..delete('/api/admin/perfis/<id>', _excluirPerfil)
       ..get('/api/acessos-escala', _listarAcessosEscala)
       ..post('/api/acessos-escala', _criarAcessoEscala)
       ..post('/api/acessos-escala/vincular', _vincularAcessoEscala)
@@ -452,6 +457,11 @@ class Servidor {
         final conta = Auth.contaDa(req);
         if (conta == null) return inner(req); // rota pública
         final precisa = permissaoDaRota(req.method, req.url.path);
+        // Senha temporária: só entra para criar a própria senha (o painel e o app mostram a tela).
+        if (conta.trocarSenha && precisa != Permissao.sessao) {
+          return Response(403,
+              body: jsonEncode({'erro': 'Crie a sua senha para continuar.', 'codigo': 'trocar-senha'}), headers: jsonHeaders);
+        }
         if (conta.pode(precisa)) return inner(req);
         return _erro(403, 'Seu perfil (${conta.perfil.nome}) não permite: ${precisa.descricao}.');
       };
@@ -489,7 +499,9 @@ class Servidor {
       final usuario = corpo['usuario'] as String? ?? '';
       final token = await auth.login(corpo['senha'] as String? ?? '', _ip(req), usuario: usuario);
       if (token == null) return _erro(401, usuario.trim().isEmpty ? 'Senha incorreta.' : 'Usuário ou senha incorretos.');
-      return _json({'token': token});
+      return _json({'token': token, 'trocarSenha': auth.contaDe(token)?.trocarSenha ?? false});
+    } on SenhaTemporariaVencida {
+      return _erro(401, 'Senha temporária vencida: peça uma nova a quem cuida dos acessos.');
     } on LimiteExcedido {
       return _erro(429, 'Muitas tentativas. Aguarde um minuto.');
     }
@@ -514,6 +526,9 @@ class Servidor {
       'perfil': c.perfil.id,
       'perfilNome': c.perfil.nome,
       'permissoes': [for (final p in c.perfil.permissoes) p.name],
+      'trocarSenha': c.trocarSenha,
+      'senhaMinima': senhaMinima,
+      'entrada': c.perfil.entrada,
       'site': {'ativo': cfg?.siteAtivo ?? false, 'galeria': cfg?.siteGaleria ?? false},
       // Regra da igreja para o telão (o app projeta direto no Holyrics, então precisa saber).
       'textoMotivos': cfg?.textoMotivos ?? true,
@@ -539,7 +554,8 @@ class Servidor {
       final usuarios = auth.usuarios!;
       if (!usuarios.conferirSenha(c.id, atual)) return _erro(403, 'Senha atual incorreta.');
       if (nova.length < senhaMinima) return _erro(400, 'A senha precisa ter pelo menos $senhaMinima caracteres.');
-      await usuarios.definirSenha(c.id, nova);
+      if (nova == atual) return _erro(400, 'A nova senha precisa ser diferente da atual.');
+      await usuarios.definirSenha(c.id, nova); // limpa a senha temporária: o acesso fica liberado
     }
     final saiu = await auth.encerrarDoUsuario(c.id, manter: Auth.tokenDe(req));
     return _json({'ok': true, 'sessoesEncerradas': saiu});
@@ -547,27 +563,57 @@ class Servidor {
 
   Usuarios? get _usuarios => auth.usuarios;
 
+  /// Perfis configurados (sem usuários, os padrões de fábrica).
+  List<Perfil> get _perfis => _usuarios?.perfis.lista ?? Perfil.values;
+
+  List<Map<String, dynamic>> _perfisJson() => [
+        for (final p in _perfis)
+          {
+            ...p.toJson(),
+            'entrada': p.entrada,
+            'usuarios': _usuarios?.quantosUsam(p.id) ?? 0,
+            'alterado': p.padrao && !Perfis.igualAoPadrao(p),
+          },
+      ];
+
+  static List<Map<String, dynamic>> _catalogoPermissoes() =>
+      [for (final p in Permissao.values) if (p != Permissao.sessao) p.toJson()];
+
   Response _listarUsuarios(Request _) => _json({
         'usuarios': [for (final u in _usuarios?.lista ?? const <Usuario>[]) u.toJson()],
-        'perfis': [for (final p in Perfil.values) p.toJson()],
-        'permissoes': [
-          for (final p in Permissao.values)
-            if (p != Permissao.sessao) {'id': p.name, 'descricao': p.descricao}
-        ],
+        'perfis': _perfisJson(),
+        'permissoes': _catalogoPermissoes(),
       });
+
+  /// Senha temporária gerada para [u]: o que a tela mostra e o texto para o WhatsApp.
+  Map<String, dynamic> _entregaDeAcesso(Usuario u, String senha) => {
+        'senhaTemporaria': senha,
+        'mensagemAcesso': mensagemAcesso(
+            nome: u.nome,
+            igreja: nomeIgreja,
+            endereco: '$_urlBase${u.perfil.entrada}',
+            login: u.login,
+            senha: senha,
+            valeAte: u.senhaTemporariaAte),
+        'whatsapp': u.membroId == null ? null : whatsappDoMembro(store.buscar('membros', u.membroId!)),
+      };
+
+  String _novaSenhaTemporaria() => gerarSenhaTemporaria(senhaMinima < 10 ? 10 : senhaMinima);
 
   /// Corpo: {"nome", "login", "perfil"} — devolve a senha temporária (mostrada uma única vez).
   Future<Response> _criarUsuario(Request req) async {
     final usuarios = _usuarios;
     if (usuarios == null) return _erro(501, 'Usuários indisponíveis.');
     final corpo = await _corpo(req);
-    final perfil = Perfil.porNome(corpo['perfil'] as String? ?? '');
+    final perfil = usuarios.perfis.buscar(corpo['perfil'] as String? ?? '');
     if (perfil == null) return _erro(400, 'Escolha o perfil.');
-    final senha = gerarSenhaTemporaria(senhaMinima < 10 ? 10 : senhaMinima);
+    final senha = _novaSenhaTemporaria();
     try {
       final u = await usuarios.criar(
-          nome: corpo['nome'] as String? ?? '', login: corpo['login'] as String? ?? '', perfil: perfil, senha: senha);
-      return _json({'usuario': u.toJson(), 'senhaTemporaria': senha}, status: 201);
+          nome: corpo['nome'] as String? ?? '', login: corpo['login'] as String? ?? '', perfil: perfil, senha: senha,
+          temporaria: true);
+      await _auditar(req, tipo: 'acesso', acao: 'senha-temporaria', alvo: u.nome, detalhe: 'Conta criada (${perfil.nome})');
+      return _json({'usuario': u.toJson(), ..._entregaDeAcesso(u, senha)}, status: 201);
     } on FormatException catch (e) {
       return _erro(400, e.message);
     }
@@ -579,7 +625,7 @@ class Servidor {
     final atual = usuarios?.buscar(id);
     if (usuarios == null || atual == null) return _erro(404, 'Usuário não encontrado.');
     final corpo = await _corpo(req);
-    final perfil = corpo['perfil'] == null ? null : Perfil.porNome(corpo['perfil'] as String);
+    final perfil = corpo['perfil'] == null ? null : usuarios.perfis.buscar(corpo['perfil'] as String);
     if (corpo['perfil'] != null && perfil == null) return _erro(400, 'Perfil inválido.');
     if (corpo.containsKey('ativo') && corpo['ativo'] is! bool) return _erro(400, '"ativo" deve ser verdadeiro ou falso.');
     final perfilAntes = atual.perfil, ativoAntes = atual.ativo;
@@ -596,13 +642,16 @@ class Servidor {
   }
 
   /// Gera uma senha temporária nova (mostrada uma única vez) e desconecta a pessoa.
-  Future<Response> _redefinirSenhaUsuario(Request _, String id) async {
+  Future<Response> _redefinirSenhaUsuario(Request req, String id) async {
     final usuarios = _usuarios;
-    if (usuarios?.buscar(id) == null) return _erro(404, 'Usuário não encontrado.');
-    final senha = gerarSenhaTemporaria(senhaMinima < 10 ? 10 : senhaMinima);
-    await usuarios!.definirSenha(id, senha);
+    final u = usuarios?.buscar(id);
+    if (u == null) return _erro(404, 'Usuário não encontrado.');
+    final senha = _novaSenhaTemporaria();
+    await usuarios!.definirSenha(id, senha, temporaria: true);
     await auth.encerrarDoUsuario(id);
-    return _json({'senhaTemporaria': senha});
+    agente?.enviarTablets(); // o tablet pareado só volta depois que a pessoa criar a senha
+    await _auditar(req, tipo: 'acesso', acao: 'senha-temporaria', alvo: u.nome, detalhe: 'Senha redefinida');
+    return _json(_entregaDeAcesso(u, senha));
   }
 
   Future<Response> _excluirUsuario(Request req, String id) async {
@@ -620,13 +669,145 @@ class Servidor {
     return _json({'ok': true, 'escalasAlteradas': escalas});
   }
 
-  // A Secretaria administra somente contas de integrantes e pode vincular uma
-  // conta pastoral já existente. Jamais devolvemos hashes ou contas de outros perfis.
+  // ---------- Perfis (configuráveis no /admin) ----------
+
+  Response _listarPerfis(Request _) => _json({
+        'perfis': _perfisJson(),
+        'permissoes': _catalogoPermissoes(),
+        'areas': [for (final a in AreaPermissao.values) {'id': a.name, 'nome': a.nome}],
+        'padroesExcluidos': [
+          for (final d in _usuarios?.perfis.padroesExcluidos ?? const <PerfilPadrao>[]) {'id': d.id, 'nome': d.nome}
+        ],
+      });
+
+  /// Lê a lista de permissões do corpo; nomes desconhecidos são erro (evita perder uma marcação em silêncio).
+  static Set<Permissao>? _permissoesDoCorpo(Object? lista) {
+    if (lista == null) return null;
+    if (lista is! List) throw const FormatException('"permissoes" deve ser uma lista.');
+    return {
+      for (final n in lista)
+        Permissao.porNome('$n') ?? (throw FormatException('Permissão desconhecida: $n')),
+    };
+  }
+
+  static String _resumoPermissoes(Set<Permissao> antes, Set<Permissao> depois) {
+    final mais = depois.difference(antes), menos = antes.difference(depois);
+    return [
+      if (mais.isNotEmpty) 'Ganhou: ${mais.map((p) => p.descricao).join('; ')}',
+      if (menos.isNotEmpty) 'Perdeu: ${menos.map((p) => p.descricao).join('; ')}',
+    ].join(' · ');
+  }
+
+  /// Mudou o que algum perfil pode: os tablets buscam /api/eu de novo e o agente revê os pareados.
+  void _perfisMudaram() => agente?.enviarTablets();
+
+  /// Corpo: {"nome", "descricao", "permissoes": [...], "copiarDe": "<id>"} (copiarDe dispensa "permissoes").
+  Future<Response> _criarPerfil(Request req) async {
+    final usuarios = _usuarios;
+    if (usuarios == null) return _erro(501, 'Perfis indisponíveis.');
+    final corpo = await _corpo(req);
+    try {
+      final base = corpo['copiarDe'] == null ? null : usuarios.perfis.buscar('${corpo['copiarDe']}');
+      if (corpo['copiarDe'] != null && base == null) return _erro(400, 'Perfil de origem não encontrado.');
+      final permissoes = _permissoesDoCorpo(corpo['permissoes']) ?? base?.permissoes ?? const <Permissao>{};
+      final perfil = await usuarios.perfis.criar(
+          nome: corpo['nome'] as String? ?? '',
+          descricao: corpo['descricao'] as String? ?? base?.descricao ?? '',
+          permissoes: permissoes);
+      await _auditar(req, tipo: 'acesso', acao: 'perfil-criado', alvo: perfil.nome,
+          detalhe: base == null ? '' : 'A partir de ${base.nome}');
+      return _json({...perfil.toJson(), 'entrada': perfil.entrada, 'usuarios': 0}, status: 201);
+    } on FormatException catch (e) {
+      return _erro(400, e.message);
+    }
+  }
+
+  /// Corpo: {"nome", "descricao", "permissoes"} (só o que mudar). Vale na hora para quem usa o perfil.
+  Future<Response> _atualizarPerfil(Request req, String id) async {
+    final usuarios = _usuarios;
+    final perfil = usuarios?.perfis.buscar(id);
+    if (usuarios == null || perfil == null) return _erro(404, 'Perfil não encontrado.');
+    final corpo = await _corpo(req);
+    final antes = {...perfil.permissoes}, nomeAntes = perfil.nome;
+    try {
+      await usuarios.perfis.atualizar(id,
+          nome: corpo['nome'] as String?,
+          descricao: corpo['descricao'] as String?,
+          permissoes: _permissoesDoCorpo(corpo['permissoes']));
+    } on FormatException catch (e) {
+      return _erro(400, e.message);
+    }
+    final resumo = [
+      if (perfil.nome != nomeAntes) 'Nome: $nomeAntes → ${perfil.nome}',
+      _resumoPermissoes(antes, perfil.permissoes),
+    ].where((s) => s.isNotEmpty).join(' · ');
+    if (resumo.isNotEmpty) await _auditar(req, tipo: 'acesso', acao: 'perfil-editado', alvo: perfil.nome, detalhe: resumo);
+    _perfisMudaram();
+    return _json({...perfil.toJson(), 'entrada': perfil.entrada, 'usuarios': usuarios.quantosUsam(id)});
+  }
+
+  Future<Response> _restaurarPerfil(Request req, String id) async {
+    final usuarios = _usuarios;
+    if (usuarios == null) return _erro(501, 'Perfis indisponíveis.');
+    final antes = {...?usuarios.perfis.buscar(id)?.permissoes};
+    try {
+      final perfil = await usuarios.perfis.restaurar(id);
+      usuarios.religarPerfis();
+      await _auditar(req, tipo: 'acesso', acao: 'perfil-restaurado', alvo: perfil.nome,
+          detalhe: _resumoPermissoes(antes, perfil.permissoes));
+      _perfisMudaram();
+      return _json({...perfil.toJson(), 'entrada': perfil.entrada, 'usuarios': usuarios.quantosUsam(id)});
+    } on FormatException catch (e) {
+      return _erro(400, e.message);
+    }
+  }
+
+  /// Só exclui perfil sem contas (a mensagem diz quantas usam).
+  Future<Response> _excluirPerfil(Request req, String id) async {
+    final usuarios = _usuarios;
+    final perfil = usuarios?.perfis.buscar(id);
+    if (usuarios == null || perfil == null) return _erro(404, 'Perfil não encontrado.');
+    final emUso = usuarios.quantosUsam(id);
+    if (emUso > 0) {
+      return _erro(400, '$emUso ${emUso == 1 ? 'conta usa' : 'contas usam'} este perfil. Troque o perfil delas antes de excluir.');
+    }
+    if (id == PerfilPadrao.integrante.id) {
+      return _erro(400, 'O perfil Integrante é usado pelas contas criadas em Acessos às escalas e não pode ser excluído.');
+    }
+    try {
+      await usuarios.perfis.excluir(id);
+    } on FormatException catch (e) {
+      return _erro(400, e.message);
+    }
+    usuarios.religarPerfis();
+    await _auditar(req, tipo: 'acesso', acao: 'perfil-excluido', alvo: perfil.nome);
+    return _json({'ok': true});
+  }
+
+  // ---------- Acessos às escalas ----------
+
+  // A Secretaria administra as contas da Minha escala: lista só quem consulta a própria escala
+  // e nunca devolve hashes nem contas de outros perfis.
+  static bool _contaDeEscala(Usuario u) =>
+      u.perfil.pode(Permissao.minhaEscala) &&
+      !u.perfil.pode(Permissao.admin) &&
+      !u.perfil.pode(Permissao.usuarios) &&
+      !u.perfil.pode(Permissao.acessosEscala);
+
   Response _listarAcessosEscala(Request _) => _json({
         'usuarios': [
           for (final u in _usuarios?.lista ?? const <Usuario>[])
-            if (u.perfil == Perfil.integrante || u.perfil == Perfil.pastor || u.perfil == Perfil.ministro || u.perfil == Perfil.louvor)
-              {'id': u.id, 'nome': u.nome, 'login': u.login, 'perfil': u.perfil.id, 'membroId': u.membroId, 'ativo': u.ativo},
+            if (_contaDeEscala(u))
+              {
+                'id': u.id,
+                'nome': u.nome,
+                'login': u.login,
+                'perfil': u.perfil.id,
+                'perfilNome': u.perfil.nome,
+                'membroId': u.membroId,
+                'ativo': u.ativo,
+                'trocarSenha': u.trocarSenha,
+              },
         ],
       });
 
@@ -637,11 +818,14 @@ class Servidor {
     final id = corpo['membroId'] as String? ?? '';
     if (store.buscar('membros', id) == null) return _erro(404, 'Membro não encontrado.');
     if (usuarios.porMembro(id) != null) return _erro(400, 'Este membro já tem acesso.');
-    final senha = gerarSenhaTemporaria(senhaMinima < 10 ? 10 : senhaMinima);
+    final integrante = usuarios.perfis.buscar(PerfilPadrao.integrante.id);
+    if (integrante == null) return _erro(500, 'O perfil Integrante foi excluído: restaure-o em Administração › Perfis.');
+    final senha = _novaSenhaTemporaria();
     try {
       final u = await usuarios.criar(nome: corpo['nome'] as String? ?? '', login: corpo['login'] as String? ?? '',
-          perfil: Perfil.integrante, senha: senha, membroId: id);
-      return _json({'usuario': u.toJson(), 'senhaTemporaria': senha}, status: 201);
+          perfil: integrante, senha: senha, membroId: id, temporaria: true);
+      await _auditar(req, tipo: 'acesso', acao: 'senha-temporaria', alvo: u.nome, detalhe: 'Acesso às escalas criado');
+      return _json({'usuario': u.toJson(), ..._entregaDeAcesso(u, senha)}, status: 201);
     } on FormatException catch (e) {
       return _erro(400, e.message);
     }
@@ -653,7 +837,7 @@ class Servidor {
     final id = corpo['membroId'] as String? ?? '';
     final u = usuarios?.buscar(corpo['usuarioId'] as String? ?? '');
     if (store.buscar('membros', id) == null || u == null) return _erro(404, 'Membro ou usuário não encontrado.');
-    if (u.perfil != Perfil.pastor && u.perfil != Perfil.integrante && u.perfil != Perfil.ministro && u.perfil != Perfil.louvor) return _erro(403, 'Não é uma conta de escalas.');
+    if (!_contaDeEscala(u)) return _erro(403, 'Não é uma conta de escalas.');
     if (u.membroId != null && u.membroId != id) return _erro(400, 'Esta conta já está vinculada a outro membro.');
     try {
       return _json((await usuarios!.vincular(u.id, id)).toJson());
@@ -664,7 +848,7 @@ class Servidor {
 
   Future<Response> _senhaAcessoEscala(Request req, String id) async {
     final u = _usuarios?.buscar(id);
-    if (u == null || u.perfil != Perfil.integrante || u.membroId == null || store.buscar('membros', u.membroId!) == null) {
+    if (u == null || u.perfil.id != PerfilPadrao.integrante.id || u.membroId == null || store.buscar('membros', u.membroId!) == null) {
       return _erro(404, 'Acesso não encontrado.');
     }
     return _redefinirSenhaUsuario(req, id);
@@ -676,7 +860,7 @@ class Servidor {
   Conta? _contaDoTablet(TabletLocal t) {
     if (t.usuario == Auth.idPrincipal) return Conta.principal;
     final u = _usuarios?.buscar(t.usuario);
-    if (u == null || !u.ativo || !u.perfil.pode(Permissao.projetar)) return null;
+    if (u == null || !u.ativo || u.trocarSenha || !u.perfil.pode(Permissao.projetar)) return null;
     return Conta(id: u.id, nome: u.nome, login: u.login, perfil: u.perfil);
   }
 
@@ -768,6 +952,10 @@ class Servidor {
       'qrMensagensHolyrics': '${Config.subpastaHolyrics}/$arquivoQrMensagens',
       // QR do PIX para o momento das ofertas (só quando a chave do PIX está configurada).
       'qrPixHolyrics': File(p.join(cartazes.pasta, arquivoQrPix)).existsSync() ? '${Config.subpastaHolyrics}/$arquivoQrPix' : null,
+      // QR do cadastro de visitante para o telão (some com o cadastro pela recepção desligado).
+      'qrVisitanteHolyrics': File(p.join(cartazes.pasta, arquivoQrVisitante)).existsSync()
+          ? '${Config.subpastaHolyrics}/$arquivoQrVisitante'
+          : null,
       'mensagensNovas': store.listar('mensagens').where((m) => m['status'] == 'nova').length,
       'cartazesNoHolyrics': agente != null ? agente!.agenteConectado : cartazesNoHolyrics,
       'modo': agente != null ? 'agente' : 'local',
@@ -2486,8 +2674,8 @@ class Servidor {
   /// Quem não cuida do cadastro (recepção, telão) não vê as anotações do acompanhamento.
   Response _listarVisitas(Request req) {
     final conta = Auth.contaDa(req);
-    // A Recepção só vê as visitas de hoje, seja qual for o "desde" pedido.
-    final desde = conta?.perfil == Perfil.recepcao
+    // Sem "ver visitantes de outros dias" (a Recepção), só as visitas de hoje, seja qual for o "desde" pedido.
+    final desde = !(conta?.pode(Permissao.visitantesHistorico) ?? false)
         ? _hoje()
         : req.url.queryParameters['desde'] ?? diaIso(_agora().subtract(const Duration(days: 30)));
     final completo = conta?.pode(Permissao.membros) ?? false;
@@ -2503,7 +2691,7 @@ class Servidor {
   Future<Response> _criarVisita(Request req) async {
     final conta = Auth.contaDa(req)!;
     final corpo = await _corpo(req);
-    final origem = conta.perfil == Perfil.recepcao || corpo['origem'] == OrigemVisita.recepcao
+    final origem = !conta.pode(Permissao.visitantesHistorico) || corpo['origem'] == OrigemVisita.recepcao
         ? OrigemVisita.recepcao
         : OrigemVisita.painel;
     return _registrarVisita(req, corpo, origem: origem, por: conta.nome);
@@ -3479,9 +3667,11 @@ class Servidor {
     return id != null && store.buscar('membros', id) != null ? id : null;
   }
 
+  bool _podeNaConta(Request req, Permissao p) => Auth.contaDa(req)?.pode(p) ?? false;
+
   /// Apenas o ministro escalado pode alterar as músicas; nunca recebe permissão para montar a escala.
   Future<Response> _musicasDoMinistro(Request req, String cultoId) async {
-    if (Auth.contaDa(req)?.perfil != Perfil.ministro) return _erro(403, 'Somente o ministro pode escolher as músicas aqui.');
+    if (!_podeNaConta(req, Permissao.musicasMinistro)) return _erro(403, 'Somente o ministro pode escolher as músicas aqui.');
     final membroId = _membroDaConta(req);
     if (membroId == null) return _erro(403, 'Sua conta ainda não está vinculada a um membro.');
     final atual = store.buscar('escalas', cultoId);
@@ -3521,8 +3711,8 @@ class Servidor {
     return _json({
       'igreja': _termo.igreja,
       'nome': membro.nome.split(' ').first,
-      'podeAvisarIndisponibilidade': Auth.contaDa(req)?.perfil != Perfil.louvor,
-      if (Auth.contaDa(req)?.perfil == Perfil.ministro)
+      'podeAvisarIndisponibilidade': _podeNaConta(req, Permissao.indisponibilidade),
+      if (_podeNaConta(req, Permissao.musicasMinistro))
         'repertorio': [for (final m in store.listar('repertorio')) if (m['ativo'] == true)
           {'id': m['id'], 'titulo': m['titulo'], 'cantor': m['cantor'], 'tomDiakonia': m['tomDiakonia']}],
       'cultos': [
@@ -3530,7 +3720,7 @@ class Servidor {
           if (c.data.compareTo(hoje) >= 0 && c.data.compareTo(limite) <= 0 && c.servindo.any((s) => s.membroId == id))
             {
               'id': c.id,
-              'podeEscolherMusicas': Auth.contaDa(req)?.perfil == Perfil.ministro &&
+              'podeEscolherMusicas': _podeNaConta(req, Permissao.musicasMinistro) &&
                   (c.da(TipoEscala.louvor)['Ministro'] ?? const <String>[]).contains(id),
               'data': c.data,
               'hora': c.hora,
@@ -3550,7 +3740,7 @@ class Servidor {
             },
       ],
       'indisponibilidades': [
-        if (Auth.contaDa(req)?.perfil != Perfil.louvor)
+        if (_podeNaConta(req, Permissao.indisponibilidade))
           for (final i in _indisponibilidades())
             if (i.membroId == id && i.ate.compareTo(hoje) >= 0) {'id': i.id, 'de': i.de, 'ate': i.ate, 'motivo': i.motivo},
       ],
@@ -3559,7 +3749,7 @@ class Servidor {
 
   /// POST /api/minha-escala/indisponivel {de, ate?, motivo?}
   Future<Response> _minhaIndisponibilidade(Request req) async {
-    if (Auth.contaDa(req)?.perfil == Perfil.louvor) return _erro(403, 'O perfil Louvor só pode consultar a escala.');
+    if (!_podeNaConta(req, Permissao.indisponibilidade)) return _erro(403, 'Seu perfil só pode consultar a escala.');
     final corpo = await _corpo(req);
     final id = _membroDaConta(req);
     if (id == null) return _erro(403, 'Sua conta ainda não está vinculada a um membro.');
@@ -3569,7 +3759,7 @@ class Servidor {
 
   /// POST /api/minha-escala/indisponivel/remover {id} — só uma indisponibilidade da própria pessoa.
   Future<Response> _removerMinhaIndisponibilidade(Request req) async {
-    if (Auth.contaDa(req)?.perfil == Perfil.louvor) return _erro(403, 'O perfil Louvor só pode consultar a escala.');
+    if (!_podeNaConta(req, Permissao.indisponibilidade)) return _erro(403, 'Seu perfil só pode consultar a escala.');
     final corpo = await _corpo(req);
     final id = _membroDaConta(req);
     if (id == null) return _erro(403, 'Sua conta ainda não está vinculada a um membro.');
@@ -4080,16 +4270,21 @@ class Servidor {
   }
 
   /// Arquivo projetado de cada QR (o que o Holyrics abre e o agente copia).
-  static const _arquivoDoQr = {'oracao': arquivoQr, 'mensagens': arquivoQrMensagens, 'pix': arquivoQrPix};
+  static const _arquivoDoQr = {
+    'oracao': arquivoQr,
+    'mensagens': arquivoQrMensagens,
+    'pix': arquivoQrPix,
+    'visitante': arquivoQrVisitante,
+  };
 
-  /// POST /api/admin/arte-qr?qr=oracao|mensagens|pix&modo=automatico|arte — corpo: bytes da imagem
+  /// POST /api/admin/arte-qr?qr=oracao|mensagens|pix|visitante&modo=automatico|arte — corpo: bytes da imagem
   /// (sem o QR). Troca a arte, apaga a anterior e refaz o QR projetado.
   Future<Response> _enviarArteQr(Request req) async {
     final c = cfg;
     if (c == null) return _erro(501, 'Configurações indisponíveis.');
     final qr = req.url.queryParameters['qr'] ?? '';
     final modo = req.url.queryParameters['modo'] ?? '';
-    if (!qrsComArte.contains(qr)) return _erro(400, 'Escolha o QR: oracao, mensagens ou pix.');
+    if (!qrsComArte.contains(qr)) return _erro(400, 'Escolha o QR: oracao, mensagens, pix ou visitante.');
     if (modo != 'automatico' && modo != 'arte') return _erro(400, 'Modo inválido: automatico ou arte.');
     final tamanho = req.contentLength;
     if (tamanho != null && tamanho > Galeria.tamanhoMaximo) return _erro(413, 'Imagem maior que 15 MB.');
@@ -4114,7 +4309,7 @@ class Servidor {
     final c = cfg;
     if (c == null) return _erro(501, 'Configurações indisponíveis.');
     final qr = req.url.queryParameters['qr'] ?? '';
-    if (!qrsComArte.contains(qr)) return _erro(400, 'Escolha o QR: oracao, mensagens ou pix.');
+    if (!qrsComArte.contains(qr)) return _erro(400, 'Escolha o QR: oracao, mensagens, pix ou visitante.');
     final anterior = c.arteQr(qr).fundo;
     final foto = c.fotoArteQr(qr);
     await c.definirArteQr(qr, modo: 'padrao', fundo: '');
@@ -4144,7 +4339,7 @@ class Servidor {
     final c = cfg;
     if (c == null) return _erro(501, 'Configurações indisponíveis.');
     final qr = req.url.queryParameters['qr'] ?? '';
-    if (!qrsComArte.contains(qr)) return _erro(400, 'Escolha o QR: oracao, mensagens ou pix.');
+    if (!qrsComArte.contains(qr)) return _erro(400, 'Escolha o QR: oracao, mensagens, pix ou visitante.');
     final bytes = await _lerBytes(req, Galeria.tamanhoMaximo);
     if (bytes == null) return _erro(413, 'Imagem maior que 15 MB.');
     final String nome;
@@ -4164,7 +4359,7 @@ class Servidor {
     final c = cfg;
     if (c == null) return _erro(501, 'Configurações indisponíveis.');
     final qr = req.url.queryParameters['qr'] ?? '';
-    if (!qrsComArte.contains(qr)) return _erro(400, 'Escolha o QR: oracao, mensagens ou pix.');
+    if (!qrsComArte.contains(qr)) return _erro(400, 'Escolha o QR: oracao, mensagens, pix ou visitante.');
     final anterior = c.fotoArteQr(qr);
     await c.definirFotoArteQr(qr, '');
     if (anterior.isNotEmpty) await artesQr.excluir(anterior);
@@ -4197,7 +4392,13 @@ class Servidor {
     final nome = _arquivoDoQr[qr];
     if (nome == null) return Response.notFound('Não encontrado');
     final f = File(p.join(cartazes.pasta, nome));
-    if (!await f.exists()) return Response.notFound(qr == 'pix' ? 'Configure a chave PIX.' : 'QR indisponível.');
+    if (!await f.exists()) {
+      return Response.notFound(switch (qr) {
+        'pix' => 'Configure a chave PIX.',
+        'visitante' => 'O cadastro pela recepção está desligado.',
+        _ => 'QR indisponível.',
+      });
+    }
     return Response.ok(f.openRead(), headers: {'content-type': 'image/png', 'cache-control': 'no-store'});
   }
 
@@ -4470,9 +4671,9 @@ class Servidor {
     // Holyrics direto: aplica a nova conexão sem reiniciar.
     final h = holyrics;
     if (h is HolyricsDireto) h.atualizar(host: c.holyricsHost, porta: c.holyricsPorta, token: c.holyricsToken);
-    // Endereço público ou arte dos QR mudou: refaz os três. Senão só o PIX, que pode ter mudado
+    // Endereço público, arte dos QR ou o cadastro de visitante mudou: refaz todos. Senão só o PIX, que pode ter mudado
     // (ou sumido). O agente copia para o PC da igreja.
-    if (c.urlOracao != urlAntes || corpo.keys.any((k) => k.startsWith('arteQr'))) {
+    if (c.urlOracao != urlAntes || corpo.keys.any((k) => k.startsWith('arteQr') || k == 'visitanteQrAtivo')) {
       await gravarQrsProjetados(cartazes.pasta, c, artesQr);
     } else {
       await gravarQrPix(cartazes.pasta,

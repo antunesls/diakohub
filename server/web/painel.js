@@ -58,6 +58,7 @@ $('form-login').addEventListener('submit', async (e) => {
   }
   token = j.token;
   localStorage.setItem('diako_token', token);
+  if (j.trocarSenha) PrimeiroAcesso.lembrar($('senha').value);
   $('senha').value = '';
   iniciar();
 });
@@ -489,6 +490,7 @@ const TIPOS_AUDITORIA = {
   repertorio: 'Repertório',
   roteiro: 'Roteiro',
   indisponibilidade: 'Indisponibilidade',
+  acesso: 'Acesso',
 };
 
 const ACOES_AUDITORIA = {
@@ -509,6 +511,11 @@ const ACOES_AUDITORIA = {
   'roteiro-excluido': 'Roteiro excluído',
   'indisponibilidade-criada': 'Indisponibilidade criada',
   'indisponibilidade-removida': 'Indisponibilidade removida',
+  'perfil-criado': 'Perfil criado',
+  'perfil-editado': 'Perfil editado',
+  'perfil-restaurado': 'Perfil restaurado',
+  'perfil-excluido': 'Perfil excluído',
+  'senha-temporaria': 'Senha temporária gerada',
 };
 
 async function carregarAuditoria() {
@@ -2405,6 +2412,7 @@ async function carregarStatus() {
   $('link-mensagens').textContent = estado.urlMensagens;
   $('link-mensagens').href = estado.urlMensagens;
   $('cartao-qr-visitante').hidden = estado.visitanteQrAtivo === false;
+  $('projetar-qr-visitante').hidden = !estado.qrVisitanteHolyrics;
   if (estado.urlVisitante) {
     $('link-visitante').textContent = estado.urlVisitante;
     $('link-visitante').href = estado.urlVisitante;
@@ -2440,6 +2448,13 @@ $('projetar-qr-mensagens').addEventListener('click', async () => {
   const r = await api('POST', '/api/holyrics/ShowImage', { file: estado.qrMensagensHolyrics });
   mensagem($('resultado-status'), r.status === 'ok' ? 'QR de mensagens no telão.' : r.error, r.status === 'ok');
 });
+$('projetar-qr-visitante').addEventListener('click', async () => {
+  if (!estado.qrVisitanteHolyrics) {
+    return mensagem($('resultado-status'), 'O cadastro de visitante pelo QR está desligado (Administração › LGPD).', false);
+  }
+  const r = await api('POST', '/api/holyrics/ShowImage', { file: estado.qrVisitanteHolyrics });
+  mensagem($('resultado-status'), r.status === 'ok' ? 'QR do cadastro de visitante no telão.' : r.error, r.status === 'ok');
+});
 
 // ---------- Tempo real ----------
 
@@ -2468,12 +2483,15 @@ function conectarTempoReal() {
 
 async function iniciar() {
   try {
-    eu = await api('GET', '/api/eu');
+    // Senha temporária: a pessoa cria a própria antes de ver o painel.
+    eu = await PrimeiroAcesso.garantir({ token, buscarEu: () => api('GET', '/api/eu'), aoSair: sair });
   } catch {
     return; // sessão expirada: api() já voltou para o login
   }
-  if (eu.perfil === 'integrante' || eu.perfil === 'ministro' || eu.perfil === 'louvor') {
-    location.replace('/minha-escala');
+  // Perfil sem nenhuma aba no painel (só a própria escala, só a recepção): vai para a página dele.
+  const abas = gruposPermitidos(eu.permissoes).flatMap((g) => g.itens);
+  if (!abas.length && eu.entrada && eu.entrada !== '/painel') {
+    location.replace(eu.entrada);
     return;
   }
   aplicarPermissoes();

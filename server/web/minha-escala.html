@@ -84,6 +84,7 @@
     <p class="dica" style="text-align:center;margin-top:18px">Sua escala é acessível somente após o login.</p>
   </section>
 </main>
+<script src="/primeiro-acesso.js?v=1"></script>
 <script>
   const $ = (id) => document.getElementById(id);
   // O QR é comum a todos; o servidor identifica o membro pela sessão autenticada.
@@ -246,6 +247,8 @@
 
   async function carregar() {
     try {
+      // Senha temporária: a pessoa cria a própria antes de ver a escala.
+      await PrimeiroAcesso.garantir({ token, buscarEu: () => chamar('/api/eu'), aoSair: () => $('sair').click() });
       dados = await chamar('/api/minha-escala');
       $('entrar').hidden = true;
       $('invalido').hidden = true;
@@ -303,6 +306,7 @@
       if (!r.ok) throw new Error(j.erro || 'Usuário ou senha incorretos.');
       token = j.token;
       localStorage.setItem('diako_token', token);
+      if (j.trocarSenha) PrimeiroAcesso.lembrar($('senha').value);
       $('senha').value = '';
       await carregar();
     } catch (err) { $('erro-login').textContent = err.message; $('erro-login').hidden = false; }

@@ -823,6 +823,7 @@
           <label><input type="radio" name="filtro-auditoria" value="repertorio">Repertório</label>
           <label><input type="radio" name="filtro-auditoria" value="roteiro">Roteiros</label>
           <label><input type="radio" name="filtro-auditoria" value="indisponibilidade">Indisponibilidades</label>
+          <label><input type="radio" name="filtro-auditoria" value="acesso">Acessos</label>
         </div>
       </div>
       <div class="lista" id="lista-auditoria"></div>
@@ -965,12 +966,14 @@
           <div class="campo"><label for="acesso-membro">Membro</label><select id="acesso-membro" required></select></div>
           <div class="campo"><label for="acesso-login">Usuário</label><input id="acesso-login" autocomplete="off" required placeholder="nome.sobrenome"></div>
           <p id="acesso-resultado" role="status"></p>
+          <div id="acesso-entrega" hidden></div>
           <button class="botao">Criar acesso</button>
         </form>
       </div>
       <form id="form-vinculo-escala" class="cartao">
-        <h2>Vincular conta existente de pastor, ministro ou louvor</h2>
-        <div class="campo"><label for="acesso-pastor">Conta do pastor, ministro ou louvor</label><select id="acesso-pastor" required></select></div>
+        <h2>Vincular conta existente</h2>
+        <p class="dica">Contas criadas em Administração (pastor, ministro, comissão…) que ainda não estão ligadas a um cadastro de membro.</p>
+        <div class="campo"><label for="acesso-pastor">Conta</label><select id="acesso-pastor" required></select></div>
         <div class="campo"><label for="acesso-pastor-membro">Cadastro de membro</label><select id="acesso-pastor-membro" required></select></div>
         <p id="vinculo-resultado" role="status"></p>
         <button class="botao secundario">Vincular</button>
@@ -987,6 +990,7 @@
             <button class="botao secundario" id="backup-agora" data-permissao="admin">Fazer backup agora</button>
             <button class="botao secundario" id="projetar-qr" data-permissao="projetar">Projetar QR no telão</button>
             <button class="botao secundario" id="projetar-qr-mensagens" data-permissao="projetar">Projetar QR de mensagens</button>
+            <button class="botao secundario" id="projetar-qr-visitante" data-permissao="projetar">Projetar QR de visitante</button>
           </div>
           <p id="resultado-status" role="status"></p>
         </div>
@@ -1465,13 +1469,14 @@
 
 <div id="impressao-membros"></div>
 
-<script src="/comum.js?v=5"></script>
+<script src="/comum.js?v=6"></script>
+<script src="/primeiro-acesso.js?v=1"></script>
 <script src="/form-visitante.js?v=2"></script>
 <script src="/menu-lateral.js?v=6"></script>
 <script src="/gestao-casa.js?v=1"></script>
 <script src="/atas.js?v=1"></script>
-<script src="/painel.js?v=25"></script>
-<script src="/acessos-escala.js?v=2"></script>
+<script src="/painel.js?v=26"></script>
+<script src="/acessos-escala.js?v=3"></script>
 <script src="/repertorio-busca.js?v=1"></script>
 <script src="/musica-youtube.js?v=1"></script>
 <script src="/repertorio.js?v=3"></script>

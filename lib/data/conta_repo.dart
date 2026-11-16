@@ -19,6 +19,10 @@ class ContaRepo extends ChangeNotifier {
   bool _conhecida = false;
   bool _textoMotivos = true;
 
+  /// O servidor já tem perfis configuráveis (manda "entrada" em /api/eu): as regras vêm só das permissões.
+  bool _perfisConfiguraveis = false;
+  bool get perfisConfiguraveis => _perfisConfiguraveis;
+
   String get nome => _nome;
   String get perfil => _perfil;
 
@@ -63,6 +67,7 @@ class ContaRepo extends ChangeNotifier {
     _perfil = '';
     _conhecida = false;
     _textoMotivos = true;
+    _perfisConfiguraveis = false;
     try {
       final f = await _cache();
       if (await f.exists()) await f.delete();
@@ -75,6 +80,7 @@ class ContaRepo extends ChangeNotifier {
     _nome = j['nome'] as String? ?? '';
     _perfil = j['perfilNome'] as String? ?? '';
     _textoMotivos = j['textoMotivos'] as bool? ?? true;
+    _perfisConfiguraveis = j.containsKey('entrada');
     _conhecida = true;
     notifyListeners();
   }

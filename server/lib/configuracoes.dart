@@ -11,7 +11,7 @@ import 'pagina_inicial.dart';
 import 'qr_oracao.dart';
 
 /// QR codes projetados que aceitam arte própria (nomes usados na URL e nas chaves).
-const qrsComArte = ['oracao', 'mensagens', 'pix'];
+const qrsComArte = ['oracao', 'mensagens', 'pix', 'visitante'];
 
 /// "padrao" = QR branco; "automatico" = arte montada no /admin; "arte" = imagem enviada pronta.
 const modosArteQr = {'padrao', 'automatico', 'arte'};
@@ -409,15 +409,15 @@ class Configuracoes {
           novos[k] = v;
         case 'muralFundoEscurecer' || 'boasVindasFundoEscurecer':
           novos[k] = inteiro(k, 0, 90);
-        case _ when RegExp(r'^arteQr(Oracao|Mensagens|Pix)Posicao$').hasMatch(k):
+        case _ when RegExp(r'^arteQr(Oracao|Mensagens|Pix|Visitante)Posicao$').hasMatch(k):
           final v = texto(k, 20);
           if (!posicoesQr.contains(v)) throw FormatException('Posição inválida em "$k".');
           novos[k] = v;
-        case _ when RegExp(r'^arteQr(Oracao|Mensagens|Pix)Tamanho$').hasMatch(k):
+        case _ when RegExp(r'^arteQr(Oracao|Mensagens|Pix|Visitante)Tamanho$').hasMatch(k):
           final v = texto(k, 1);
           if (!tamanhosQr.contains(v)) throw FormatException('Tamanho inválido em "$k" (P, M ou G).');
           novos[k] = v;
-        case _ when RegExp(r'^arteQr(Oracao|Mensagens|Pix)Layout$').hasMatch(k):
+        case _ when RegExp(r'^arteQr(Oracao|Mensagens|Pix|Visitante)Layout$').hasMatch(k):
           // Só o editor do /admin lê: guarda como veio, desde que seja um objeto JSON pequeno.
           final v = texto(k, 4000);
           if (v.isNotEmpty) {

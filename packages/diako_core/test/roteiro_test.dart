@@ -101,6 +101,22 @@ void main() {
     expect(ofertas(true), [AcaoPasso.texto, AcaoPasso.qrPix]);
   });
 
+  test('boas-vindas ganham o QR do cadastro de visitante quando o servidor tem, mesmo sem visitante', () {
+    Momento? boasVindas({required bool qr, List<Visita> visitas = const []}) => montarRoteiro(
+          horaCulto: '', ceia: false, musicas: const [], louvor: const {}, pastoral: const {}, tema: '',
+          recados: const [], motivos: const [], respondidas: const [], visitas: visitas, qrVisitante: qr,
+        ).where((m) => m.tipo == TipoMomento.boasVindas).firstOrNull;
+    expect(boasVindas(qr: false), isNull, reason: 'sem visitante e sem QR: o momento fica de fora');
+    final soQr = boasVindas(qr: true)!;
+    expect(soQr.passos.map((p) => p.acao), [AcaoPasso.qrVisitante]);
+    expect(soQr.detalhe, 'QR para quem chegou se cadastrar');
+    final ana = visita('Ana');
+    final comNomes = boasVindas(qr: true, visitas: [ana])!;
+    expect(comNomes.passos.map((p) => p.acao), [AcaoPasso.boasVindas, AcaoPasso.qrVisitante]);
+    expect(comNomes.detalhe, '1 visitante para citar');
+    expect(boasVindas(qr: false, visitas: [ana])!.passos.map((p) => p.acao), [AcaoPasso.boasVindas]);
+  });
+
   test('ofertas e ceia com o título em negrito', () {
     final r = roteiro(ceia: true);
     expect(r.firstWhere((m) => m.tipo == TipoMomento.ofertas).passos.single.valor, startsWith('<b>Dízimos e ofertas</b>\n'));

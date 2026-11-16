@@ -32,6 +32,7 @@ $('form-login').addEventListener('submit', async (e) => {
   }
   token = j.token;
   localStorage.setItem('diako_token', token);
+  if (j.trocarSenha) PrimeiroAcesso.lembrar($('senha-login').value);
   $('senha-login').value = '';
   iniciar();
 });
@@ -693,7 +694,8 @@ $('encerrar-sessoes').addEventListener('click', async () => {
 async function iniciar() {
   let eu;
   try {
-    eu = await api('GET', '/api/eu');
+    // Senha temporária: a pessoa cria a própria antes de continuar.
+    eu = await PrimeiroAcesso.garantir({ token, buscarEu: () => api('GET', '/api/eu'), aoSair: sair });
   } catch {
     return; // sessão expirada: api() já voltou para o login
   }
@@ -714,22 +716,23 @@ async function iniciar() {
   }
 }
 
-// ---------- Usuários e perfis ----------
+// ---------- Usuários ----------
 
 let perfis = [];
+let catalogo = [];
 
 async function carregarUsuarios() {
   const r = await api('GET', '/api/admin/usuarios');
   perfis = r.perfis;
-  if (!$('u-perfil').options.length) {
-    $('u-perfil').replaceChildren(...perfis.map((p) => el('option', { value: p.id }, p.nome)));
-    $('u-perfil').value = 'secretaria';
-  }
+  catalogo = r.permissoes;
+  const escolhido = $('u-perfil').value || 'secretaria';
+  $('u-perfil').replaceChildren(...perfis.map((p) => el('option', { value: p.id }, p.nome)));
+  $('u-perfil').value = perfis.some((p) => p.id === escolhido) ? escolhido : perfis[0]?.id || '';
   mostrarDicaPerfil();
   $('tabela-usuarios').tBodies[0].replaceChildren(...(r.usuarios.length
     ? r.usuarios.map(linhaUsuario)
     : [el('tr', {}, el('td', { colspan: 5, class: 'dica' }, 'Ninguém cadastrado ainda. Hoje só a conta principal entra.'))]));
-  montarMatriz(r.permissoes);
+  await carregarPerfis();
   await carregarTablets();
 }
 
@@ -756,10 +759,18 @@ function mostrarDicaPerfil() {
 }
 $('u-perfil').addEventListener('change', mostrarDicaPerfil);
 
+/** "aguardando primeiro acesso" ou "senha temporária vencida" (quem ainda não criou a própria senha). */
+function estadoSenha(u) {
+  if (!u.trocarSenha) return null;
+  return el('span', { class: 'estado-senha' },
+    u.senhaTemporariaVencida ? 'Senha temporária vencida: gere uma nova' : 'Aguardando primeiro acesso');
+}
+
 function linhaUsuario(u) {
   const saida = $('res-usuario');
   const seletor = el('select', { 'aria-label': 'Perfil de ' + u.nome },
-    perfis.map((p) => el('option', { value: p.id, selected: p.id === u.perfil }, p.nome)));
+    perfis.map((p) => el('option', { value: p.id, selected: p.id === u.perfil }, p.nome)),
+    perfis.some((p) => p.id === u.perfil) ? null : el('option', { value: u.perfil, selected: true, disabled: true }, 'Sem perfil (excluído)'));
   seletor.addEventListener('change', async () => {
     try {
       await api('PUT', '/api/admin/usuarios/' + u.id, { perfil: seletor.value });
@@ -770,10 +781,11 @@ function linhaUsuario(u) {
     }
   });
   const acoes = el('td', { class: 'acoes-tabela' },
-    botao('Nova senha', async () => {
-      if (!await confirmar('Gerar nova senha?', `${u.nome} sai de todos os aparelhos e precisa entrar com a senha nova.`, 'Gerar')) return;
+    botao('Nova senha e enviar', async () => {
+      if (!await confirmar('Gerar nova senha?', `${u.nome} sai de todos os aparelhos, entra com a senha temporária e cria uma nova no primeiro acesso.`, 'Gerar')) return;
       const r = await api('POST', `/api/admin/usuarios/${u.id}/senha`);
-      mostrarSenhaGerada(u.nome, u.login, r.senhaTemporaria);
+      mostrarSenhaGerada(u.nome, u.login, r);
+      await carregarUsuarios();
     }),
     botao(u.ativo ? 'Desativar' : 'Reativar', async () => {
       await api('PUT', '/api/admin/usuarios/' + u.id, { ativo: !u.ativo });
@@ -786,29 +798,19 @@ function linhaUsuario(u) {
       await carregarUsuarios();
     }, 'perigo pequeno'));
   return el('tr', { style: u.ativo ? '' : 'opacity:.55' },
-    el('td', {}, u.nome, u.ativo ? null : el('span', { class: 'dica' }, ' (desativado)')),
+    el('td', {}, u.nome, u.ativo ? null : el('span', { class: 'dica' }, ' (desativado)'), estadoSenha(u)),
     el('td', {}, el('code', {}, u.login)),
     el('td', {}, seletor),
     el('td', { class: 'dica' }, u.ultimoAcesso ? dataCurta(u.ultimoAcesso) : 'nunca'),
     acoes);
 }
 
-function mostrarSenhaGerada(nome, login, senha) {
+/** Senha temporária com a prévia do texto para o WhatsApp (cartaoEntregaAcesso, em comum.js). */
+function mostrarSenhaGerada(nome, login, r) {
   const caixa = $('senha-gerada');
-  caixa.replaceChildren(
-    el('strong', {}, `Acesso de ${nome}: `), 'usuário ', el('code', {}, login), ' e senha ', el('code', {}, senha), '. ',
-    'Anote e entregue à pessoa; ela não aparece de novo. A pessoa pode trocar em "Minha senha", no painel. ',
-    botao('Copiar', () => copiar(`Usuário: ${login}\nSenha: ${senha}`, $('res-usuario'))));
+  caixa.replaceChildren(cartaoEntregaAcesso(nome, login, r));
   caixa.hidden = false;
-}
-
-function montarMatriz(permissoes) {
-  $('matriz-perfis').replaceChildren(
-    el('thead', {}, el('tr', {}, el('th', {}, 'Pode'), perfis.map((p) => el('th', { style: 'text-align:center' }, p.nome)))),
-    el('tbody', {}, permissoes.map((perm) => el('tr', {},
-      el('td', {}, perm.descricao),
-      perfis.map((p) => el('td', { style: 'text-align:center' }, p.permissoes.includes(perm.id)
-        ? el('span', { 'aria-label': 'sim' }, '✓') : el('span', { 'aria-label': 'não', class: 'dica' }, '—')))))));
+  caixa.scrollIntoView({ block: 'nearest' });
 }
 
 $('form-usuario').addEventListener('submit', async (e) => {
@@ -819,12 +821,193 @@ $('form-usuario').addEventListener('submit', async (e) => {
     $('u-nome').value = '';
     $('u-login').value = '';
     mensagem(saida, 'Pessoa adicionada.');
-    mostrarSenhaGerada(r.usuario.nome, r.usuario.login, r.senhaTemporaria);
+    mostrarSenhaGerada(r.usuario.nome, r.usuario.login, r);
     await carregarUsuarios();
   } catch (err) {
     mensagem(saida, err.message, false);
   }
 });
+
+// ---------- Perfis ----------
+
+/** Permissões que [id] traz junto (catálogo do servidor: "implica"). */
+function implicadas(id) {
+  const vistas = new Set();
+  const fila = [...(catalogo.find((c) => c.id === id)?.implica || [])];
+  while (fila.length) {
+    const p = fila.pop();
+    if (vistas.has(p)) continue;
+    vistas.add(p);
+    fila.push(...(catalogo.find((c) => c.id === p)?.implica || []));
+  }
+  return vistas;
+}
+
+/** O conjunto marcado mais o que ele implica. */
+function completar(marcadas) {
+  const r = new Set(marcadas);
+  for (const p of marcadas) for (const q of implicadas(p)) r.add(q);
+  return r;
+}
+
+/** Só as escolhas de fato (tira as que já vêm incluídas por outra marcada). */
+function explicitas(permissoes) {
+  const conjunto = new Set(permissoes.filter((p) => p !== 'sessao'));
+  return new Set([...conjunto].filter((p) => ![...conjunto].some((q) => q !== p && implicadas(q).has(p))));
+}
+
+async function carregarPerfis() {
+  const r = await api('GET', '/api/admin/perfis');
+  perfis = r.perfis;
+  catalogo = r.permissoes;
+  $('lista-perfis').replaceChildren(...perfis.map(cartaoPerfil));
+  const excluidos = r.padroesExcluidos || [];
+  $('padroes-excluidos').hidden = !excluidos.length;
+  $('padroes-excluidos').replaceChildren(
+    el('span', { class: 'dica' }, 'Perfis padrão excluídos:'),
+    ...excluidos.map((d) => botao('Trazer de volta: ' + d.nome, async () => {
+      await api('POST', `/api/admin/perfis/${encodeURIComponent(d.id)}/restaurar`);
+      mensagem($('res-perfis'), `Perfil ${d.nome} de volta.`);
+      await carregarUsuarios();
+    })));
+  montarMatriz();
+}
+
+function cartaoPerfil(p) {
+  const qtd = p.usuarios || 0;
+  const n = p.permissoes.filter((x) => x !== 'sessao').length;
+  const excluir = botao('Excluir', async () => {
+    if (!await confirmar('Excluir perfil?', `O perfil ${p.nome} deixa de existir.${p.padrao ? ' Por ser um perfil padrão, dá para trazer de volta depois.' : ''}`, 'Excluir')) return;
+    try {
+      await api('DELETE', '/api/admin/perfis/' + encodeURIComponent(p.id));
+      mensagem($('res-perfis'), `Perfil ${p.nome} excluído.`);
+      await carregarUsuarios();
+    } catch (err) {
+      mensagem($('res-perfis'), err.message, false);
+    }
+  }, 'perigo pequeno');
+  if (qtd > 0) {
+    excluir.disabled = true;
+    excluir.title = 'Troque o perfil de quem usa antes de excluir.';
+  }
+  return el('article', { class: 'perfil' },
+    el('div', { class: 'perfil-topo' }, el('strong', {}, p.nome),
+      p.travado ? el('span', { class: 'selo', title: 'Não pode ser alterado nem excluído' }, '🔒 Travado') : null),
+    el('div', { class: 'selos' },
+      p.padrao ? el('span', { class: 'selo' }, 'Padrão') : el('span', { class: 'selo proprio' }, 'Criado pela igreja'),
+      p.alterado ? el('span', { class: 'selo alterado' }, 'Alterado') : null),
+    p.descricao ? el('p', {}, p.descricao) : null,
+    el('p', { class: 'perfil-usuarios' },
+      `${qtd === 0 ? 'Ninguém usa' : qtd === 1 ? '1 pessoa usa' : qtd + ' pessoas usam'} · ${n} ${n === 1 ? 'permissão' : 'permissões'}`,
+      p.entrada && p.entrada !== '/painel' ? ` · entra em ${p.entrada}` : ''),
+    el('div', { class: 'acoes' },
+      botao(p.travado ? 'Ver' : 'Editar', () => editarPerfil(p)),
+      botao('Duplicar', () => editarPerfil(null, p)),
+      p.alterado ? botao('Restaurar padrão', async () => {
+        if (!await confirmar('Restaurar padrão?', `O perfil ${p.nome} volta ao nome e às permissões de fábrica. Vale na hora para ${qtd === 1 ? 'a pessoa que usa' : 'quem usa'}.`, 'Restaurar')) return;
+        await api('POST', `/api/admin/perfis/${encodeURIComponent(p.id)}/restaurar`);
+        mensagem($('res-perfis'), `Perfil ${p.nome} restaurado.`);
+        await carregarUsuarios();
+      }) : null,
+      p.travado ? null : excluir));
+}
+
+/** Editor: [perfil] para editar, ou null para criar (a partir de [base], se houver). */
+let marcadas = new Set();
+let perfilEditado = null;
+let somenteLeitura = false;
+
+function editarPerfil(perfil, base = null) {
+  perfilEditado = perfil;
+  somenteLeitura = !!perfil?.travado;
+  $('titulo-perfil').textContent = perfil ? (somenteLeitura ? perfil.nome : 'Editar perfil') : 'Novo perfil';
+  $('p-nome').value = perfil ? perfil.nome : base ? base.nome + ' (cópia)' : '';
+  $('p-descricao').value = perfil ? perfil.descricao : base ? base.descricao : '';
+  $('campo-base').hidden = !!perfil;
+  $('p-base').replaceChildren(el('option', { value: '' }, 'Nenhum (começar do zero)'),
+    ...perfis.map((x) => el('option', { value: x.id, selected: base?.id === x.id }, x.nome)));
+  for (const id of ['p-nome', 'p-descricao']) $(id).disabled = somenteLeitura;
+  $('salvar-perfil').hidden = somenteLeitura;
+  $('cancelar-perfil').textContent = somenteLeitura ? 'Fechar' : 'Cancelar';
+  marcadas = explicitas((perfil || base)?.permissoes || []);
+  const qtd = perfil?.usuarios || 0;
+  $('p-uso').textContent = somenteLeitura
+    ? 'O Administrador tem tudo e não pode ser alterado.'
+    : qtd ? `${qtd === 1 ? '1 pessoa usa' : qtd + ' pessoas usam'} este perfil: a mudança vale na hora.` : '';
+  $('erro-perfil').hidden = true;
+  desenharPermissoes();
+  $('dlg-perfil').showModal();
+  if (!somenteLeitura) $('p-nome').focus();
+}
+
+$('p-base').addEventListener('change', () => {
+  const base = perfis.find((x) => x.id === $('p-base').value);
+  marcadas = explicitas(base?.permissoes || []);
+  if (base && !$('p-descricao').value) $('p-descricao').value = base.descricao;
+  desenharPermissoes();
+});
+
+function desenharPermissoes() {
+  const efetivas = completar(marcadas);
+  const areas = [];
+  for (const c of catalogo) if (!areas.some((a) => a.id === c.area)) areas.push({ id: c.area, nome: c.areaNome });
+  $('p-permissoes').replaceChildren(...areas.map((a) => el('fieldset', {},
+    el('legend', {}, a.nome),
+    ...catalogo.filter((c) => c.area === a.id).map((c) => {
+      const explicita = marcadas.has(c.id);
+      const incluida = !explicita && efetivas.has(c.id);
+      const por = incluida ? [...marcadas].filter((m) => implicadas(m).has(c.id))
+        .map((m) => catalogo.find((x) => x.id === m)?.descricao).filter(Boolean) : [];
+      const caixa = el('input', { type: 'checkbox', checked: explicita || incluida, disabled: somenteLeitura || incluida });
+      caixa.addEventListener('change', () => {
+        if (caixa.checked) marcadas.add(c.id);
+        else {
+          // Desmarcar não leva junto o que ela incluía: essas continuam marcadas (desmarque à parte).
+          marcadas.delete(c.id);
+          for (const p of implicadas(c.id)) marcadas.add(p);
+        }
+        desenharPermissoes();
+      });
+      return el('label', { class: 'marcar' }, caixa,
+        el('span', {}, c.descricao,
+          c.dica ? el('small', {}, c.dica) : null,
+          incluida ? el('small', { class: 'incluida' }, 'Incluída por: ' + por.join('; ')) : null));
+    }))));
+}
+
+$('cancelar-perfil').addEventListener('click', () => $('dlg-perfil').close());
+
+$('form-perfil').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  if (somenteLeitura) return $('dlg-perfil').close();
+  const erro = $('erro-perfil');
+  erro.hidden = true;
+  const corpo = { nome: valor('p-nome'), descricao: $('p-descricao').value.trim(), permissoes: [...completar(marcadas)] };
+  $('salvar-perfil').disabled = true;
+  try {
+    if (perfilEditado) await api('PUT', '/api/admin/perfis/' + encodeURIComponent(perfilEditado.id), corpo);
+    else await api('POST', '/api/admin/perfis', corpo);
+    $('dlg-perfil').close();
+    mensagem($('res-perfis'), perfilEditado ? `Perfil ${corpo.nome} salvo.` : `Perfil ${corpo.nome} criado. Escolha-o ao adicionar uma pessoa.`);
+    await carregarUsuarios();
+  } catch (err) {
+    erro.textContent = err.message;
+    erro.hidden = false;
+  } finally {
+    $('salvar-perfil').disabled = false;
+  }
+});
+
+$('novo-perfil').addEventListener('click', () => editarPerfil(null));
+
+function montarMatriz() {
+  $('matriz-perfis').replaceChildren(
+    el('thead', {}, el('tr', {}, el('th', {}, 'Pode'), perfis.map((p) => el('th', { style: 'text-align:center' }, p.nome)))),
+    el('tbody', {}, catalogo.map((perm) => el('tr', {},
+      el('td', {}, perm.descricao),
+      perfis.map((p) => el('td', { style: 'text-align:center' }, p.permissoes.includes(perm.id)
+        ? el('span', { 'aria-label': 'sim' }, '✓') : el('span', { 'aria-label': 'não', class: 'dica' }, '—')))))));
+}
 
 if (token) iniciar();
 else sair();

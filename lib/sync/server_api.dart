@@ -74,10 +74,19 @@ class ServerApi {
 
   /// Troca a senha por um token de sessão.
   /// [usuario] vazio entra com a senha principal da igreja.
-  Future<String> login(String base, String senha, {String usuario = ''}) async {
-    final j = await _enviar('POST', base, '/api/login', null, json: {'usuario': usuario.trim(), 'senha': senha});
-    return (j as Map)['token'] as String;
+  Future<String> login(String base, String senha, {String usuario = ''}) async =>
+      (await entrar(base, senha, usuario: usuario)).token;
+
+  /// Como [login], dizendo também se a senha é temporária ([trocarSenha]): a pessoa precisa criar
+  /// a própria senha (com [criarMinhaSenha]) antes de usar o resto da API.
+  Future<({String token, bool trocarSenha})> entrar(String base, String senha, {String usuario = ''}) async {
+    final j = await _enviar('POST', base, '/api/login', null, json: {'usuario': usuario.trim(), 'senha': senha}) as Map;
+    return (token: j['token'] as String, trocarSenha: j['trocarSenha'] as bool? ?? false);
   }
+
+  /// Primeiro acesso: troca a senha temporária [atual] pela [nova] (sessão atual continua valendo).
+  Future<void> criarMinhaSenha(String base, String sessao, {required String atual, required String nova}) =>
+      _enviar('POST', base, '/api/eu/senha', sessao, json: {'atual': atual, 'nova': nova});
 
   /// Quem está logado: nome, perfil e permissões.
   Future<Map<String, dynamic>> eu() async => Map<String, dynamic>.from(await _req('GET', '/api/eu') as Map);

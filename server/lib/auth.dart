@@ -11,16 +11,19 @@ import 'usuarios.dart';
 
 /// Quem está usando o painel/app nesta requisição.
 class Conta {
-  const Conta({required this.id, required this.nome, required this.login, required this.perfil});
+  const Conta({required this.id, required this.nome, required this.login, required this.perfil, this.trocarSenha = false});
 
   /// A conta principal: a senha do painel definida na instalação (config.json / /admin).
-  static const principal =
+  static final principal =
       Conta(id: Auth.idPrincipal, nome: 'Administrador', login: Auth.idPrincipal, perfil: Perfil.administrador);
 
   final String id;
   final String nome;
   final String login;
   final Perfil perfil;
+
+  /// Entrou com senha temporária: só pode criar a própria senha (rotas de sessão).
+  final bool trocarSenha;
 
   bool get ehPrincipal => id == Auth.idPrincipal;
   bool pode(Permissao p) => perfil.pode(p);
@@ -77,7 +80,9 @@ class Auth {
     if (login.isEmpty || login == idPrincipal) {
       if (_conferir(senhaInformada)) id = idPrincipal;
     } else {
-      id = (await usuarios?.autenticar(login, senhaInformada))?.id;
+      final r = await usuarios?.entrar(login, senhaInformada);
+      if (r?.resultado == ResultadoLogin.temporariaVencida) throw SenhaTemporariaVencida();
+      id = r?.usuario?.id;
     }
     if (id == null) return null;
     final bytes = List<int>.generate(32, (_) => _rng.nextInt(256));
@@ -120,7 +125,7 @@ class Auth {
     if (s.usuario == idPrincipal) return Conta.principal;
     final u = usuarios?.buscar(s.usuario);
     if (u == null || !u.ativo) return null;
-    return Conta(id: u.id, nome: u.nome, login: u.login, perfil: u.perfil);
+    return Conta(id: u.id, nome: u.nome, login: u.login, perfil: u.perfil, trocarSenha: u.trocarSenha);
   }
 
   bool valido(String? token) => contaDe(token) != null;
@@ -203,6 +208,9 @@ final _rng = Random.secure();
 const jsonHeaders = {'content-type': 'application/json; charset=utf-8'};
 
 class LimiteExcedido implements Exception {}
+
+/// A senha temporária passou de [Usuarios.validadeSenhaTemporaria]: é preciso gerar outra.
+class SenhaTemporariaVencida implements Exception {}
 
 /// Limita quantas ações cada chave (IP) faz numa janela de tempo.
 class LimiteTaxa {

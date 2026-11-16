@@ -120,7 +120,25 @@ const arquivoQrPix = 'qr-pix.png';
 
 /// QR gerados pelo servidor: não são cartazes (não aparecem na lista nem vão para o backup),
 /// mas o agente os copia para a pasta de imagens do Holyrics.
-bool ehArquivoDeQr(String nome) => nome == arquivoQr || nome == arquivoQrMensagens || nome == arquivoQrPix;
+bool ehArquivoDeQr(String nome) =>
+    nome == arquivoQr || nome == arquivoQrMensagens || nome == arquivoQrPix || nome == arquivoQrVisitante;
+
+/// QR do cadastro de visitante como vai ao telão (com a arte, se houver). Para imprimir na
+/// recepção continua o /qr-visitante.png simples, gerado na hora.
+const arquivoQrVisitante = 'qr-visitante-telao.png';
+
+/// Grava o QR do cadastro de visitante para o telão. Com o cadastro pela recepção desligado
+/// ([ativo] falso), apaga o antigo e retorna null.
+Future<File?> gravarQrVisitante(String pasta, String url, {required bool ativo, ArteDoQr? arte}) async {
+  final f = File(p.join(pasta, arquivoQrVisitante));
+  if (!ativo) {
+    if (await f.exists()) await f.delete();
+    return null;
+  }
+  await Directory(pasta).create(recursive: true);
+  await f.writeAsBytes(gerarPngQr(url, rotulo: 'CADASTRO DE VISITANTE', arte: arte));
+  return f;
+}
 
 /// QR do PIX (com a chave escrita) para o momento das ofertas no culto. Sem chave, nome e
 /// cidade, apaga o antigo e retorna null.

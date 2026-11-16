@@ -7,6 +7,14 @@ function preencherPessoas(select, pessoas) {
   select.replaceChildren(new Option('Escolha…', ''), ...pessoas.map((m) => new Option(m.nome, m.id)));
 }
 
+/** Mostra a senha temporária com a prévia do texto para o WhatsApp. */
+function mostrarEntregaAcesso(nome, login, r) {
+  const caixa = $('acesso-entrega');
+  caixa.replaceChildren(cartaoEntregaAcesso(nome, login, r));
+  caixa.hidden = false;
+  caixa.scrollIntoView({ block: 'nearest' });
+}
+
 async function carregarAcessosEscala() {
   try {
     [membrosAcesso, { usuarios: usuariosAcesso }] = await Promise.all([
@@ -15,23 +23,25 @@ async function carregarAcessosEscala() {
     const disponiveis = membrosAcesso.filter((m) => !usuariosAcesso.some((u) => u.membroId === m.id));
     preencherPessoas($('acesso-membro'), disponiveis);
     preencherPessoas($('acesso-pastor-membro'), disponiveis);
+    // O servidor só lista contas da Minha escala (quem consulta a própria escala, sem administrar acessos).
     $('acesso-pastor').replaceChildren(new Option('Escolha…', ''),
-      ...usuariosAcesso.filter((u) => (u.perfil === 'pastor' || u.perfil === 'ministro' || u.perfil === 'louvor') && !u.membroId)
-        .map((u) => new Option(`${u.nome} (${u.login})`, u.id)));
+      ...usuariosAcesso.filter((u) => u.perfil !== 'integrante' && !u.membroId)
+        .map((u) => new Option(`${u.nome} (${u.login}) · ${u.perfilNome || u.perfil}`, u.id)));
     const lista = $('acessos-lista');
     lista.replaceChildren();
     for (const u of usuariosAcesso.filter((u) => u.membroId)) {
       const linha = document.createElement('p');
-      linha.textContent = `${u.nome} · ${u.login} · ${u.perfil === 'pastor' ? 'Pastor' : u.perfil === 'ministro' ? 'Ministro' : u.perfil === 'louvor' ? 'Louvor' : 'Integrante'}`;
+      linha.textContent = `${u.nome} · ${u.login} · ${u.perfilNome || u.perfil}${u.trocarSenha ? ' · aguardando primeiro acesso' : ''}`;
       if (u.perfil === 'integrante') {
         const redefinir = document.createElement('button');
         redefinir.type = 'button'; redefinir.className = 'botao secundario pequeno';
-        redefinir.style.marginLeft = '10px'; redefinir.textContent = 'Nova senha';
+        redefinir.style.marginLeft = '10px'; redefinir.textContent = 'Nova senha e enviar';
         redefinir.addEventListener('click', async () => {
-          if (!confirm(`Redefinir a senha de ${u.nome}? A sessão atual da pessoa será encerrada.`)) return;
+          if (!confirm(`Gerar uma senha nova para ${u.nome}? A sessão atual da pessoa será encerrada.`)) return;
           try {
             const r = await api('POST', `/api/acessos-escala/${encodeURIComponent(u.id)}/senha`);
-            mensagem($('acesso-resultado'), `Senha temporária de ${u.nome}: ${r.senhaTemporaria}. Anote agora; ela não será mostrada novamente.`);
+            mostrarEntregaAcesso(u.nome, u.login, r);
+            await carregarAcessosEscala();
           } catch (err) { mensagem($('acesso-resultado'), err.message, false); }
         });
         linha.append(redefinir);
@@ -52,7 +62,8 @@ $('form-acesso-escala').addEventListener('submit', async (e) => {
   try {
     const r = await api('POST', '/api/acessos-escala', { membroId: id, nome: membro.nome, login: $('acesso-login').value.trim() });
     await carregarAcessosEscala();
-    mensagem($('acesso-resultado'), `Usuário ${r.usuario.login} criado. Senha temporária: ${r.senhaTemporaria}. Anote agora; ela não será mostrada novamente.`);
+    mensagem($('acesso-resultado'), `Usuário ${r.usuario.login} criado.`);
+    mostrarEntregaAcesso(r.usuario.nome, r.usuario.login, r);
     $('acesso-login').value = '';
   } catch (err) { mensagem($('acesso-resultado'), err.message, false); }
 });

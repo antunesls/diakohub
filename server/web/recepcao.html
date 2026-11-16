@@ -61,6 +61,7 @@
     </div>
   </section>
 </main>
+<script src="/primeiro-acesso.js?v=1"></script>
 <script src="/form-visitante.js?v=2"></script>
 <script>
   // Sessão própria da recepção: não mistura com o painel aberto no mesmo aparelho.
@@ -102,6 +103,7 @@
       if (!r.ok) throw new Error(j.erro || 'Não foi possível entrar.');
       token = j.token;
       try { localStorage.setItem(CHAVE, token); } catch (e2) { /* ok */ }
+      if (j.trocarSenha) PrimeiroAcesso.lembrar($('senha').value);
       $('senha').value = '';
       await iniciar();
     } catch (err) {
@@ -133,7 +135,8 @@
   async function iniciar() {
     let eu;
     try {
-      eu = await api('GET', '/api/eu');
+      // Senha temporária: o obreiro cria a própria antes de cadastrar.
+      eu = await PrimeiroAcesso.garantir({ token, buscarEu: () => api('GET', '/api/eu'), aoSair: sair });
     } catch (e) {
       sair();
       return;

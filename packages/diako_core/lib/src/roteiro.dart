@@ -151,6 +151,9 @@ enum AcaoPasso {
 
   /// QR do PIX da igreja (momento das ofertas), gerado pelo servidor.
   qrPix,
+
+  /// QR do cadastro de visitante (momento das boas-vindas), gerado pelo servidor.
+  qrVisitante,
 }
 
 /// Um toque em Avançar: uma ação no telão, com o rótulo que o pastor vê.
@@ -232,6 +235,10 @@ List<Momento> montarRoteiro({
 
   /// O servidor tem o QR do PIX: entra depois do slide das ofertas.
   bool pix = false,
+
+  /// O servidor tem o QR do cadastro de visitante: entra nas boas-vindas (mesmo sem visitante para
+  /// citar, para quem chegou se cadastrar).
+  bool qrVisitante = false,
   List<ItemRoteiro>? modelo,
 }) {
   String nomes(Map<String, List<String>> funcoes, String funcao) => (funcoes[funcao] ?? const []).join(', ');
@@ -261,11 +268,19 @@ List<Momento> montarRoteiro({
                 linhas: const <String>[],
               )
             : null,
-        TipoMomento.boasVindas => citaveis.isEmpty
+        TipoMomento.boasVindas => citaveis.isEmpty && !qrVisitante
             ? null
             : (
-                passos: [Passo(AcaoPasso.boasVindas, 'Sejam bem-vindos!', ids: [for (final v in citaveis) v.id])],
-                detalhe: citaveis.length == 1 ? '1 visitante para citar' : '${citaveis.length} visitantes para citar',
+                passos: [
+                  if (citaveis.isNotEmpty)
+                    Passo(AcaoPasso.boasVindas, 'Sejam bem-vindos!', ids: [for (final v in citaveis) v.id]),
+                  if (qrVisitante) const Passo(AcaoPasso.qrVisitante, 'QR do cadastro de visitante'),
+                ],
+                detalhe: switch (citaveis.length) {
+                  0 => 'QR para quem chegou se cadastrar',
+                  1 => '1 visitante para citar',
+                  final n => '$n visitantes para citar',
+                },
                 linhas: [for (final v in citaveis) v.nome],
               ),
         TipoMomento.louvor => musicas.isEmpty && escalados(louvor).isEmpty

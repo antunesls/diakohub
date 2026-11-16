@@ -1,5 +1,6 @@
 'use strict';
-// /admin › Telão › QR codes: a imagem que vai ao telão com cada QR (pedidos de oração, mensagens, PIX).
+// /admin › Telão › QR codes: a imagem que vai ao telão com cada QR (pedidos de oração, mensagens, PIX
+// e cadastro de visitante).
 // Automático: este editor desenha a arte (fundo, logo, título, chamada) num canvas 1920x1080 e envia
 // o PNG sem o QR. Arte própria: a imagem pronta é enviada como está. Nos dois, o servidor encaixa o
 // QR num cartão branco (server/lib/qr_oracao.dart › comporQr).
@@ -93,6 +94,8 @@ const QRS_ARTE = [
   { id: 'mensagens', nome: 'Caixa de mensagens', titulo: 'Caixa de mensagens',
     chamada: 'Dúvidas, sugestões e críticas', caminho: '/mensagens' },
   { id: 'pix', nome: 'PIX das ofertas', titulo: 'Dízimos e ofertas', chamada: '', caminho: null },
+  { id: 'visitante', nome: 'Cadastro de visitante', titulo: 'Seja bem-vindo!',
+    chamada: 'Aponte a câmera do celular e faça seu cadastro', caminho: '/visitante' },
 ];
 
 const POSICOES_QR = [
@@ -367,7 +370,9 @@ function montarEditor(q) {
     ver: el('button', { type: 'button', class: 'botao secundario', onclick: () => verNoTelao(e) }, 'Ver como fica no telão'),
     padrao: el('button', { type: 'button', class: 'botao secundario', onclick: () => voltarAoPadrao(e) }, 'Voltar ao padrão'),
   };
-  e.semPix = el('p', { class: 'dica erro', hidden: true }, 'Configure a chave PIX em Página inicial para usar este QR.');
+  e.semPix = el('p', { class: 'dica erro', hidden: true }, q.id === 'visitante'
+    ? 'O cadastro de visitante pelo QR está desligado. Ligue em LGPD › "Cadastro de visitante pelo QR code da recepção".'
+    : 'Configure a chave PIX em Página inicial para usar este QR.');
 
   e.raiz = el('div', { class: 'fundo-tv arte-qr', id: 'arte-qr-' + q.id },
     el('h3', {}, q.nome),
@@ -462,9 +467,10 @@ async function carregarEditor(e) {
   mostrarCampos(e);
 }
 
-/** O QR do PIX só existe com chave, nome e cidade (Página inicial). */
+/** O QR do PIX só existe com chave, nome e cidade (Página inicial); o do visitante, com o cadastro ligado. */
 function atualizarPix(e) {
-  const semPix = e.q.id === 'pix' && !(cfg.sitePixChave && cfg.sitePixNome && cfg.sitePixCidade);
+  const semPix = (e.q.id === 'pix' && !(cfg.sitePixChave && cfg.sitePixNome && cfg.sitePixCidade)) ||
+    (e.q.id === 'visitante' && cfg.visitanteQrAtivo === false);
   e.semPix.hidden = !semPix;
   for (const b of [e.botoes.salvar, ...e.radios]) b.disabled = semPix;
 }

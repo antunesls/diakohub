@@ -271,7 +271,7 @@ void main() {
       String? fundoAtual() => (cfg.publicas()['arteQrOracaoFundo'] as String?);
 
       // Validações: QR, modo, imagem e login.
-      expect((await req('POST', '/api/admin/arte-qr?qr=visitante&modo=arte', bytes: bytesArte)).statusCode, 400);
+      expect((await req('POST', '/api/admin/arte-qr?qr=palco&modo=arte', bytes: bytesArte)).statusCode, 400);
       expect((await req('POST', '/api/admin/arte-qr?qr=oracao&modo=padrao', bytes: bytesArte)).statusCode, 400);
       expect((await req('POST', '/api/admin/arte-qr?qr=oracao&modo=arte', bytes: [1, 2, 3])).statusCode, 400);
       expect((await req('POST', '/api/admin/arte-qr?qr=oracao&modo=arte', bytes: bytesArte, comToken: 'x')).statusCode, 401);
@@ -334,6 +334,37 @@ void main() {
       expect(cfg.arteQr('oracao').modo, 'arte');
       expect(File(p.join(tmp.path, 'data', 'artes-qr', segunda)).existsSync(), isTrue);
       expect(File(p.join(tmp.path, 'data', 'artes-qr', foto)).existsSync(), isTrue);
+    });
+
+    test('QR do cadastro de visitante no telão: com arte, para o tablet, e some com o cadastro desligado', () async {
+      final arte = img.Image(width: 1920, height: 1080);
+      img.fill(arte, color: img.ColorRgb8(90, 30, 60));
+      File projetado() => File(p.join(pastaCartazes, arquivoQrVisitante));
+      Future<Map> estado() async => await corpo(await req('GET', '/api/estado')) as Map;
+
+      // Com o cadastro ligado (padrão), o QR do telão existe desde já, no modo padrão.
+      await req('PUT', '/api/admin/configuracoes', json: {'visitanteQrAtivo': true});
+      expect(projetado().existsSync(), isTrue);
+      expect((await estado())['qrVisitanteHolyrics'], '${Config.subpastaHolyrics}/$arquivoQrVisitante');
+      final padrao = projetado().readAsBytesSync();
+
+      final r = await corpo(await req('POST', '/api/admin/arte-qr?qr=visitante&modo=automatico', bytes: img.encodePng(arte))) as Map;
+      expect(r['modo'], 'automatico');
+      final comArte = projetado().readAsBytesSync();
+      expect(comArte, isNot(equals(padrao)));
+      expect(img.decodePng(Uint8List.fromList(comArte))!.getPixel(40, 40).r, greaterThan(70), reason: 'o fundo é a arte');
+      expect(await (await req('GET', '/api/qr-projetado?qr=visitante')).read().expand((b) => b).toList(), comArte);
+      await req('PUT', '/api/admin/configuracoes', json: {'arteQrVisitantePosicao': 'centro-baixo', 'arteQrVisitanteTamanho': 'P'});
+      expect(projetado().readAsBytesSync(), isNot(equals(comArte)), reason: 'posição nova recompõe');
+
+      // Cadastro pela recepção desligado: o QR do telão some (o tablet e o painel deixam de oferecer).
+      await req('PUT', '/api/admin/configuracoes', json: {'visitanteQrAtivo': false});
+      expect(projetado().existsSync(), isFalse);
+      expect((await estado())['qrVisitanteHolyrics'], isNull);
+      expect((await req('GET', '/api/admin/arte-qr/previa?qr=visitante')).statusCode, 404);
+      await req('PUT', '/api/admin/configuracoes', json: {'visitanteQrAtivo': true});
+      expect(projetado().existsSync(), isTrue, reason: 'religado, volta com a mesma arte');
+      expect(ehArquivoDeQr(arquivoQrVisitante), isTrue, reason: 'o agente copia para o PC da igreja');
     });
   });
 

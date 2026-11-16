@@ -8,6 +8,7 @@ import '../data/blur_cartaz.dart';
 import '../data/settings.dart';
 import '../holyrics/agente_local.dart';
 import 'previa_fundo.dart';
+import 'primeiro_acesso_dialog.dart';
 import '../sync/server_api.dart';
 
 class SettingsPage extends StatefulWidget {
@@ -78,8 +79,20 @@ class _SettingsPageState extends State<SettingsPage> {
     final base = normalizarServidor(_servidor.text);
     if (base.isEmpty) return;
     setState(() => _entrando = true);
+    final senha = _senha.text;
+    ({String token, bool trocarSenha})? login;
+    final entrou = await executar(context, () async => login = await scope.api.entrar(base, senha, usuario: _usuario.text));
+    // Primeiro acesso (senha temporária): cria a própria senha antes de conectar.
+    final liberado = entrou &&
+        mounted &&
+        (!login!.trocarSenha || await criarSenhaPrimeiroAcesso(context, base, login!.token, senha));
+    if (!mounted) return;
+    if (!liberado) {
+      setState(() => _entrando = false);
+      return;
+    }
     final ok = await executar(context, () async {
-      final sessao = await scope.api.login(base, _senha.text, usuario: _usuario.text);
+      final sessao = login!.token;
       await scope.settings.atualizar(servidor: base, sessao: sessao);
       _servidor.text = base;
       _senha.clear();

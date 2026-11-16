@@ -1,72 +1,127 @@
-/// Perfis de acesso e o que cada um pode fazer. Esta matriz é a única fonte de verdade:
-/// o servidor confere cada rota por ela e o painel/app escondem o que o perfil não permite.
+/// Permissões e perfis de acesso. O servidor confere cada rota pela permissão exigida e o
+/// painel/app escondem o que o perfil não permite. Os perfis são configuráveis no /admin
+/// (data/perfis.json); [PerfilPadrao] guarda só os padrões de fábrica.
 library;
 
-enum Permissao {
-  /// Estar logado (logout, "eu", WebSocket).
-  sessao('Entrar no painel'),
-  painel('Início, Status e Histórico'),
-  motivosVer('Ver pedidos de oração públicos'),
-  motivosParticulares('Ver pedidos particulares e o nome de quem pediu'),
-  motivosEditar('Aprovar, editar e marcar pedidos como atendidos'),
-  mensagens('Caixa de mensagens'),
-  recados('Recados'),
-  agendaVer('Ver a agenda'),
-  agendaEditar('Criar e editar eventos da agenda'),
-  cartazes('Cartazes'),
-  galeria('Galeria do site'),
-  membros('Cadastro de membros'),
-  gestaoCasa('Gestão da Casa: pendências, compras e manutenção'),
-  atas('Atas de reunião'),
-  atasSigilosas('Ver e escrever atas sigilosas'),
-  visitantes('Ver os visitantes do dia e dar as boas-vindas'),
-  visitantesCadastrar('Cadastrar visitantes (recepção)'),
-  resumo('Resumo da semana'),
-  escalasVer('Ver as escalas'),
-  escalaPastoral('Montar a escala pastoral e os cultos do mês'),
-  escalaLouvor('Montar a escala e as músicas do louvor'),
-  minhaEscala('Consultar a própria escala e avisar indisponibilidade'),
-  acessosEscala('Administrar acessos individuais às escalas'),
-  projetar('Projetar no telão'),
-  palavras('Preparar as próprias Palavras (sermões) no painel'),
-  palavrasTodas('Ver e revisar as Palavras de todos os pregadores'),
-  admin('Administração'),
-  usuarios('Usuários e perfis');
+/// Áreas que agrupam as permissões na tela de perfis (mesma ordem do menu do painel).
+enum AreaPermissao {
+  painel('Painel e telão'),
+  oracao('Oração e mensagens'),
+  pessoas('Pessoas e visitantes'),
+  escalas('Escalas e louvor'),
+  comunicacao('Comunicação'),
+  gestao('Gestão'),
+  administracao('Administração');
 
-  const Permissao(this.descricao);
+  const AreaPermissao(this.nome);
+  final String nome;
+}
+
+enum Permissao {
+  /// Estar logado (logout, "eu", WebSocket). Todo perfil tem.
+  sessao('Entrar no painel', AreaPermissao.painel, ''),
+  painel('Início, Status e Histórico', AreaPermissao.painel, 'Abas Visão geral, Histórico e Status do painel.'),
+  projetar('Projetar no telão', AreaPermissao.painel, 'Mandar recados, pedidos, cartazes e a Palavra para o Holyrics; operar o tablet.'),
+  motivosVer('Ver pedidos de oração públicos', AreaPermissao.oracao, 'Aba Motivos de oração (só os públicos).'),
+  motivosParticulares('Ver pedidos particulares e o nome de quem pediu', AreaPermissao.oracao, 'Inclui os pedidos marcados como particulares.'),
+  motivosEditar('Aprovar, editar e marcar pedidos como atendidos', AreaPermissao.oracao, ''),
+  mensagens('Caixa de mensagens', AreaPermissao.oracao, 'Mensagens enviadas pelo site (dúvidas, sugestões, críticas).'),
+  membros('Cadastro de membros', AreaPermissao.pessoas, 'Aba Membros, fichas, certificado de batismo e contato com visitantes.'),
+  visitantes('Ver os visitantes do dia e dar as boas-vindas', AreaPermissao.pessoas, ''),
+  visitantesHistorico('Ver visitantes de outros dias', AreaPermissao.pessoas, 'Sem esta, só aparecem os visitantes de hoje (como na Recepção).'),
+  visitantesCadastrar('Cadastrar visitantes (recepção)', AreaPermissao.pessoas, 'Página /recepcao pelo celular.'),
+  escalasVer('Ver as escalas', AreaPermissao.escalas, 'Abas Escalas, Repertório e Roteiros (só consulta).'),
+  escalaPastoral('Montar a escala pastoral e os cultos do mês', AreaPermissao.escalas, ''),
+  escalaLouvor('Montar a escala e as músicas do louvor', AreaPermissao.escalas, ''),
+  minhaEscala('Consultar a própria escala', AreaPermissao.escalas, 'Página Minha escala.'),
+  indisponibilidade('Avisar indisponibilidade', AreaPermissao.escalas, 'Na Minha escala, marcar os dias em que não pode servir.'),
+  musicasMinistro('Escolher as músicas dos cultos em que ministra', AreaPermissao.escalas, 'Na Minha escala, para quem é ministro de louvor.'),
+  acessosEscala('Administrar acessos individuais às escalas', AreaPermissao.escalas, 'Criar contas da Minha escala para os membros.'),
+  palavras('Preparar as próprias Palavras (sermões) no painel', AreaPermissao.escalas, ''),
+  palavrasTodas('Ver e revisar as Palavras de todos os pregadores', AreaPermissao.escalas, ''),
+  recados('Recados', AreaPermissao.comunicacao, ''),
+  agendaVer('Ver a agenda', AreaPermissao.comunicacao, ''),
+  agendaEditar('Criar e editar eventos da agenda', AreaPermissao.comunicacao, ''),
+  cartazes('Cartazes', AreaPermissao.comunicacao, ''),
+  galeria('Galeria do site', AreaPermissao.comunicacao, 'Fotos do carrossel da página inicial.'),
+  gestaoCasa('Gestão da Casa: pendências, compras e manutenção', AreaPermissao.gestao, ''),
+  atas('Atas de reunião', AreaPermissao.gestao, ''),
+  atasSigilosas('Ver e escrever atas sigilosas', AreaPermissao.gestao, ''),
+  resumo('Resumo da semana', AreaPermissao.gestao, ''),
+  admin('Administração', AreaPermissao.administracao, 'Página /admin: configurações, backup, integrações e auditoria.'),
+  usuarios('Usuários e perfis', AreaPermissao.administracao, 'Criar contas, redefinir senhas e configurar perfis.');
+
+  const Permissao(this.descricao, this.area, this.dica);
   final String descricao;
+  final AreaPermissao area;
+  final String dica;
 
   static Permissao? porNome(String nome) => values.where((p) => p.name == nome).firstOrNull;
+
+  /// Permissões que esta exige para fazer sentido (marcar uma marca as outras).
+  Set<Permissao> get implica => switch (this) {
+        motivosParticulares || motivosEditar => {motivosVer},
+        visitantesHistorico || visitantesCadastrar => {visitantes},
+        escalaPastoral || escalaLouvor => {escalasVer},
+        indisponibilidade || musicasMinistro => {minhaEscala},
+        palavrasTodas => {palavras},
+        agendaEditar => {agendaVer},
+        atasSigilosas => {atas},
+        _ => const {},
+      };
+
+  /// [conjunto] mais a sessão e tudo o que as permissões dele implicam.
+  static Set<Permissao> completar(Iterable<Permissao> conjunto) {
+    final r = {sessao, ...conjunto};
+    var mudou = true;
+    while (mudou) {
+      final antes = r.length;
+      r.addAll([for (final p in r.toList()) ...p.implica]);
+      mudou = r.length != antes;
+    }
+    return r;
+  }
+
+  Map<String, dynamic> toJson() => {
+        'id': name,
+        'descricao': descricao,
+        'area': area.name,
+        'areaNome': area.nome,
+        'dica': dica,
+        'implica': [for (final p in implica) p.name],
+      };
 }
 
 // Visão geral, Histórico e Status (permissão painel) ficam com a equipe do telão e a administração;
 // os perfis de uma área só (comissão, gestão da casa, pregador) entram direto na própria aba.
 const _base = {Permissao.sessao, Permissao.painel, Permissao.motivosVer, Permissao.recados, Permissao.agendaVer, Permissao.cartazes};
 
-enum Perfil {
+/// Os perfis de fábrica. Viram dados editáveis em data/perfis.json; "Restaurar padrão" volta a estes.
+enum PerfilPadrao {
   administrador('Administrador', 'Tudo, inclusive configurações, backup e usuários.', {
     ..._base, Permissao.motivosParticulares, Permissao.motivosEditar, Permissao.mensagens, Permissao.agendaEditar,
     Permissao.galeria, Permissao.membros, Permissao.gestaoCasa, Permissao.resumo, Permissao.projetar, Permissao.admin, Permissao.usuarios,
-    Permissao.visitantes, Permissao.visitantesCadastrar, Permissao.escalasVer, Permissao.escalaPastoral, Permissao.escalaLouvor,
-    Permissao.minhaEscala, Permissao.acessosEscala, Permissao.palavras, Permissao.palavrasTodas,
-    Permissao.atas, Permissao.atasSigilosas,
+    Permissao.visitantes, Permissao.visitantesHistorico, Permissao.visitantesCadastrar, Permissao.escalasVer,
+    Permissao.escalaPastoral, Permissao.escalaLouvor, Permissao.minhaEscala, Permissao.indisponibilidade,
+    Permissao.acessosEscala, Permissao.palavras, Permissao.palavrasTodas, Permissao.atas, Permissao.atasSigilosas,
   }),
   pastor('Pastor', 'Todo o conteúdo, inclusive pedidos particulares. Sem configurações técnicas.', {
     ..._base, Permissao.motivosParticulares, Permissao.motivosEditar, Permissao.mensagens, Permissao.agendaEditar,
     Permissao.galeria, Permissao.membros, Permissao.gestaoCasa, Permissao.resumo, Permissao.projetar,
-    Permissao.visitantes, Permissao.visitantesCadastrar, Permissao.escalasVer, Permissao.escalaPastoral, Permissao.escalaLouvor,
-    Permissao.minhaEscala, Permissao.palavras, Permissao.palavrasTodas, Permissao.atas, Permissao.atasSigilosas,
+    Permissao.visitantes, Permissao.visitantesHistorico, Permissao.visitantesCadastrar, Permissao.escalasVer,
+    Permissao.escalaPastoral, Permissao.escalaLouvor, Permissao.minhaEscala, Permissao.indisponibilidade,
+    Permissao.palavras, Permissao.palavrasTodas, Permissao.atas, Permissao.atasSigilosas,
   }),
   secretaria('Secretaria', 'Recados, agenda, mensagens, aniversariantes e pedidos públicos.', {
     ..._base, Permissao.motivosEditar, Permissao.mensagens, Permissao.agendaEditar, Permissao.membros, Permissao.gestaoCasa, Permissao.resumo,
-    Permissao.visitantes, Permissao.visitantesCadastrar, Permissao.escalasVer,
-    Permissao.minhaEscala, Permissao.acessosEscala, Permissao.atas,
+    Permissao.visitantes, Permissao.visitantesHistorico, Permissao.visitantesCadastrar, Permissao.escalasVer,
+    Permissao.minhaEscala, Permissao.indisponibilidade, Permissao.acessosEscala, Permissao.atas,
   }),
   midia('Mídia', 'Cartazes, galeria do site, recados e projeção no telão.', {
     ..._base, Permissao.galeria, Permissao.projetar, Permissao.escalasVer,
   }),
   telao('Telão (tablet)', 'Operar o telão no culto: recados, pedidos públicos, boas-vindas e projeção.', {
-    ..._base, Permissao.projetar, Permissao.visitantes, Permissao.escalasVer,
+    ..._base, Permissao.projetar, Permissao.visitantes, Permissao.visitantesHistorico, Permissao.escalasVer,
   }),
   recepcao('Recepção', 'Obreiro da recepção: cadastra visitantes pelo celular (/recepcao) e vê os do dia. Nada mais.', {
     Permissao.sessao, Permissao.visitantes, Permissao.visitantesCadastrar,
@@ -76,38 +131,102 @@ enum Perfil {
   }),
   comissaoLouvor('Comissão do Louvor', 'Membros da comissão: montam a escala e as músicas do louvor e veem a escala pastoral e a agenda.', {
     Permissao.sessao, Permissao.agendaVer, Permissao.escalasVer, Permissao.escalaLouvor, Permissao.minhaEscala,
+    Permissao.indisponibilidade,
   }),
   louvor('Louvor', 'Consulta somente a própria escala e as músicas dos cultos em que serve.', {
     Permissao.sessao, Permissao.minhaEscala,
   }),
   ministro('Ministro', 'Escolhe as músicas dos cultos em que ministra e consulta a própria escala.', {
-    Permissao.sessao, Permissao.minhaEscala,
+    Permissao.sessao, Permissao.minhaEscala, Permissao.indisponibilidade, Permissao.musicasMinistro,
   }),
   pregador('Pregador', 'Prepara as próprias Palavras (sermões) no painel e consulta a própria escala.', {
-    Permissao.sessao, Permissao.palavras, Permissao.escalasVer, Permissao.minhaEscala,
+    Permissao.sessao, Permissao.palavras, Permissao.escalasVer, Permissao.minhaEscala, Permissao.indisponibilidade,
   }),
   integrante('Integrante', 'Consulta a própria escala e avisa indisponibilidades.', {
-    Permissao.sessao, Permissao.minhaEscala,
+    Permissao.sessao, Permissao.minhaEscala, Permissao.indisponibilidade,
   }),
   // Conta de máquina: o DiakoPlayer (PC do som) lê o culto e o repertório para montar a fila do louvor.
   player('DiakoPlayer', 'Conta do PC do som: o DiakoPlayer lê as escalas e o repertório para montar a fila do louvor. Não entra no painel.', {
     Permissao.sessao, Permissao.escalasVer,
   });
 
-  const Perfil(this.nome, this.descricao, this.permissoes);
+  const PerfilPadrao(this.nome, this.descricao, this.permissoes);
   final String nome;
   final String descricao;
   final Set<Permissao> permissoes;
 
+  /// Identificador gravado nas contas (as contas antigas "louvor" agora são somente leitura).
+  String get id => this == PerfilPadrao.comissaoLouvor ? 'comissao-louvor' : name;
+
+  static PerfilPadrao? porId(String id) => values.where((p) => p.id == id).firstOrNull;
+
+  Perfil criar() => Perfil(id: id, nome: nome, descricao: descricao, permissoes: permissoes, padrao: true);
+}
+
+/// Perfil de acesso: um conjunto nomeado de permissões. Os de fábrica ([padrao]) podem ser editados
+/// e restaurados; o Administrador é travado para ninguém perder o acesso à administração.
+class Perfil {
+  Perfil({required this.id, required this.nome, this.descricao = '', required Iterable<Permissao> permissoes, this.padrao = false})
+      : permissoes = Permissao.completar(permissoes);
+
+  final String id;
+  String nome;
+  String descricao;
+  Set<Permissao> permissoes;
+
+  /// Veio de fábrica ([PerfilPadrao]); pode ser restaurado.
+  final bool padrao;
+
+  bool get travado => id == PerfilPadrao.administrador.id;
   bool pode(Permissao p) => permissoes.contains(p);
 
-  /// Identificador público do perfil (as contas antigas "louvor" agora são somente leitura).
-  String get id => this == Perfil.comissaoLouvor ? 'comissao-louvor' : name;
+  /// Perfil de uma conta cujo perfil foi apagado ou não existe: só entra, não vê nada.
+  factory Perfil.semAcesso(String id) => Perfil(id: id, nome: 'Sem perfil', permissoes: const {});
 
-  static Perfil? porNome(String nome) => values.where((p) => p.id == nome).firstOrNull;
+  // Os padrões de fábrica, para código e testes que precisam de um perfil conhecido.
+  static final administrador = PerfilPadrao.administrador.criar();
+  static final pastor = PerfilPadrao.pastor.criar();
+  static final secretaria = PerfilPadrao.secretaria.criar();
+  static final midia = PerfilPadrao.midia.criar();
+  static final telao = PerfilPadrao.telao.criar();
+  static final recepcao = PerfilPadrao.recepcao.criar();
+  static final gestaoCasa = PerfilPadrao.gestaoCasa.criar();
+  static final comissaoLouvor = PerfilPadrao.comissaoLouvor.criar();
+  static final louvor = PerfilPadrao.louvor.criar();
+  static final ministro = PerfilPadrao.ministro.criar();
+  static final pregador = PerfilPadrao.pregador.criar();
+  static final integrante = PerfilPadrao.integrante.criar();
+  static final player = PerfilPadrao.player.criar();
 
-  Map<String, dynamic> toJson() =>
-      {'id': id, 'nome': nome, 'descricao': descricao, 'permissoes': [for (final p in permissoes) p.name]};
+  /// Os padrões de fábrica, na ordem de [PerfilPadrao].
+  static final List<Perfil> values = [
+    administrador, pastor, secretaria, midia, telao, recepcao, gestaoCasa, comissaoLouvor, louvor, ministro, pregador,
+    integrante, player,
+  ];
+
+  /// Padrão de fábrica com este id (os perfis configurados ficam em `Perfis`).
+  static Perfil? porNome(String id) => values.where((p) => p.id == id).firstOrNull;
+
+  /// Página onde a pessoa deste perfil entra: /recepcao, /minha-escala ou /painel.
+  String get entrada {
+    final uteis = permissoes.difference({Permissao.sessao, Permissao.indisponibilidade, Permissao.musicasMinistro});
+    if (uteis.every({Permissao.visitantes, Permissao.visitantesCadastrar}.contains) && pode(Permissao.visitantesCadastrar)) {
+      return '/recepcao';
+    }
+    if (uteis.length == 1 && uteis.single == Permissao.minhaEscala) return '/minha-escala';
+    return '/painel';
+  }
+
+  Perfil copia() => Perfil(id: id, nome: nome, descricao: descricao, permissoes: permissoes, padrao: padrao);
+
+  Map<String, dynamic> toJson() => {
+        'id': id,
+        'nome': nome,
+        'descricao': descricao,
+        'permissoes': [for (final p in Permissao.values) if (permissoes.contains(p)) p.name],
+        'padrao': padrao,
+        'travado': travado,
+      };
 }
 
 /// Permissão exigida por uma rota da API (caminho sem a barra inicial, ex.: "api/motivos/abc").
@@ -127,6 +246,8 @@ Permissao permissaoDaRota(String metodo, String caminho) {
   if (comeca('api/galeria')) return Permissao.galeria;
   if (comeca('api/membros')) return Permissao.membros;
   if (comeca('api/solicitacoes-membros')) return Permissao.membros;
+  // Certificado de batismo (geração do PDF e as imagens de assinatura/carimbo salvas).
+  if (comeca('api/certificado')) return Permissao.membros;
   if (comeca('api/casa')) return Permissao.gestaoCasa;
   // Atas sigilosas: cada handler confere atasSigilosas antes de mostrar ou alterar.
   if (comeca('api/atas')) return Permissao.atas;
@@ -153,6 +274,6 @@ Permissao permissaoDaRota(String metodo, String caminho) {
   if (comeca('api/palavras')) return Permissao.palavras;
   if (caminho == 'api/temas' || comeca('api/holyrics') || comeca('api/projetar')) return Permissao.projetar;
   if (comeca('api/agente-local')) return Permissao.projetar; // parear o tablet com o agente da rede local
-  if (comeca('api/admin/usuarios')) return Permissao.usuarios;
+  if (comeca('api/admin/usuarios') || comeca('api/admin/perfis')) return Permissao.usuarios;
   return Permissao.admin; // api/admin/*, api/backup(s) e qualquer rota nova não listada
 }

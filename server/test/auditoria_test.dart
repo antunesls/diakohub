@@ -88,6 +88,8 @@ void main() {
       final (_, j) = await chamar('POST', '/api/admin/usuarios',
           token: admin, json: {'nome': 'Usuário $login', 'login': login, 'perfil': perfil.id});
       final (_, l) = await chamar('POST', '/api/login', json: {'usuario': login, 'senha': j['senhaTemporaria']});
+      // Primeiro acesso: a senha temporária só serve para criar a própria.
+      await chamar('POST', '/api/eu/senha', token: l['token'] as String, json: {'atual': j['senhaTemporaria'], 'nova': 'senha-propria-1'});
       return l['token'] as String;
     }
 

@@ -21,7 +21,7 @@ class ModoCultoController extends ChangeNotifier {
     _fontes = Listenable.merge([scope.repo, scope.motivos, scope.visitas, scope.agenda, scope.escalas, scope.settings, scope.palavra, scope.conta]);
     _fontes.addListener(_remontar);
     _remontar();
-    _conferirPix();
+    _conferirQrs();
     // Cultos de hoje em diante, para o seletor do tablet.
     scope.escalas.buscarFuturos();
   }
@@ -40,6 +40,9 @@ class ModoCultoController extends ChangeNotifier {
 
   /// O servidor tem o QR do PIX (chave configurada em Administração).
   bool _pix = false;
+
+  /// O servidor tem o QR do cadastro de visitante (cadastro pela recepção ligado).
+  bool _qrVisitante = false;
   bool _descartado = false;
 
   /// Trecho da Palavra na TV do palco (null = a leitura ainda não começou).
@@ -272,12 +275,15 @@ class ModoCultoController extends ChangeNotifier {
         escalas.cultos.last;
   }
 
-  /// Pergunta ao servidor se há QR do PIX; sem conexão, o momento das ofertas fica só com o slide.
-  Future<void> _conferirPix() async {
+  /// Pergunta ao servidor se há QR do PIX e do cadastro de visitante; sem conexão, as ofertas ficam
+  /// só com o slide e as boas-vindas só com os nomes.
+  Future<void> _conferirQrs() async {
     try {
-      final pix = (await scope.api.estado())['qrPixHolyrics'] is String;
-      if (pix != _pix && !_descartado) {
+      final estado = await scope.api.estado();
+      final pix = estado['qrPixHolyrics'] is String, visitante = estado['qrVisitanteHolyrics'] is String;
+      if ((pix != _pix || visitante != _qrVisitante) && !_descartado) {
         _pix = pix;
+        _qrVisitante = visitante;
         _remontar();
       }
     } on ErroAmigavel catch (_) {}
@@ -319,6 +325,7 @@ class ModoCultoController extends ChangeNotifier {
       negritoTitulo: s.negritoTitulo,
       textoMotivos: scope.conta.textoMotivos,
       pix: _pix,
+      qrVisitante: _qrVisitante,
       modelo: c?.roteiro ?? scope.escalas.roteiroPadrao,
     );
     notifyListeners();
@@ -507,12 +514,13 @@ class ModoCultoController extends ChangeNotifier {
       case AcaoPasso.boasVindas:
         await limpar();
         await scope.visitas.projetarBoasVindas(ids: passo.ids);
-      case AcaoPasso.qrOracao || AcaoPasso.qrMensagens || AcaoPasso.qrPix:
+      case AcaoPasso.qrOracao || AcaoPasso.qrMensagens || AcaoPasso.qrPix || AcaoPasso.qrVisitante:
         // Pergunta o arquivo antes de mexer no telão: sem QR no servidor, a tela fica como está.
         final estado = await scope.api.estado();
         final chave = switch (passo.acao) {
           AcaoPasso.qrOracao => 'qrHolyrics',
           AcaoPasso.qrMensagens => 'qrMensagensHolyrics',
+          AcaoPasso.qrVisitante => 'qrVisitanteHolyrics',
           _ => 'qrPixHolyrics',
         };
         final arquivo = estado[chave];
