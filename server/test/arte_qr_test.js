@@ -19,6 +19,15 @@ test('cartão do QR no mesmo lugar que o servidor desenha', () => {
   }
 });
 
+test('prévia do projetor mantém a geometria 4:3 e o texto acima do QR', () => {
+  const formato = { largura: 1440, altura: 1080 };
+  const r = retanguloCartaoQr('centro-baixo', 'P', 29, formato);
+  assert.deepEqual(r, { x: 498, y: 540, lado: 444 });
+  const area = areaDoTexto('centro-baixo', 'P', formato);
+  assert.equal(area.x1, 1280);
+  assert.ok(area.y1 < r.y);
+});
+
 test('o texto fica do lado oposto ao QR, sem invadir o cartão', () => {
   for (const posicao of ['esquerda-meio', 'direita-baixo', 'centro-meio', 'centro-baixo']) {
     for (const tamanho of ['P', 'M', 'G']) {

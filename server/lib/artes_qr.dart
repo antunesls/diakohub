@@ -79,7 +79,7 @@ Uint8List normalizarArte(Uint8List bytes, {bool jpg = false}) {
   var arte = decoder.decode(bytes);
   if (arte == null) throw const FormatException('Não foi possível ler a imagem.');
   arte = img.bakeOrientation(arte);
-  final largura = arte.width * 3 == arte.height * 4 ? ArtesQr.larguraProjetor : ArtesQr.largura;
+  final largura = !jpg && arte.width * 3 == arte.height * 4 ? ArtesQr.larguraProjetor : ArtesQr.largura;
   final escala = max(largura / arte.width, ArtesQr.altura / arte.height);
   final w = max(largura, (arte.width * escala).ceil()), h = max(ArtesQr.altura, (arte.height * escala).ceil());
   final ajustada = img.copyResize(arte, width: w, height: h, interpolation: img.Interpolation.average);

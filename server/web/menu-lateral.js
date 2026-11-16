@@ -10,6 +10,7 @@ const MENU_GRUPOS = [
     { id: 'motivos', titulo: 'Motivos de oração', permissao: 'motivosVer', badge: 'badge' },
     { id: 'mensagens', titulo: 'Mensagens', permissao: 'mensagens', badge: 'badge-mensagens' },
     { id: 'membros', titulo: 'Membros', permissao: 'membros', badge: 'badge-cadastros' },
+    { id: 'ministerios', titulo: 'Ministérios', permissao: 'ministerios' },
   ] },
   { nome: 'Cultos', itens: [
     { id: 'escalas', titulo: 'Escalas', permissao: 'escalasVer' },

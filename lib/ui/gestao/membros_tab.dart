@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../app_scope.dart';
+import 'certificado_dialog.dart';
 import 'gestao_page.dart';
 
 /// Consulta do cadastro de membros: busca, ficha e contato (ligar/WhatsApp).
@@ -274,6 +275,12 @@ class FichaMembro extends StatelessWidget {
               label: const Text('Ligar'),
               onPressed: () => _abrir(context, Uri(scheme: 'tel', path: whatsapp)),
             ),
+          if ((m.dataBatismo ?? '').isNotEmpty)
+            OutlinedButton.icon(
+              icon: const Icon(Icons.workspace_premium_outlined),
+              label: const Text('Certificado de batismo'),
+              onPressed: () => CertificadoDialog.abrir(context, m),
+            ),
         ]),
         const Divider(height: 32),
         linha('Aniversário', _aniversario()),
@@ -301,6 +308,12 @@ class FichaMembro extends StatelessWidget {
         ],
         const SizedBox(height: 24),
         Text('Para alterar a ficha, use o painel web (Membros).', style: TextStyle(color: tema.colorScheme.outline)),
+        if ((m.dataBatismo ?? '').isEmpty)
+          Padding(
+            padding: const EdgeInsets.only(top: 4),
+            child: Text('O certificado de batismo fica disponível depois de preencher a data no painel web.',
+                style: TextStyle(color: tema.colorScheme.outline)),
+          ),
       ],
     );
   }

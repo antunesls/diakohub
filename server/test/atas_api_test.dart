@@ -11,6 +11,7 @@ import 'package:diako_server/configuracoes.dart';
 import 'package:diako_server/email_mensagens.dart';
 import 'package:diako_server/historico.dart';
 import 'package:diako_server/holyrics.dart';
+import 'package:diako_server/ministerios.dart';
 import 'package:diako_server/permissoes.dart';
 import 'package:diako_server/store.dart';
 import 'package:diako_server/usuarios.dart';
@@ -28,6 +29,8 @@ void main() {
   late String admin;
   late String secretaria;
   late String midia;
+  late String bruno;
+  late String pastor;
   late List<EmailAta> enviados;
 
   Future<(int, dynamic)> chamar(String metodo, String caminho, {String? token, Object? json, List<int>? bytes}) async {
@@ -45,14 +48,20 @@ void main() {
     store = Store(config.pastaDados);
     await store.carregar();
     await store.salvarVarios('membros', [
-      {'id': 'm1', 'nome': 'Ana Souza', 'status': 'membro', 'email': 'ana@exemplo.org'},
-      {'id': 'm2', 'nome': 'Bruno Lima', 'status': 'membro'},
+      {'id': 'm1', 'nome': 'Ana Souza', 'status': 'membro', 'email': 'ana@exemplo.org', 'ministerios': ['Conselho', 'louvor']},
+      {'id': 'm2', 'nome': 'Bruno Lima', 'status': 'membro', 'ministerios': ['Infantil']},
       {'id': 'm3', 'nome': 'Carla Visitante', 'status': 'visitante', 'email': 'carla@exemplo.org'},
     ]);
     final cfg = await Configuracoes.carregar(config, urlDetectada: 'http://192.168.0.10:8080');
     final usuarios = Usuarios(config.pastaDados);
     final auth = Auth(conferirSenha: cfg.conferirSenha, pastaDados: config.pastaDados, usuarios: usuarios);
-    await usuarios.criar(nome: 'Secretária', login: 'secretaria', perfil: Perfil.secretaria, senha: 'senha-forte-123');
+    // A secretária é a Ana (Conselho e Louvor); o pastor vê todos os ministérios sem participar.
+    await Ministerios(store).garantirPadroes();
+    await Ministerios(store).criar({'nome': 'Louvor'});
+    await Ministerios(store).criar({'nome': 'Infantil'});
+    await usuarios.criar(nome: 'Secretária', login: 'secretaria', perfil: Perfil.secretaria, senha: 'senha-forte-123', membroId: 'm1');
+    await usuarios.criar(nome: 'Bruno', login: 'bruno', perfil: Perfil.secretaria, senha: 'senha-forte-123', membroId: 'm2');
+    await usuarios.criar(nome: 'Pastor', login: 'pastor', perfil: Perfil.pastor, senha: 'senha-forte-123');
     await usuarios.criar(nome: 'Mídia', login: 'midia', perfil: Perfil.midia, senha: 'senha-forte-123');
     final web = Directory(p.join(tmp.path, 'web'))..createSync();
     File(p.join(web.path, 'ajuda-atas.html')).writeAsStringSync('<h1>Atas</h1>');
@@ -68,6 +77,8 @@ void main() {
     admin = (await chamar('POST', '/api/login', json: {'senha': 'senha-teste'})).$2['token'] as String;
     secretaria = (await chamar('POST', '/api/login', json: {'usuario': 'secretaria', 'senha': 'senha-forte-123'})).$2['token'] as String;
     midia = (await chamar('POST', '/api/login', json: {'usuario': 'midia', 'senha': 'senha-forte-123'})).$2['token'] as String;
+    bruno = (await chamar('POST', '/api/login', json: {'usuario': 'bruno', 'senha': 'senha-forte-123'})).$2['token'] as String;
+    pastor = (await chamar('POST', '/api/login', json: {'usuario': 'pastor', 'senha': 'senha-forte-123'})).$2['token'] as String;
   });
   tearDown(() async { await store.fechar(); await tmp.delete(recursive: true); });
 
@@ -99,6 +110,56 @@ void main() {
     expect(pessoas.first.containsKey('email'), isFalse);
     expect(pessoas.first['temEmail'], isTrue);
     expect((await chamar('GET', '/ajuda/atas')).$1, 200);
+  });
+
+  test('cada ministério só vê as próprias atas; o pastor vê todas; Conselho também é ministério', () async {
+    final (_, lista) = await chamar('GET', '/api/ministerios', token: secretaria);
+    final ids = {for (final m in lista['ministerios'] as List) m['nome']: m['id']};
+    expect(ids.keys, containsAll(['Conselho', 'Diretoria', 'Assembleia', 'Louvor', 'Infantil']));
+    expect((lista['ministerios'] as List).firstWhere((m) => m['nome'] == 'Louvor')['meu'], isTrue,
+        reason: 'o nome no cadastro do membro vale sem acento nem caixa');
+
+    Map<String, dynamic> reuniao(String ministerio) =>
+        {'tipo': 'ministerio', 'ministerioId': ids[ministerio], 'titulo': 'Planejamento $ministerio', 'data': '2026-11-10'};
+    final (stL, louvor) = await chamar('POST', '/api/atas', token: secretaria, json: reuniao('Louvor'));
+    expect(stL, 201, reason: '$louvor');
+    expect(louvor['ministerio'], 'Louvor');
+    final (stI, infantil) = await chamar('POST', '/api/atas', token: bruno, json: reuniao('Infantil'));
+    expect(stI, 201, reason: '$infantil');
+    // Ninguém registra ata de ministério de que não participa.
+    expect((await chamar('POST', '/api/atas', token: bruno, json: reuniao('Louvor'))).$1, 400);
+    expect((await chamar('POST', '/api/atas', token: bruno, json: conselho())).$1, 400);
+    final (_, doConselho) = await chamar('POST', '/api/atas', token: secretaria, json: conselho());
+
+    List<String> titulos(dynamic l) => [for (final a in l as List) '${a['ministerio']}'];
+    expect(titulos((await chamar('GET', '/api/atas', token: secretaria)).$2), unorderedEquals(['Louvor', 'Conselho']));
+    expect(titulos((await chamar('GET', '/api/atas', token: bruno)).$2), ['Infantil']);
+    expect(titulos((await chamar('GET', '/api/atas', token: pastor)).$2), unorderedEquals(['Louvor', 'Infantil', 'Conselho']));
+    // Quem é do Louvor não abre, não edita, não baixa nem finaliza a ata do Infantil.
+    for (final (metodo, caminho) in [('GET', ''), ('GET', '/pdf'), ('PUT', ''), ('POST', '/finalizar')]) {
+      final corpo = metodo == 'GET' ? null : {'local': 'x'};
+      expect((await chamar(metodo, '/api/atas/${infantil['id']}$caminho', token: secretaria, json: corpo)).$1, 404,
+          reason: '$metodo $caminho');
+    }
+    expect((await chamar('GET', '/api/atas/${doConselho['id']}', token: bruno)).$1, 404);
+
+    // Tirar a pessoa do ministério tira o acesso na hora; renomear leva o nome para as atas e as pessoas.
+    final louvorId = ids['Louvor'];
+    expect((await chamar('POST', '/api/ministerios/$louvorId/pessoas/remover', token: secretaria, json: {'membros': ['m1']})).$1, 200);
+    expect(titulos((await chamar('GET', '/api/atas', token: secretaria)).$2), ['Conselho']);
+    final (_, pessoas) = await chamar('POST', '/api/ministerios/$louvorId/pessoas', token: secretaria, json: {'membros': ['m1', 'm2']});
+    expect([for (final p in pessoas as List) p['nome']], ['Ana Souza', 'Bruno Lima']);
+    await chamar('PUT', '/api/ministerios/$louvorId', token: secretaria, json: {'nome': 'Louvor e Adoração'});
+    expect(titulos((await chamar('GET', '/api/atas', token: bruno)).$2), unorderedEquals(['Infantil', 'Louvor e Adoração']));
+    expect(store.buscar('membros', 'm2')!['ministerios'] as List, contains('Louvor e Adoração'));
+
+    // Exclusão: fixos e ministérios com ata ficam; o cadastro é só de quem tem a permissão.
+    expect((await chamar('DELETE', '/api/ministerios/conselho', token: secretaria)).$1, 400);
+    expect((await chamar('DELETE', '/api/ministerios/${ids['Infantil']}', token: secretaria)).$1, 400);
+    expect((await chamar('GET', '/api/ministerios', token: midia)).$1, 200, reason: 'a lista de nomes é para todos');
+    expect((await chamar('POST', '/api/ministerios', token: midia, json: {'nome': 'Jovens'})).$1, 403);
+    expect((await chamar('POST', '/api/ministerios', token: secretaria, json: {'nome': 'Jovens'})).$1, 201);
+    expect((await chamar('POST', '/api/ministerios', token: secretaria, json: {'nome': 'jovens'})).$1, 400, reason: 'nome repetido');
   });
 
   test('fluxo completo: finaliza, gera PDF, envia, aprova e trava', () async {

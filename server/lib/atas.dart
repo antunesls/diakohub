@@ -1,11 +1,47 @@
+import 'ministerios.dart';
 import 'store.dart';
+
+/// O que uma conta pode ver nas atas: as sigilosas ([sigilosas]) e de quais ministérios. Cada ata
+/// pertence a um ministério (Conselho, Diretoria e Assembleia inclusive); só quem é dele vê, a não
+/// ser quem tem a visão de todos ([todos], ex.: pastor e administrador). Ata sem ministério
+/// ("Outra reunião" sem ministério escolhido) fica para todos que têm acesso às atas.
+class AcessoAtas {
+  const AcessoAtas({this.sigilosas = false, this.todos = false, this.ministerios = const {}});
+
+  /// Tudo: sigilosas e todos os ministérios (a conta principal, testes).
+  static const total = AcessoAtas(sigilosas: true, todos: true);
+
+  final bool sigilosas;
+  final bool todos;
+
+  /// Ids dos ministérios da pessoa (pelo cadastro de membro vinculado à conta).
+  final Set<String> ministerios;
+
+  bool podeMinisterio(String id) => id.isEmpty || todos || ministerios.contains(id);
+
+  bool ve(Map<String, dynamic> ata) => (sigilosas || ata['sigilosa'] != true) && podeMinisterio(donoDa(ata));
+
+  /// O ministério dono da ata. Sem o campo (ata de antes do cadastro de ministérios, ex.: backup
+  /// antigo restaurado, até a próxima subida do servidor ligá-la): as formais pelo tipo, e a de
+  /// ministério fica só para quem vê todos, nunca aberta a todos.
+  static String donoDa(Map<String, dynamic> ata) {
+    final id = ata['ministerioId'];
+    if (id is String) return id;
+    final tipo = ata['tipo'] as String? ?? '';
+    if (Atas.formais.contains(tipo)) return tipo;
+    return tipo == 'ministerio' ? '?' : '';
+  }
+}
 
 /// Atas de reunião. As formais (conselho, diretoria, assembleia) recebem número por tipo e ano
 /// ao serem finalizadas e, depois de aprovadas, só aceitam retificações (o texto original fica).
 class Atas {
-  Atas(this.store, {DateTime Function()? agora}) : _agora = agora ?? DateTime.now;
+  Atas(this.store, {DateTime Function()? agora, Ministerios? ministerios})
+      : _agora = agora ?? DateTime.now,
+        ministerios = ministerios ?? Ministerios(store, agora: agora);
 
   final Store store;
+  final Ministerios ministerios;
   final DateTime Function() _agora;
 
   static const colecao = 'atas';
@@ -21,11 +57,11 @@ class Atas {
 
   static bool formal(Map<String, dynamic> ata) => formais.contains(ata['tipo']);
 
-  /// Atas que a conta pode ver (as sigilosas só com [podeSigilosas]), mais recentes primeiro.
-  List<Map<String, dynamic>> listar({required bool podeSigilosas}) {
+  /// Atas que a conta pode ver ([AcessoAtas.ve]), mais recentes primeiro.
+  List<Map<String, dynamic>> listar({required AcessoAtas acesso}) {
     final lista = [
       for (final a in store.listar(colecao))
-        if (podeSigilosas || a['sigilosa'] != true) a,
+        if (acesso.ve(a)) a,
     ];
     lista.sort((a, b) {
       final d = (b['data'] as String).compareTo(a['data'] as String);
@@ -34,16 +70,16 @@ class Atas {
     return lista;
   }
 
-  Map<String, dynamic>? ata(String id, {required bool podeSigilosas}) {
+  Map<String, dynamic>? ata(String id, {required AcessoAtas acesso}) {
     final a = store.buscar(colecao, id);
-    if (a == null || (a['sigilosa'] == true && !podeSigilosas)) return null;
+    if (a == null || !acesso.ve(a)) return null;
     return a;
   }
 
   /// Encaminhamentos ainda abertos de todas as atas visíveis, com o prazo mais próximo primeiro.
-  List<Map<String, dynamic>> pendentes({required bool podeSigilosas}) {
+  List<Map<String, dynamic>> pendentes({required AcessoAtas acesso}) {
     final lista = <Map<String, dynamic>>[
-      for (final a in listar(podeSigilosas: podeSigilosas))
+      for (final a in listar(acesso: acesso))
         if (a['status'] != 'rascunho')
           for (final e in (a['encaminhamentos'] as List? ?? const []).cast<Map>())
             if (e['concluido'] != true)
@@ -111,6 +147,37 @@ class Atas {
           },
       ];
 
+  /// O ministério dono da ata: as formais pelo tipo (Conselho, Diretoria, Assembleia); as de
+  /// ministério pelo `ministerioId` (ou pelo nome, de clientes antigos), obrigatório; "Outra
+  /// reunião" pode ter ministério ou não.
+  Map<String, dynamic>? _ministerioDa(String tipo, Map<String, dynamic> corpo) {
+    if (formais.contains(tipo)) {
+      return ministerios.buscar(tipo) ?? {'id': tipo, 'nome': Ministerios.fixos[tipo]};
+    }
+    final id = corpo['ministerioId'];
+    if (id != null && id is! String) throw const FormatException('Ministério inválido.');
+    Map<String, dynamic>? m;
+    if (id is String && id.isNotEmpty) {
+      m = ministerios.buscar(id);
+      if (m == null) throw const FormatException('Ministério não encontrado.');
+    } else if (corpo['ministerio'] is String && (corpo['ministerio'] as String).trim().isNotEmpty) {
+      m = ministerios.porNome(corpo['ministerio'] as String);
+      if (m == null) {
+        throw FormatException('O ministério "${(corpo['ministerio'] as String).trim()}" não está cadastrado. '
+            'Cadastre em Ministérios, no painel.');
+      }
+    }
+    if (tipo == 'ministerio' && m == null) throw const FormatException('Escolha o ministério da reunião.');
+    return m;
+  }
+
+  /// Quem não é do ministério (e não vê todos) não cria nem muda atas dele.
+  void _conferirMinisterio(Map<String, dynamic> campos, AcessoAtas acesso) {
+    if (!acesso.podeMinisterio(campos['ministerioId'] as String)) {
+      throw FormatException('Você não faz parte do ministério ${campos['ministerio']}: não pode registrar atas dele.');
+    }
+  }
+
   Map<String, dynamic> _campos(Map<String, dynamic> corpo, {Map<String, dynamic>? anterior}) {
     final tipo = corpo['tipo'];
     if (!tipos.containsKey(tipo)) throw const FormatException('Tipo de reunião inválido.');
@@ -122,9 +189,11 @@ class Atas {
     final anteriores = {
       for (final e in (anterior?['encaminhamentos'] as List? ?? const []).cast<Map>()) e['id']: e,
     };
+    final ministerio = _ministerioDa(tipo as String, corpo);
     return {
       'tipo': tipo,
-      'ministerio': tipo == 'ministerio' ? _texto(corpo['ministerio'], 'Ministério', maximo: 100) : '',
+      'ministerioId': ministerio?['id'] ?? '',
+      'ministerio': ministerio?['nome'] ?? '',
       'titulo': _texto(corpo['titulo'], 'Título', maximo: 160, obrigatorio: !formais.contains(tipo)),
       'data': _data(corpo['data'], 'Data da reunião'),
       'horaInicio': _hora(corpo['horaInicio'], 'Hora de início'),
@@ -167,8 +236,8 @@ class Atas {
   Map<String, dynamic> _evento(String acao, String por, [Map<String, dynamic> extra = const {}]) =>
       {'acao': acao, 'em': _agora().toIso8601String(), 'por': por, ...extra};
 
-  Map<String, dynamic> _existente(String id, bool podeSigilosas) {
-    final a = ata(id, podeSigilosas: podeSigilosas);
+  Map<String, dynamic> _existente(String id, AcessoAtas acesso) {
+    final a = ata(id, acesso: acesso);
     if (a == null) throw ArgumentError('Ata não encontrada.');
     return a;
   }
@@ -176,11 +245,12 @@ class Atas {
   // ---------- Operações ----------
 
   Future<Map<String, dynamic>> criar(Map<String, dynamic> corpo,
-      {required String por, required bool podeSigilosas}) async {
+      {required String por, required AcessoAtas acesso}) async {
     final campos = _campos(corpo);
-    if (campos['sigilosa'] == true && !podeSigilosas) {
+    if (campos['sigilosa'] == true && !acesso.sigilosas) {
       throw const FormatException('Seu perfil não pode criar atas sigilosas.');
     }
+    _conferirMinisterio(campos, acesso);
     final agora = _agora().toIso8601String();
     final doc = {
       'id': novoId(), ...campos, 'status': 'rascunho', 'anexos': <String>[], 'retificacoes': [],
@@ -191,15 +261,16 @@ class Atas {
   }
 
   Future<Map<String, dynamic>> editar(String id, Map<String, dynamic> corpo,
-      {required String por, required bool podeSigilosas}) async {
-    final anterior = _existente(id, podeSigilosas);
+      {required String por, required AcessoAtas acesso}) async {
+    final anterior = _existente(id, acesso);
     if (anterior['status'] == 'aprovada') {
       throw StateError('Ata aprovada não pode ser editada. Registre uma retificação.');
     }
     final campos = _campos({...anterior, ...corpo}, anterior: anterior);
-    if (campos['sigilosa'] == true && !podeSigilosas) {
+    if (campos['sigilosa'] == true && !acesso.sigilosas) {
       throw const FormatException('Seu perfil não pode marcar atas como sigilosas.');
     }
+    _conferirMinisterio(campos, acesso);
     final novo = {...anterior, ...campos, 'atualizadoEm': _agora().toIso8601String(),
       'historico': [...anterior['historico'] as List, _evento('editada', por)]};
     await store.salvar(colecao, novo);
@@ -207,8 +278,8 @@ class Atas {
   }
 
   /// Fecha o texto. As formais ganham o próximo número do tipo no ano da reunião.
-  Future<Map<String, dynamic>> finalizar(String id, {required String por, required bool podeSigilosas}) async {
-    final anterior = _existente(id, podeSigilosas);
+  Future<Map<String, dynamic>> finalizar(String id, {required String por, required AcessoAtas acesso}) async {
+    final anterior = _existente(id, acesso);
     if (anterior['status'] != 'rascunho') throw StateError('A ata já foi finalizada.');
     _campos(anterior, anterior: anterior); // confere de novo o que foi salvo
     final novo = {...anterior, 'status': 'finalizada', 'finalizadaEm': _agora().toIso8601String(),
@@ -229,8 +300,8 @@ class Atas {
   }
 
   /// Volta uma ata finalizada (ainda não aprovada) para rascunho. O número é mantido.
-  Future<Map<String, dynamic>> reabrir(String id, {required String por, required bool podeSigilosas}) async {
-    final anterior = _existente(id, podeSigilosas);
+  Future<Map<String, dynamic>> reabrir(String id, {required String por, required AcessoAtas acesso}) async {
+    final anterior = _existente(id, acesso);
     if (anterior['status'] != 'finalizada') throw StateError('Só uma ata finalizada e não aprovada pode ser reaberta.');
     final novo = {...anterior, 'status': 'rascunho', 'atualizadoEm': _agora().toIso8601String(),
       'historico': [...anterior['historico'] as List, _evento('reaberta', por)]};
@@ -240,8 +311,8 @@ class Atas {
 
   /// Registra a aprovação (em geral na reunião seguinte). Depois disso o texto fica travado.
   Future<Map<String, dynamic>> aprovar(String id, Map<String, dynamic> corpo,
-      {required String por, required bool podeSigilosas}) async {
-    final anterior = _existente(id, podeSigilosas);
+      {required String por, required AcessoAtas acesso}) async {
+    final anterior = _existente(id, acesso);
     if (!formal(anterior)) throw StateError('Só atas de conselho, diretoria e assembleia passam por aprovação.');
     if (anterior['status'] != 'finalizada') throw StateError('Finalize a ata antes de aprovar.');
     final data = _data(corpo['data'], 'Data da aprovação');
@@ -261,8 +332,8 @@ class Atas {
 
   /// Correção de uma ata aprovada: entra como adendo, sem mexer no texto original.
   Future<Map<String, dynamic>> retificar(String id, Map<String, dynamic> corpo,
-      {required String por, required bool podeSigilosas}) async {
-    final anterior = _existente(id, podeSigilosas);
+      {required String por, required AcessoAtas acesso}) async {
+    final anterior = _existente(id, acesso);
     if (anterior['status'] != 'aprovada') throw StateError('Só atas aprovadas recebem retificação; edite a ata.');
     final texto = _texto(corpo['texto'], 'Retificação', maximo: 4000, obrigatorio: true);
     final em = _agora().toIso8601String();
@@ -275,8 +346,8 @@ class Atas {
 
   /// Marca ou desmarca um encaminhamento (vale também em atas aprovadas: é acompanhamento, não texto).
   Future<Map<String, dynamic>> marcarEncaminhamento(String id, String encaminhamentoId, Map<String, dynamic> corpo,
-      {required String por, required bool podeSigilosas}) async {
-    final anterior = _existente(id, podeSigilosas);
+      {required String por, required AcessoAtas acesso}) async {
+    final anterior = _existente(id, acesso);
     final concluido = corpo['concluido'];
     if (concluido is! bool) throw const FormatException('Informe se o encaminhamento foi concluído.');
     final lista = [for (final e in (anterior['encaminhamentos'] as List).cast<Map>()) Map<String, dynamic>.from(e)];
@@ -293,8 +364,8 @@ class Atas {
 
   /// Só rascunhos podem ser apagados: o que foi finalizado faz parte do livro de atas.
   /// Devolve os anexos para o chamador apagar do disco.
-  Future<List<String>> excluir(String id, {required bool podeSigilosas}) async {
-    final anterior = _existente(id, podeSigilosas);
+  Future<List<String>> excluir(String id, {required AcessoAtas acesso}) async {
+    final anterior = _existente(id, acesso);
     if (anterior['status'] != 'rascunho' || anterior['numero'] != null) {
       throw StateError('Só rascunhos que nunca foram finalizados podem ser excluídos.');
     }

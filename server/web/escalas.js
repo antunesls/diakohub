@@ -88,7 +88,10 @@ function desenharEscala() {
   $('escala-resumo').replaceChildren(
     el('span', {}, el('strong', {}, String(d.cultos.length)), d.cultos.length === 1 ? ' culto no mês' : ' cultos no mês'),
     el('span', {}, el('strong', {}, String(preenchidas)), ` de ${total} funções preenchidas`),
-    avisos.length ? el('span', { class: 'alerta' }, `${avisos.length} ${avisos.length === 1 ? 'aviso' : 'avisos'}`) : null);
+    avisos.length ? el('button', {
+      type: 'button', class: 'alerta', 'aria-haspopup': 'dialog',
+      'aria-controls': 'dlg-avisos-escala', onclick: abrirAvisosEscala,
+    }, `${avisos.length} ${avisos.length === 1 ? 'aviso' : 'avisos'}`) : null);
 
   const cabecalho = el('tr', {}, el('th', { scope: 'col' }, 'Culto'),
     ...colunas.map((f) => el('th', { scope: 'col' }, f)),
@@ -103,11 +106,7 @@ function desenharEscala() {
     tipo === 'louvor' ? el('td', {}, celulaMusicas(c, d.pode.louvor)) : null));
   $('escala-grade').replaceChildren(el('thead', {}, cabecalho), el('tbody', {}, ...linhas));
 
-  $('escala-avisos').replaceChildren(...(avisos.length
-    ? avisos.map((av) => el('div', { class: 'escala-aviso ' + av.tipo },
-      el('span', { class: 'marca', 'aria-hidden': 'true' }, '!'),
-      el('div', {}, el('div', { style: 'font-weight:600' }, av.titulo), el('div', { class: 'texto' }, av.texto))))
-    : [el('p', { class: 'dica', style: 'margin:0' }, 'Nenhum aviso: escala completa e sem conflitos.')]));
+  $('escala-avisos').replaceChildren(...elementosAvisosEscala(avisos));
 
   $('escala-indisponiveis').replaceChildren(...(d.indisponibilidades.length ? [
     el('h3', { style: 'font-size:15px;margin:18px 0 8px' }, 'Indisponíveis no mês'),
@@ -123,6 +122,24 @@ function desenharEscala() {
   $('escala-whatsapp').value = d.whatsapp[tipo];
   $('escala-abrir-whatsapp').href = 'https://wa.me/?text=' + encodeURIComponent(d.whatsapp[tipo]);
 }
+
+function elementosAvisosEscala(avisos) {
+  return avisos.length
+    ? avisos.map((av) => el('div', { class: 'escala-aviso ' + av.tipo },
+      el('span', { class: 'marca', 'aria-hidden': 'true' }, '!'),
+      el('div', {}, el('div', { style: 'font-weight:600' }, av.titulo), el('div', { class: 'texto' }, av.texto))))
+    : [el('p', { class: 'dica', style: 'margin:0' }, 'Nenhum aviso: escala completa e sem conflitos.')];
+}
+
+function abrirAvisosEscala() {
+  const d = escala.dados;
+  if (!d) return;
+  $('avisos-escala-titulo').textContent = `Avisos da escala · ${NOMES_ESCALA[escala.tipo]}`;
+  $('avisos-escala-mes').textContent = comMaiuscula(d.titulo);
+  $('avisos-escala-lista').replaceChildren(...elementosAvisosEscala(d.avisos[escala.tipo]));
+  $('dlg-avisos-escala').showModal();
+}
+$('avisos-escala-fechar').addEventListener('click', () => $('dlg-avisos-escala').close());
 
 function periodo(de, ate) {
   const f = (iso) => iso.slice(8, 10) + '/' + iso.slice(5, 7);

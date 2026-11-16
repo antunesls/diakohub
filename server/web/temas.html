@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Coleções para TV e telão — DiakoHub</title>
+  <link rel="icon" href="/logo.png" type="image/png">
+  <link rel="stylesheet" href="/estilo.css?v=5">
+  <link rel="stylesheet" href="/temas.css?v=1">
+</head>
+<body>
+  <header class="temas-topo"><a href="/painel?aba=cartazes">Voltar para Cartazes</a><span id="sessao-temas">Verificando a sessão…</span></header>
+  <main class="temas-layout">
+    <header class="temas-intro"><h1>Uma igreja, três coleções.</h1><p>Artes para acolher, comunicar e celebrar. Escolha a identidade, prepare o texto e use na TV ou no projetor.</p></header>
+    <div id="colecoes" class="temas-colecoes" role="group" aria-label="Coleção visual"></div>
+    <div class="temas-estudio">
+      <section class="temas-visual" aria-label="Prévia da arte">
+        <div class="temas-previa"><canvas id="previa-tema" width="1920" height="1080" aria-label="Prévia da arte selecionada"></canvas></div>
+        <p id="descricao-previa" class="dica"></p>
+        <div class="temas-acoes">
+          <button id="baixar-tema" class="botao" type="button" disabled>Baixar PNG</button>
+          <button id="baixar-fundo" class="botao secundario" type="button" disabled>Baixar sem texto</button>
+          <button id="enviar-cartaz" class="botao secundario" type="button" hidden>Adicionar a Cartazes</button>
+          <button id="aplicar-qr" class="botao secundario" type="button" hidden>Aplicar ao QR do telão</button>
+        </div>
+        <p id="resultado-tema" role="status" aria-live="polite"></p>
+        <a id="entrar-temas" href="/painel?aba=cartazes" hidden>Entre no painel para adicionar cartazes. A aplicação de QR exige permissão de Administração.</a>
+      </section>
+      <section class="temas-campos" aria-label="Personalizar a arte">
+        <label for="formato-tema">Onde vai aparecer?</label>
+        <select id="formato-tema"><option value="tv">TV · 16:9 · 1920 × 1080</option><option value="projetor">Projetor · 4:3 · 1440 × 1080</option></select>
+        <label for="aplicacao-tema">Tipo de arte</label><select id="aplicacao-tema"></select>
+        <label for="titulo-tema">Título</label><textarea id="titulo-tema" maxlength="200" rows="3"></textarea>
+        <label for="chamada-tema">Chamada / detalhes</label><textarea id="chamada-tema" maxlength="350" rows="3"></textarea>
+        <label class="temas-marcar"><input id="logo-tema" type="checkbox" checked> Logo oficial da igreja</label>
+        <p id="orientacao-tema" class="dica"></p>
+      </section>
+    </div>
+    <section class="temas-instrucoes">
+      <h2>Pronto para usar, sem perder o controle</h2>
+      <p><strong>Holyrics:</strong> selecione Fundo de louvor, baixe o PNG e importe como fundo de um tema no Holyrics. As letras continuam editáveis no programa. Esta biblioteca não cria temas nativos automaticamente.</p>
+      <p><strong>QR codes:</strong> a prévia marca apenas o espaço reservado. O download é um fundo sem código. Ao aplicar, o servidor encaixa o QR real de oração, mensagens ou PIX, usando as configurações da igreja. Cada QR tem uma arte ativa por vez; aplicar outra substitui a anterior.</p>
+      <p><strong>TV e projetor:</strong> logo e textos são reorganizados para cada proporção. Confira leitura, brilho e foco no equipamento antes do culto. A biblioteca não altera cartazes ou configurações até você confirmar uma ação.</p>
+    </section>
+  </main>
+  <script src="/comum.js?v=3"></script>
+  <script src="/temas.js?v=1"></script>
+  <script src="/temas-pagina.js?v=1"></script>
+</body>
+</html>

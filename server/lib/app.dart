@@ -24,6 +24,7 @@ import 'backup.dart';
 import 'backup_cifrado.dart';
 import 'cadastro_publico.dart';
 import 'cartazes.dart';
+import 'certificado_pdf.dart';
 import 'config.dart';
 import 'configuracoes.dart';
 import 'escala_pdf.dart';
@@ -35,9 +36,11 @@ import 'artes_qr.dart';
 import 'fundos_tv.dart';
 import 'galeria.dart';
 import 'gestao_casa.dart';
+import 'imagens_certificado.dart';
 import 'lgpd.dart';
 import 'limpeza_escalas.dart';
 import 'mensagem_acesso.dart';
+import 'ministerios.dart';
 import 'pagina_inicial.dart';
 import 'perfis.dart';
 import 'palavras.dart';
@@ -134,6 +137,9 @@ class Servidor {
   /// Imagens de fundo das TVs do mural e de boas-vindas (data/fundos-tv).
   late final FundosTv fundosTv = FundosTv(store.pasta);
   late final ArtesQr artesQr = ArtesQr(store.pasta);
+
+  /// Assinatura e carimbo do certificado de batismo (data/imagens-certificado) — nunca públicos.
+  late final ImagensCertificado imagensCertificado = ImagensCertificado(store.pasta);
 
   /// Fotos do cadastro de membros (data/fotos-membros) — nunca públicas.
   final FotosMembros fotosMembros;
@@ -297,24 +303,47 @@ class Servidor {
       ..post('/api/casa/rotinas', _criarRotinaCasa)
       ..put('/api/casa/rotinas/<id>', _editarRotinaCasa)
       // Atas de reunião (painel). As sigilosas só aparecem para quem tem atasSigilosas.
-      ..get('/api/atas', (Request req) => _json(atas.listar(podeSigilosas: _podeSigilosas(req))))
-      ..get('/api/atas/encaminhamentos', (Request req) => _json(atas.pendentes(podeSigilosas: _podeSigilosas(req))))
+      ..get('/api/atas', (Request req) => _json(atas.listar(acesso: _acessoAtas(req))))
+      ..get('/api/atas/encaminhamentos', (Request req) => _json(atas.pendentes(acesso: _acessoAtas(req))))
       ..get('/api/atas/pessoas', _pessoasAtas)
       ..get('/api/atas/anexos/<nome>', _verAnexoAta)
       ..post('/api/atas', _criarAta)
+      // Ministérios: a lista (nomes) para quem escolhe um; quem participa e as alterações só com
+      // "Cadastro de ministérios".
+      ..get('/api/ministerios', _listarMinisterios)
+      ..post('/api/ministerios', (Request req) async => _operacaoAta(() async {
+            final m = await atas.ministerios.criar(await _corpo(req));
+            return {...m, 'pessoas': 0};
+          }, status: 201))
+      ..put('/api/ministerios/<id>', (Request req, String id) async =>
+          _operacaoAta(() async => atas.ministerios.editar(id, await _corpo(req))))
+      ..delete('/api/ministerios/<id>', (Request req, String id) async => _operacaoAta(() async {
+            await atas.ministerios.excluir(id);
+            return {'ok': true};
+          }))
+      // Só id e nome de cada pessoa, para escolher quem entra (sem o resto do cadastro de membros).
+      ..get('/api/ministerios/membros', (Request _) => _json([
+            for (final m in store.listar('membros')) {'id': m['id'], 'nome': m['nome'], 'status': m['status']},
+          ]..sort((a, b) => Ministerios.chave('${a['nome']}').compareTo(Ministerios.chave('${b['nome']}')))))
+      ..get('/api/ministerios/<id>/pessoas', (Request _, String id) => atas.ministerios.buscar(id) == null
+          ? _erro(404, 'Ministério não encontrado.')
+          : _json(atas.ministerios.pessoas(id)))
+      ..post('/api/ministerios/<id>/pessoas', (Request req, String id) async => _vincularMinisterio(req, id, entrar: true))
+      ..post('/api/ministerios/<id>/pessoas/remover', (Request req, String id) async =>
+          _vincularMinisterio(req, id, entrar: false))
       ..get('/api/atas/<id>', _verAta)
       ..put('/api/atas/<id>', _editarAta)
       ..delete('/api/atas/<id>', _excluirAta)
       ..post('/api/atas/<id>/finalizar', (Request req, String id) =>
-          _operacaoAta(() => atas.finalizar(id, por: _autorCasa(req), podeSigilosas: _podeSigilosas(req))))
+          _operacaoAta(() => atas.finalizar(id, por: _autorCasa(req), acesso: _acessoAtas(req))))
       ..post('/api/atas/<id>/reabrir', (Request req, String id) =>
-          _operacaoAta(() => atas.reabrir(id, por: _autorCasa(req), podeSigilosas: _podeSigilosas(req))))
+          _operacaoAta(() => atas.reabrir(id, por: _autorCasa(req), acesso: _acessoAtas(req))))
       ..post('/api/atas/<id>/aprovar', (Request req, String id) async => _operacaoAta(() async =>
-          atas.aprovar(id, await _corpo(req), por: _autorCasa(req), podeSigilosas: _podeSigilosas(req))))
+          atas.aprovar(id, await _corpo(req), por: _autorCasa(req), acesso: _acessoAtas(req))))
       ..post('/api/atas/<id>/retificar', (Request req, String id) async => _operacaoAta(() async =>
-          atas.retificar(id, await _corpo(req), por: _autorCasa(req), podeSigilosas: _podeSigilosas(req))))
+          atas.retificar(id, await _corpo(req), por: _autorCasa(req), acesso: _acessoAtas(req))))
       ..put('/api/atas/<id>/encaminhamentos/<eid>', (Request req, String id, String eid) async => _operacaoAta(() async =>
-          atas.marcarEncaminhamento(id, eid, await _corpo(req), por: _autorCasa(req), podeSigilosas: _podeSigilosas(req))))
+          atas.marcarEncaminhamento(id, eid, await _corpo(req), por: _autorCasa(req), acesso: _acessoAtas(req))))
       ..get('/api/atas/<id>/pdf', _pdfAta)
       ..post('/api/atas/<id>/email', _emailAta)
       ..post('/api/atas/<id>/anexos', _enviarAnexoAta)
@@ -334,6 +363,16 @@ class Servidor {
       ..post('/api/membros/<id>/lgpd/termo', _anexarTermo)
       ..get('/api/membros/<id>/lgpd/termo', _verTermoAssinado)
       ..post('/api/membros/<id>/lgpd/revogar', _revogarLgpd)
+      // Certificado de batismo: configuração, imagens salvas (assinatura/carimbo) e o PDF
+      ..get('/api/certificado/config', _configCertificado)
+      ..put('/api/certificado/config', _salvarConfigCertificado)
+      ..get('/api/certificado/assinatura', (Request _) => _imagemCertificado('assinatura'))
+      ..post('/api/certificado/assinatura', (Request req) => _enviarImagemCertificado(req, 'assinatura'))
+      ..delete('/api/certificado/assinatura', (Request req) => _removerImagemCertificado(req, 'assinatura'))
+      ..get('/api/certificado/carimbo', (Request _) => _imagemCertificado('carimbo'))
+      ..post('/api/certificado/carimbo', (Request req) => _enviarImagemCertificado(req, 'carimbo'))
+      ..delete('/api/certificado/carimbo', (Request req) => _removerImagemCertificado(req, 'carimbo'))
+      ..get('/api/membros/<id>/certificado-batismo', _certificadoBatismo)
       // Visitas (QR, obreiro da recepção, painel) e boas-vindas no culto
       ..get('/api/visitas', _listarVisitas)
       ..post('/api/visitas', _criarVisita)
@@ -1283,10 +1322,21 @@ class Servidor {
 
   // ---------- Atas de reunião ----------
 
-  bool _podeSigilosas(Request req) => Auth.contaDa(req)?.pode(Permissao.atasSigilosas) ?? false;
+  /// O que a conta vê nas atas: sigilosas pela permissão, e só os ministérios de que a pessoa
+  /// participa (pelo cadastro de membro ligado à conta), a não ser com a visão de todos.
+  AcessoAtas _acessoAtas(Request req) {
+    final c = Auth.contaDa(req);
+    if (c == null) return const AcessoAtas();
+    if (c.ehPrincipal) return AcessoAtas.total;
+    return AcessoAtas(
+      sigilosas: c.pode(Permissao.atasSigilosas),
+      todos: c.pode(Permissao.atasTodosMinisterios),
+      ministerios: atas.ministerios.doMembro(_usuarios?.buscar(c.id)?.membroId),
+    );
+  }
 
   /// Ata que a conta pode ver; sigilosa sem permissão responde como inexistente (404).
-  Map<String, dynamic>? _ataVisivel(Request req, String id) => atas.ata(id, podeSigilosas: _podeSigilosas(req));
+  Map<String, dynamic>? _ataVisivel(Request req, String id) => atas.ata(id, acesso: _acessoAtas(req));
 
   Future<Response> _operacaoAta(Future<Map<String, dynamic>> Function() executar, {int status = 200}) async {
     try {
@@ -1305,15 +1355,55 @@ class Servidor {
     return a == null ? _erro(404, 'Ata não encontrada.') : _json(a);
   }
 
+  /// GET /api/ministerios — todos os ministérios, com `meu` (a pessoa participa) e `podeAtas`
+  /// (pode registrar atas dele). Quantas pessoas e os nomes soltos só para quem cuida do cadastro.
+  Response _listarMinisterios(Request req) {
+    final conta = Auth.contaDa(req);
+    final acesso = _acessoAtas(req);
+    final cadastro = conta?.pode(Permissao.ministerios) ?? false;
+    return _json({
+      'ministerios': [
+        for (final m in atas.ministerios.listar())
+          {
+            'id': m['id'],
+            'nome': m['nome'],
+            'descricao': m['descricao'] ?? '',
+            'fixo': Ministerios.fixos.containsKey(m['id']),
+            'meu': acesso.ministerios.contains(m['id']),
+            'podeAtas': acesso.podeMinisterio(m['id'] as String),
+            if (cadastro) 'pessoas': atas.ministerios.quantas(m),
+            if (cadastro) 'atas': store.listar(Atas.colecao).where((a) => a['ministerioId'] == m['id']).length,
+          },
+      ],
+      if (cadastro) 'semCadastro': [
+        for (final e in atas.ministerios.semCadastro().entries) {'nome': e.key, 'pessoas': e.value},
+      ],
+    });
+  }
+
+  /// POST /api/ministerios/<id>/pessoas[/remover] {membros: [ids]}
+  Future<Response> _vincularMinisterio(Request req, String id, {required bool entrar}) async {
+    final corpo = await _corpo(req);
+    final ids = corpo['membros'];
+    if (ids is! List || ids.any((e) => e is! String)) return _erro(400, 'Envie a lista de pessoas.');
+    try {
+      return _json(await atas.ministerios.vincular(id, ids.cast<String>(), entrar: entrar));
+    } on FormatException catch (e) {
+      return _erro(400, e.message);
+    } on ArgumentError catch (e) {
+      return _erro(404, '${e.message}');
+    }
+  }
+
   Future<Response> _criarAta(Request req) async => _operacaoAta(() async =>
-      atas.criar(await _corpo(req), por: _autorCasa(req), podeSigilosas: _podeSigilosas(req)), status: 201);
+      atas.criar(await _corpo(req), por: _autorCasa(req), acesso: _acessoAtas(req)), status: 201);
 
   Future<Response> _editarAta(Request req, String id) async => _operacaoAta(() async =>
-      atas.editar(id, await _corpo(req), por: _autorCasa(req), podeSigilosas: _podeSigilosas(req)));
+      atas.editar(id, await _corpo(req), por: _autorCasa(req), acesso: _acessoAtas(req)));
 
   Future<Response> _excluirAta(Request req, String id) async {
     try {
-      final anexos = await atas.excluir(id, podeSigilosas: _podeSigilosas(req));
+      final anexos = await atas.excluir(id, acesso: _acessoAtas(req));
       for (final nome in anexos) {
         await anexosAtas.excluir(nome);
       }
@@ -1437,7 +1527,7 @@ class Servidor {
 
   /// O anexo só sai para quem pode ver a ata a que ele pertence.
   Response _verAnexoAta(Request req, String nome) {
-    final vinculado = atas.listar(podeSigilosas: _podeSigilosas(req))
+    final vinculado = atas.listar(acesso: _acessoAtas(req))
         .any((a) => (a['anexos'] as List? ?? const []).contains(nome));
     final arquivo = vinculado ? anexosAtas.arquivo(nome) : null;
     return arquivo == null ? _erro(404, 'Anexo não encontrado.') : _arquivo(arquivo);
@@ -2208,6 +2298,120 @@ class Servidor {
     // A URL muda a cada foto nova (o painel usa ?v=), mas o login é por token: sem cache agressivo.
     return Response.ok(f.openRead(),
         headers: {'content-type': 'image/jpeg', 'cache-control': 'private, no-cache'});
+  }
+
+  // ---------- Certificado de batismo ----------
+
+  /// Configuração que o tablet lê para montar o diálogo do certificado.
+  Response _configCertificado(Request _) => _json({
+        'pastor': cfg?.certPastor ?? '',
+        'cargo': cfg?.certCargo ?? 'Pastor',
+        'assinatura': _arquivoImagemCertificado('assinatura') != null,
+        'carimbo': _arquivoImagemCertificado('carimbo') != null,
+      });
+
+  /// Corpo: {"pastor", "cargo"} — só estes dois campos, sem precisar da página /admin.
+  Future<Response> _salvarConfigCertificado(Request req) async {
+    final c = cfg;
+    if (c == null) return _erro(503, 'Configurações indisponíveis neste servidor.');
+    final corpo = await _corpo(req);
+    final desconhecido = corpo.keys.where((k) => k != 'pastor' && k != 'cargo').firstOrNull;
+    if (desconhecido != null) return _erro(400, 'Campo desconhecido: $desconhecido.');
+    try {
+      await c.atualizar({
+        if (corpo['pastor'] is String) 'certPastor': corpo['pastor'],
+        if (corpo['cargo'] is String) 'certCargo': corpo['cargo'],
+      });
+      return _configCertificado(req);
+    } on FormatException catch (e) {
+      return _erro(400, e.message);
+    }
+  }
+
+  File? _arquivoImagemCertificado(String tipo) {
+    final nome = (tipo == 'assinatura' ? cfg?.certAssinatura : cfg?.certCarimbo) ?? '';
+    if (nome.isEmpty) return null;
+    final f = imagensCertificado.arquivo(nome);
+    return f != null && f.existsSync() ? f : null;
+  }
+
+  /// GET /api/certificado/assinatura|carimbo — atrás de login, nunca pública.
+  Response _imagemCertificado(String tipo) {
+    final f = _arquivoImagemCertificado(tipo);
+    if (f == null) return Response.notFound('Não encontrado');
+    return Response.ok(f.openRead(),
+        headers: {'content-type': 'image/png', 'cache-control': 'private, no-cache'});
+  }
+
+  /// Corpo: bytes da imagem (JPG ou PNG até 10 MB). Substitui a anterior.
+  Future<Response> _enviarImagemCertificado(Request req, String tipo) async {
+    final c = cfg;
+    if (c == null) return _erro(503, 'Configurações indisponíveis neste servidor.');
+    final tamanho = req.contentLength;
+    if (tamanho != null && tamanho > ImagensCertificado.tamanhoMaximo) return _erro(413, 'Imagem maior que 10 MB.');
+    final bytes = await _lerBytes(req, ImagensCertificado.tamanhoMaximo);
+    if (bytes == null) return _erro(413, 'Imagem maior que 10 MB.');
+    try {
+      final nome = await imagensCertificado.salvar(bytes);
+      final antiga = tipo == 'assinatura' ? c.certAssinatura : c.certCarimbo;
+      await c.definirImagemCertificado(tipo, nome: nome);
+      await imagensCertificado.excluir(antiga);
+      return _json({'ok': true}, status: 201);
+    } on FormatException catch (e) {
+      return _erro(400, e.message);
+    }
+  }
+
+  Future<Response> _removerImagemCertificado(Request _, String tipo) async {
+    final c = cfg;
+    if (c == null) return _erro(503, 'Configurações indisponíveis neste servidor.');
+    final antiga = tipo == 'assinatura' ? c.certAssinatura : c.certCarimbo;
+    if (antiga.isEmpty) return _erro(404, 'Sem imagem salva.');
+    await c.definirImagemCertificado(tipo, nome: '');
+    await imagensCertificado.excluir(antiga);
+    return _json({'ok': true});
+  }
+
+  /// GET /api/membros/<id>/certificado-batismo?assinatura=1&carimbo=1 — o PDF pronto.
+  Future<Response> _certificadoBatismo(Request req, String id) async {
+    final doc = store.buscar('membros', id);
+    if (doc == null) return _erro(404, 'Membro não encontrado.');
+    final m = Membro.fromJson(doc);
+    if ((m.dataBatismo ?? '').isEmpty) {
+      return _erro(422, 'A ficha não tem data de batismo. Preencha no painel web.');
+    }
+    final q = req.url.queryParameters;
+    final logo = File(p.join(pastaWeb, 'logo.png'));
+    Uint8List? imagem(String tipo) {
+      final f = _arquivoImagemCertificado(tipo);
+      return f == null ? null : f.readAsBytesSync();
+    }
+
+    final pdf = await gerarCertificadoBatismoPdf(
+      nome: m.nome,
+      dataBatismo: m.dataBatismo!,
+      sexo: m.sexo,
+      igreja: nomeIgreja,
+      local: (q['local'] ?? '').isNotEmpty ? q['local'] : m.cidade,
+      emissao: _agora(),
+      pastor: q['pastor'] ?? cfg?.certPastor ?? '',
+      cargo: q['cargo'] ?? cfg?.certCargo ?? 'Pastor',
+      logo: logo.existsSync() ? logo.readAsBytesSync() : null,
+      assinatura: q['assinatura'] == '1' ? imagem('assinatura') : null,
+      carimbo: q['carimbo'] == '1' ? imagem('carimbo') : null,
+    );
+    return Response.ok(pdf, headers: {
+      'content-type': 'application/pdf',
+      'content-disposition': 'attachment; filename="${_nomePdfCertificado(m.nome)}"',
+    });
+  }
+
+  static String _nomePdfCertificado(String nome) {
+    final slug = nome
+        .toLowerCase()
+        .replaceAll(RegExp(r'[^a-z0-9]+'), '-')
+        .replaceAll(RegExp(r'^-+|-+$'), '');
+    return 'certificado-batismo-${slug.isEmpty ? 'membro' : slug}.pdf';
   }
 
   // ---------- LGPD: autorização pelo link, termo assinado e cadastro pelo QR ----------
@@ -4286,6 +4490,20 @@ class Servidor {
     final modo = req.url.queryParameters['modo'] ?? '';
     if (!qrsComArte.contains(qr)) return _erro(400, 'Escolha o QR: oracao, mensagens, pix ou visitante.');
     if (modo != 'automatico' && modo != 'arte') return _erro(400, 'Modo inválido: automatico ou arte.');
+    // A biblioteca envia fundo e geometria juntos. Clientes antigos continuam usando só o PNG.
+    final posicao = req.url.queryParameters['posicao'];
+    final tamanhoQr = req.url.queryParameters['tamanho'];
+    final layout = req.url.queryParameters['layout'];
+    if (posicao != null && !posicoesQr.contains(posicao)) return _erro(400, 'Posição do QR inválida.');
+    if (tamanhoQr != null && !tamanhosQr.contains(tamanhoQr)) return _erro(400, 'Tamanho do QR inválido.');
+    if (layout != null) {
+      if (layout.length > 4000) return _erro(400, 'Layout do QR muito longo.');
+      try {
+        if (jsonDecode(layout) is! Map) return _erro(400, 'Layout do QR inválido.');
+      } on FormatException {
+        return _erro(400, 'Layout do QR inválido.');
+      }
+    }
     final tamanho = req.contentLength;
     if (tamanho != null && tamanho > Galeria.tamanhoMaximo) return _erro(413, 'Imagem maior que 15 MB.');
     final bytes = await _lerBytes(req, Galeria.tamanhoMaximo);
@@ -4297,7 +4515,7 @@ class Servidor {
       return _erro(400, e.message);
     }
     final anterior = c.arteQr(qr).fundo;
-    await c.definirArteQr(qr, modo: modo, fundo: nome);
+    await c.definirArteQr(qr, modo: modo, fundo: nome, posicao: posicao, tamanho: tamanhoQr, layout: layout);
     if (anterior.isNotEmpty && anterior != nome) await artesQr.excluir(anterior);
     await gravarQrsProjetados(cartazes.pasta, c, artesQr);
     store.avisar('cartazes');

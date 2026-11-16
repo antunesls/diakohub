@@ -65,7 +65,8 @@ class ServidorFalso {
 
   late final membros = [
     Membro(id: 'p1', nome: 'Ana Paula Souza', status: StatusMembro.membro, whatsapp: '11987654321',
-        dia: 30, mes: 10, ministerios: ['Louvor'], cpf: '12345678900', conjugeId: 'p2'),
+        dia: 30, mes: 10, ministerios: ['Louvor'], cpf: '12345678900', conjugeId: 'p2',
+        dataBatismo: '2019-08-11'),
     Membro(id: 'p2', nome: 'Jorge Souza', status: StatusMembro.membro, conjugeId: 'p1'),
     Membro(id: 'p3', nome: 'Caio Torres', status: StatusMembro.visitante),
   ];
@@ -216,6 +217,13 @@ class ServidorFalso {
           '/api/estado' => {'qrHolyrics': 'DiakoNews/qr.png', 'qrMensagensHolyrics': 'DiakoNews/qr-mensagens.png', 'qrPixHolyrics': 'DiakoNews/qr-pix.png'},
           '/api/projetar/boas-vindas' => {'status': 'ok'},
           '/api/membros' => [for (final m in membros) m.toJson()],
+          '/api/certificado/config' when req.method == 'GET' =>
+            {'pastor': 'Pr. Marcos', 'cargo': 'Pastor', 'assinatura': false, 'carimbo': false},
+          _ when caminho.startsWith('/api/certificado/') => () {
+              gestao.add('${req.method} $caminho');
+              corposGestao.add(req.body.isEmpty ? {} : Map<String, dynamic>.from(jsonDecode(req.body) as Map));
+              return <String, dynamic>{'ok': true};
+            }(),
           '/api/casa' when req.method == 'GET' => {'tarefas': tarefasCasa, 'rotinas': const []},
           '/api/casa/responsaveis' => const ['Administrador', 'Sérgio'],
           '/api/atas' when req.method == 'GET' => atasGestao,

@@ -72,6 +72,32 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('certificado: botão para quem tem batismo, diálogo com assinatura e carimbo', (tester) async {
+    await abrir(tester, const GestaoPage());
+    // Batizada: o botão aparece e abre o diálogo.
+    await tester.tap(find.text('Ana Paula Souza'));
+    await tester.pumpAndSettle();
+    expect(find.text('Certificado de batismo'), findsOneWidget);
+    await tester.tap(find.text('Certificado de batismo'));
+    await tester.pumpAndSettle();
+    await esperar(tester);
+    expect(find.text('Batismo: 11/08/2019'), findsOneWidget);
+    expect(find.text('Assinatura salva'), findsOneWidget);
+    expect(find.text('Carimbo da igreja'), findsOneWidget);
+    expect(find.text('Quem assina (ministro)'), findsOneWidget);
+    expect(find.text('Gerar PDF'), findsOneWidget);
+    // Sem assinatura nem carimbo salvos: as caixas começam desmarcadas e desligadas.
+    expect(find.text('Nenhuma imagem salva ainda'), findsNWidgets(2));
+    await tester.tap(find.text('Fechar'));
+    await tester.pumpAndSettle();
+    // Sem data de batismo na ficha: só a orientação de preencher no painel web.
+    await tester.tap(find.text('Cônjuge: Jorge Souza'));
+    await tester.pumpAndSettle();
+    expect(find.text('Certificado de batismo'), findsNothing);
+    expect(find.textContaining('fica disponível depois de preencher a data'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('casa: mostra atrasadas e conclui tarefa pelo tablet', (tester) async {
     final servidor = await abrir(tester, const GestaoPage());
     await tester.tap(find.text('Gestão da Casa'));

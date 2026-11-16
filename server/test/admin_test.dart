@@ -262,6 +262,35 @@ void main() {
       expect(await baixar(segunda), 200);
     });
 
+    test('coleções 4:3: cartaz e QR mantêm as dimensões pela API', () async {
+      final fundo = img.Image(width: 1440, height: 1080);
+      img.fill(fundo, color: img.ColorRgb8(9, 26, 50));
+      final bytes = img.encodePng(fundo);
+      final cartaz = await req('POST', '/api/cartazes?nome=diakonia-louvor-4x3.png', bytes: bytes);
+      expect(cartaz.statusCode, 201);
+      final nome = (await corpo(cartaz))['nome'] as String;
+      final salvo = img.decodePng(await File(p.join(pastaCartazes, nome)).readAsBytes())!;
+      expect([salvo.width, salvo.height], [1440, 1080]);
+
+      final parametros = Uri(queryParameters: {
+        'qr': 'oracao', 'modo': 'arte', 'posicao': 'centro-baixo', 'tamanho': 'P',
+        'layout': jsonEncode({'formato': 'projetor', 'colecao': 'luz-e-presenca'}),
+      }).query;
+      expect((await req('POST', '/api/admin/arte-qr?$parametros', bytes: bytes)).statusCode, 200);
+      expect(cfg.arteQr('oracao').posicao, 'centro-baixo');
+      expect(cfg.arteQr('oracao').tamanho, 'P');
+      final nomeFundo = cfg.arteQr('oracao').fundo;
+      expect((await req('POST', '/api/admin/arte-qr?qr=oracao&modo=arte&posicao=topo', bytes: bytes)).statusCode, 400);
+      expect(cfg.arteQr('oracao').fundo, nomeFundo);
+      expect(cfg.arteQr('oracao').posicao, 'centro-baixo');
+      expect((await req('POST', '/api/admin/arte-qr?qr=oracao&modo=arte&posicao=direita-meio&tamanho=M', bytes: [1, 2, 3])).statusCode, 400);
+      expect(cfg.arteQr('oracao').posicao, 'centro-baixo');
+      final previa = await req('GET', '/api/admin/arte-qr/previa?qr=oracao');
+      expect(previa.statusCode, 200);
+      final projetada = img.decodePng(Uint8List.fromList(await previa.read().expand((b) => b).toList()))!;
+      expect([projetada.width, projetada.height], [1440, 1080]);
+    });
+
     test('arte dos QR: envio, posição, troca, volta ao padrão e backup', () async {
       final arte = img.Image(width: 1280, height: 720); // outra proporção de 16:9: vira 1920x1080
       img.fill(arte, color: img.ColorRgb8(20, 40, 90));

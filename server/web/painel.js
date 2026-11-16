@@ -1485,7 +1485,10 @@ function montarFiltroMinisterios() {
     el('option', { value: '' }, 'Todos'),
     ...todos.map((x) => el('option', { value: x }, x)));
   $('filtro-ministerio-membro').value = todos.includes(atual) ? atual : '';
-  $('dl-ministerios').replaceChildren(...todos.map((x) => el('option', { value: x })));
+  // Sugestões do campo: os ministérios cadastrados (mesma grafia em todo cadastro).
+  api('GET', '/api/ministerios').then((r) => $('dl-ministerios').replaceChildren(
+    ...r.ministerios.map((x) => el('option', { value: x.nome })))).catch(() =>
+    $('dl-ministerios').replaceChildren(...todos.map((x) => el('option', { value: x }))));
 }
 
 /** Os filtros da tela, no formato da exportação (o CSV sai com as mesmas pessoas). */

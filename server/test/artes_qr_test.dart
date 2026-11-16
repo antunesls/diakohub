@@ -95,10 +95,32 @@ void main() {
     expect(() => normalizarArte(Uint8List.fromList([1, 2, 3])), throwsFormatException);
   });
 
+  test('foto do editor automático continua 16:9 mesmo com entrada 4:3', () {
+    final foto = img.Image(width: 800, height: 600);
+    final saida = img.decodeJpg(normalizarArte(img.encodePng(foto), jpg: true))!;
+    expect([saida.width, saida.height], [1920, 1080]);
+  });
+
   group('ArtesQr', () {
     late Directory pasta;
     setUp(() async => pasta = await Directory.systemTemp.createTemp('artes_qr'));
     tearDown(() => pasta.delete(recursive: true));
+
+    test('arte 4:3 é preservada ao salvar, reabrir e compor um QR legível', () async {
+      final fundo = img.Image(width: 800, height: 600);
+      img.fill(fundo, color: img.ColorRgb8(9, 26, 50));
+      final artes = ArtesQr(pasta.path);
+      final nome = await artes.salvar('oracao', Uint8List.fromList(img.encodePng(fundo)));
+      final config = Config.lerJson('{"senhaAdmin":"teste123"}', pastaBase: pasta.path);
+      final cfg = await Configuracoes.carregar(config, urlDetectada: 'http://192.168.0.10:8080');
+      await cfg.definirArteQr('oracao', modo: 'arte', fundo: nome);
+      final arte = (await artes.carregar(cfg, 'oracao'))!;
+      expect([arte.fundo.width, arte.fundo.height], [1440, 1080]);
+      final png = comporQr((fundo: arte.fundo, posicao: 'centro-baixo', tamanho: 'P'), url);
+      final saida = img.decodePng(png)!;
+      expect([saida.width, saida.height], [1440, 1080]);
+      expect(lerQr(png), url);
+    });
 
     test('nomes aceitos e arte sumida cai no QR padrão', () async {
       final artes = ArtesQr(pasta.path);

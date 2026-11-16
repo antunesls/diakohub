@@ -27,6 +27,7 @@ enum Permissao {
   motivosEditar('Aprovar, editar e marcar pedidos como atendidos', AreaPermissao.oracao, ''),
   mensagens('Caixa de mensagens', AreaPermissao.oracao, 'Mensagens enviadas pelo site (dúvidas, sugestões, críticas).'),
   membros('Cadastro de membros', AreaPermissao.pessoas, 'Aba Membros, fichas, certificado de batismo e contato com visitantes.'),
+  ministerios('Cadastro de ministérios', AreaPermissao.pessoas, 'Criar ministérios e dizer quem participa de cada um (decide quem vê as atas de cada ministério).'),
   visitantes('Ver os visitantes do dia e dar as boas-vindas', AreaPermissao.pessoas, ''),
   visitantesHistorico('Ver visitantes de outros dias', AreaPermissao.pessoas, 'Sem esta, só aparecem os visitantes de hoje (como na Recepção).'),
   visitantesCadastrar('Cadastrar visitantes (recepção)', AreaPermissao.pessoas, 'Página /recepcao pelo celular.'),
@@ -47,6 +48,7 @@ enum Permissao {
   gestaoCasa('Gestão da Casa: pendências, compras e manutenção', AreaPermissao.gestao, ''),
   atas('Atas de reunião', AreaPermissao.gestao, ''),
   atasSigilosas('Ver e escrever atas sigilosas', AreaPermissao.gestao, ''),
+  atasTodosMinisterios('Ver atas de todos os ministérios', AreaPermissao.gestao, 'Sem esta, a pessoa só vê as atas dos ministérios de que participa (pelo cadastro de membro ligado à conta).'),
   resumo('Resumo da semana', AreaPermissao.gestao, ''),
   admin('Administração', AreaPermissao.administracao, 'Página /admin: configurações, backup, integrações e auditoria.'),
   usuarios('Usuários e perfis', AreaPermissao.administracao, 'Criar contas, redefinir senhas e configurar perfis.');
@@ -66,7 +68,7 @@ enum Permissao {
         indisponibilidade || musicasMinistro => {minhaEscala},
         palavrasTodas => {palavras},
         agendaEditar => {agendaVer},
-        atasSigilosas => {atas},
+        atasSigilosas || atasTodosMinisterios => {atas},
         _ => const {},
       };
 
@@ -104,6 +106,7 @@ enum PerfilPadrao {
     Permissao.visitantes, Permissao.visitantesHistorico, Permissao.visitantesCadastrar, Permissao.escalasVer,
     Permissao.escalaPastoral, Permissao.escalaLouvor, Permissao.minhaEscala, Permissao.indisponibilidade,
     Permissao.acessosEscala, Permissao.palavras, Permissao.palavrasTodas, Permissao.atas, Permissao.atasSigilosas,
+    Permissao.ministerios, Permissao.atasTodosMinisterios,
   }),
   pastor('Pastor', 'Todo o conteúdo, inclusive pedidos particulares. Sem configurações técnicas.', {
     ..._base, Permissao.motivosParticulares, Permissao.motivosEditar, Permissao.mensagens, Permissao.agendaEditar,
@@ -111,11 +114,12 @@ enum PerfilPadrao {
     Permissao.visitantes, Permissao.visitantesHistorico, Permissao.visitantesCadastrar, Permissao.escalasVer,
     Permissao.escalaPastoral, Permissao.escalaLouvor, Permissao.minhaEscala, Permissao.indisponibilidade,
     Permissao.palavras, Permissao.palavrasTodas, Permissao.atas, Permissao.atasSigilosas,
+    Permissao.ministerios, Permissao.atasTodosMinisterios,
   }),
   secretaria('Secretaria', 'Recados, agenda, mensagens, aniversariantes e pedidos públicos.', {
     ..._base, Permissao.motivosEditar, Permissao.mensagens, Permissao.agendaEditar, Permissao.membros, Permissao.gestaoCasa, Permissao.resumo,
     Permissao.visitantes, Permissao.visitantesHistorico, Permissao.visitantesCadastrar, Permissao.escalasVer,
-    Permissao.minhaEscala, Permissao.indisponibilidade, Permissao.acessosEscala, Permissao.atas,
+    Permissao.minhaEscala, Permissao.indisponibilidade, Permissao.acessosEscala, Permissao.atas, Permissao.ministerios,
   }),
   midia('Mídia', 'Cartazes, galeria do site, recados e projeção no telão.', {
     ..._base, Permissao.galeria, Permissao.projetar, Permissao.escalasVer,
@@ -251,6 +255,10 @@ Permissao permissaoDaRota(String metodo, String caminho) {
   if (comeca('api/casa')) return Permissao.gestaoCasa;
   // Atas sigilosas: cada handler confere atasSigilosas antes de mostrar ou alterar.
   if (comeca('api/atas')) return Permissao.atas;
+  // A lista de ministérios (nomes) serve a todo mundo que escolhe um (atas, membros); quem
+  // participa de cada um e as alterações são do cadastro de ministérios.
+  if (caminho == 'api/ministerios' && leitura) return Permissao.sessao;
+  if (comeca('api/ministerios')) return Permissao.ministerios;
   if (comeca('api/visitas')) {
     // Contato pós-visita mexe com telefone e anotações: só quem cuida do cadastro.
     if (caminho.endsWith('/contato')) return Permissao.membros;

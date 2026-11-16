@@ -10,23 +10,24 @@ const MARGEM_CARTAO = 96;
 const LADO_CARTAO = { P: 0.44, M: 0.56, G: 0.70 };
 
 /** Mesmo cálculo de retanguloCartaoQr (qr_oracao.dart): onde fica o cartão branco do QR. */
-function retanguloCartaoQr(posicao, tamanho, modulos = 29) {
-  const alvo = Math.round(ALTURA_ARTE * (LADO_CARTAO[tamanho] || LADO_CARTAO.M));
+function retanguloCartaoQr(posicao, tamanho, modulos = 29, { largura = LARGURA_ARTE, altura = ALTURA_ARTE } = {}) {
+  const alvo = Math.round(altura * (LADO_CARTAO[tamanho] || LADO_CARTAO.M));
   const escala = Math.max(1, Math.floor(alvo / (modulos + 8)));
   const lado = escala * (modulos + 8);
   const [h, v] = posicao.split('-');
-  const x = h === 'esquerda' ? MARGEM_CARTAO : h === 'direita' ? LARGURA_ARTE - MARGEM_CARTAO - lado : Math.floor((LARGURA_ARTE - lado) / 2);
-  const y = v === 'baixo' ? ALTURA_ARTE - MARGEM_CARTAO - lado : Math.floor((ALTURA_ARTE - lado) / 2);
+  const x = h === 'esquerda' ? MARGEM_CARTAO : h === 'direita' ? largura - MARGEM_CARTAO - lado : Math.floor((largura - lado) / 2);
+  const y = v === 'baixo' ? altura - MARGEM_CARTAO - lado : Math.floor((altura - lado) / 2);
   return { x, y, lado };
 }
 
 /** Área livre para logo e textos, do lado oposto ao QR (com o QR no centro, a faixa de cima). */
-function areaDoTexto(posicao, tamanho) {
-  const r = retanguloCartaoQr(posicao, tamanho);
+function areaDoTexto(posicao, tamanho, formato = {}) {
+  const largura = formato.largura || LARGURA_ARTE, altura = formato.altura || ALTURA_ARTE;
+  const r = retanguloCartaoQr(posicao, tamanho, 29, formato);
   const [h] = posicao.split('-');
-  if (h === 'direita') return { x0: 120, x1: r.x - 100, y0: 90, y1: ALTURA_ARTE - 90, alinhar: 'left' };
-  if (h === 'esquerda') return { x0: r.x + r.lado + 100, x1: LARGURA_ARTE - 120, y0: 90, y1: ALTURA_ARTE - 90, alinhar: 'left' };
-  return { x0: 160, x1: LARGURA_ARTE - 160, y0: 60, y1: r.y - 40, alinhar: 'center' };
+  if (h === 'direita') return { x0: 120, x1: r.x - 100, y0: 90, y1: altura - 90, alinhar: 'left' };
+  if (h === 'esquerda') return { x0: r.x + r.lado + 100, x1: largura - 120, y0: 90, y1: altura - 90, alinhar: 'left' };
+  return { x0: 160, x1: largura - 160, y0: 60, y1: r.y - 40, alinhar: 'center' };
 }
 
 /** Quebra [texto] em linhas de até [largura] px, medindo com [medir] (ctx.measureText). */
@@ -146,9 +147,14 @@ function layoutDe(q) {
 function desenharArte(ctx, e, { exemploQr }) {
   const L = e.layout;
   const foto = e.foto;
-  ctx.clearRect(0, 0, LARGURA_ARTE, ALTURA_ARTE);
+  const largura = e.modo === 'arte' && e.arte && e.arte.width * 3 === e.arte.height * 4 ? 1440 : LARGURA_ARTE;
+  const altura = ALTURA_ARTE;
+  ctx.canvas.width = largura;
+  ctx.canvas.height = altura;
+  ctx.canvas.style.aspectRatio = `${largura} / ${altura}`;
+  ctx.clearRect(0, 0, largura, altura);
   if (e.modo === 'arte') {
-    if (e.arte) ctx.drawImage(e.arte, 0, 0, LARGURA_ARTE, ALTURA_ARTE);
+    if (e.arte) ctx.drawImage(e.arte, 0, 0, largura, altura);
     else { ctx.fillStyle = '#e8e8ee'; ctx.fillRect(0, 0, LARGURA_ARTE, ALTURA_ARTE); }
   } else {
     const g = ctx.createLinearGradient(0, 0, LARGURA_ARTE, ALTURA_ARTE);
@@ -163,7 +169,7 @@ function desenharArte(ctx, e, { exemploQr }) {
     }
     desenharTextos(ctx, e);
   }
-  const r = retanguloCartaoQr(e.posicao, e.tamanho);
+  const r = retanguloCartaoQr(e.posicao, e.tamanho, 29, { largura, altura });
   if (exemploQr) desenharQrDeExemplo(ctx, r);
   if (e.modo === 'arte') {
     // Arte própria: mostra a área que o QR vai cobrir, para ajustar a arte no Canva.
@@ -253,6 +259,9 @@ function desenharQrDeExemplo(ctx, r) {
 function desenharPrevia(e) {
   const ctx = e.canvas.getContext('2d');
   if (e.modo === 'padrao') {
+    e.canvas.width = LARGURA_ARTE;
+    e.canvas.height = ALTURA_ARTE;
+    e.canvas.style.aspectRatio = '16 / 9';
     ctx.fillStyle = '#fff';
     ctx.fillRect(0, 0, LARGURA_ARTE, ALTURA_ARTE);
     if (e.previaServidor) ctx.drawImage(e.previaServidor, 0, 0, LARGURA_ARTE, ALTURA_ARTE);

@@ -87,6 +87,10 @@ class Configuracoes {
       'siteWhatsapp': '',
       'termoLgpdTexto': '', // vazio: termo padrão (termoLgpdPadrao)
       'termoLgpdVersao': 1,
+      // Certificado de batismo (aba Membros): quem assina e as imagens salvas
+      // (assinatura desenhada/enviada e carimbo, em data/imagens-certificado).
+      'certPastor': '',
+      'certCargo': 'Pastor',
       'visitanteQrAtivo': true,
       'muralBoasVindas': false, // boas-vindas também no mural principal (igreja com uma TV só)
       'textoMotivos': true, // desligado: telão, mural e resumo mostram só por quem orar e a categoria
@@ -170,9 +174,13 @@ class Configuracoes {
   }
 
   /// Troca modo e arquivo de fundo de um QR. Só o envio e a remoção pelo /admin chamam.
-  Future<void> definirArteQr(String qr, {required String modo, required String fundo}) async {
+  Future<void> definirArteQr(String qr,
+      {required String modo, required String fundo, String? posicao, String? tamanho, String? layout}) async {
     _valores[_chaveArteQr(qr, 'Modo')] = modo;
     _valores[_chaveArteQr(qr, 'Fundo')] = fundo;
+    if (posicao != null) _valores[_chaveArteQr(qr, 'Posicao')] = posicao;
+    if (tamanho != null) _valores[_chaveArteQr(qr, 'Tamanho')] = tamanho;
+    if (layout != null) _valores[_chaveArteQr(qr, 'Layout')] = layout;
     await _salvar();
   }
 
@@ -187,6 +195,24 @@ class Configuracoes {
   /// Troca a imagem de fundo de uma TV ('' = sem imagem). Só o envio pelo /admin chama.
   Future<void> definirImagemFundo(String prefixo, String nome) async {
     _valores['${prefixo}FundoImagem'] = nome;
+    await _salvar();
+  }
+
+  // ---------- Certificado de batismo ----------
+
+  /// Nome de quem assina o certificado (o ministro que batizou).
+  String get certPastor => _s('certPastor');
+
+  /// Como aparece abaixo do nome (ex.: "Pastor", "Pr. Presidente").
+  String get certCargo => _s('certCargo').isEmpty ? 'Pastor' : _s('certCargo');
+
+  /// Assinatura e carimbo salvos em data/imagens-certificado ('' = nenhum).
+  String get certAssinatura => _s('certAssinatura');
+  String get certCarimbo => _s('certCarimbo');
+
+  /// Troca a assinatura ou o carimbo salvo ('' = remove). Só o envio e a remoção pela API chamam.
+  Future<void> definirImagemCertificado(String tipo, {required String nome}) async {
+    _valores[tipo == 'assinatura' ? 'certAssinatura' : 'certCarimbo'] = nome;
     await _salvar();
   }
   String get pedidoTitulo => _s('pedidoTitulo');
@@ -403,6 +429,10 @@ class Configuracoes {
             novos['termoLgpdVersao'] = termoLgpdVersao + 1;
           }
           novos[k] = v == termoLgpdPadrao(nomeIgreja) ? '' : v;
+        case 'certPastor':
+          novos[k] = texto(k, 80);
+        case 'certCargo':
+          novos[k] = texto(k, 40);
         case 'muralFundoCor' || 'boasVindasFundoCor':
           final v = texto(k, 7, vazio: false).toLowerCase();
           if (!RegExp(r'^#[0-9a-f]{6}$').hasMatch(v)) throw FormatException('Cor inválida em "$k" (use #rrggbb).');
@@ -453,6 +483,7 @@ class Configuracoes {
       'siteInstagram', 'siteYoutube', 'siteWhatsapp', 'diakoPlayerUrl', 'termoLgpdTexto', 'termoLgpdVersao', 'visitanteQrAtivo', 'muralBoasVindas',
       'textoMotivos', 'muralFundoCor', 'muralFundoImagem', 'muralFundoEscurecer',
       'boasVindasFundoCor', 'boasVindasFundoImagem', 'boasVindasFundoEscurecer',
+      'certPastor', 'certCargo', 'certAssinatura', 'certCarimbo',
       for (final qr in qrsComArte)
         for (final campo in ['Modo', 'Fundo', 'Posicao', 'Tamanho', 'Layout', 'Foto']) _chaveArteQr(qr, campo),
     };

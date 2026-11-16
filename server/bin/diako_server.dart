@@ -15,6 +15,7 @@ import 'package:diako_server/email_mensagens.dart';
 import 'package:diako_server/historico.dart';
 import 'package:diako_server/holyrics.dart';
 import 'package:diako_server/limpeza_escalas.dart';
+import 'package:diako_server/ministerios.dart';
 import 'package:diako_server/store.dart';
 import 'package:diako_server/tablets_locais.dart';
 import 'package:diako_server/usuarios.dart';
@@ -92,6 +93,9 @@ Future<void> main(List<String> args) async {
   );
   await agenda.carregar();
   agenda.iniciar();
+
+  // Conselho, Diretoria e Assembleia no cadastro de ministérios, e cada ata ligada ao seu.
+  await Ministerios(store).garantirPadroes();
 
   final servidor = Servidor(
     store: store,

@@ -320,8 +320,19 @@
   .segmentos button { min-height: 36px; padding: 0 18px; border: 0; border-radius: 18px; background: transparent; color: var(--suave); font-weight: 600; font-size: 14px; cursor: pointer; }
   .segmentos button[aria-selected=true] { background: var(--superficie); color: var(--primaria); box-shadow: 0 1px 2px rgba(0,0,0,.08); }
   .escala-resumo { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 14px; }
+  /* Ministérios: lista à esquerda, quem participa à direita. */
+  .lista-ministerios { display: flex; flex-direction: column; gap: 6px; }
+  .item-ministerio { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; padding: 10px 14px; border: 1px solid var(--linha); border-radius: 12px; background: var(--superficie); color: var(--texto); font: inherit; text-align: left; cursor: pointer; }
+  .item-ministerio small { color: var(--suave); font-size: 13px; white-space: nowrap; }
+  .item-ministerio:hover, .item-ministerio.ativo { border-color: var(--primaria); background: var(--primaria-suave); }
+  .item-ministerio:focus-visible { outline: 3px solid var(--primaria); outline-offset: 2px; }
+  .pessoas-ministerio { list-style: none; margin: 0; padding: 0; }
+  .pessoas-ministerio li { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 8px 0; border-bottom: 1px solid var(--linha); }
   .escala-resumo span { padding: 6px 14px; border-radius: 16px; background: var(--superficie); border: 1px solid var(--linha); font-size: 14px; }
-  .escala-resumo span.alerta { background: #f9ece7; border-color: #f9ece7; color: #8a3b12; font-weight: 600; }
+  .escala-resumo button.alerta { padding: 6px 14px; border: 1px solid #f9ece7; border-radius: 16px; background: #f9ece7; color: #8a3b12; font-family: inherit; font-size: 14px; font-weight: 600; cursor: pointer; text-decoration: underline; }
+  .escala-resumo button.alerta:hover { border-color: #8a3b12; }
+  .escala-resumo button.alerta:focus-visible { outline: 3px solid var(--primaria); outline-offset: 2px; }
+  #dlg-avisos-escala { max-height: 85dvh; overflow-y: auto; }
   .escala-grade-cartao { padding: 0; overflow: hidden; margin-bottom: 20px; }
   .escala-grade { width: 100%; min-width: 900px; border-collapse: collapse; }
   .escala-grade th { padding: 14px 12px; font-size: 13px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--suave); text-align: left; border-bottom: 1px solid var(--linha); }
@@ -842,6 +853,7 @@
       <div class="barra">
         <span class="dica">Imagens JPG ou PNG até 10 MB. Ficam disponíveis no Holyrics e no tablet.</span>
         <span class="espaco"></span>
+        <a class="botao secundario" href="/temas.html">Coleções para TV e telão</a>
         <label class="botao" for="arquivo-cartaz" style="margin:0">Enviar imagens</label>
         <input type="file" id="arquivo-cartaz" accept="image/jpeg,image/png" multiple class="escondido">
       </div>
@@ -880,6 +892,25 @@
       <h2>Rotinas programadas</h2>
       <p class="dica">A próxima tarefa aparece quando a anterior é concluída. Alterações na rotina não mudam o histórico.</p>
       <div id="casa-rotinas" class="lista"></div>
+    </section>
+
+    <section data-painel="ministerios" hidden>
+      <div class="duas">
+        <div class="cartao">
+          <h2 style="font-size:18px">Ministérios</h2>
+          <p class="dica">Cada ministério tem as suas pessoas, e uma pessoa pode estar em vários. As atas de um ministério só aparecem para quem participa dele (além de quem vê todos, como o pastor). Conselho, Diretoria e Assembleia também são ministérios.</p>
+          <form id="form-ministerio" style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end;margin-bottom:12px">
+            <div class="campo" style="flex:1 1 200px;margin:0"><label for="novo-ministerio">Novo ministério</label><input type="text" id="novo-ministerio" maxlength="60" required placeholder="ex.: Infantil"></div>
+            <button class="botao">Criar</button>
+          </form>
+          <p id="ministerios-resultado" role="status"></p>
+          <div id="lista-ministerios" class="lista-ministerios"></div>
+          <div id="ministerios-sem-cadastro" hidden></div>
+        </div>
+        <div class="cartao" id="ministerio-detalhe">
+          <p class="dica">Escolha um ministério para ver e mudar quem participa.</p>
+        </div>
+      </div>
     </section>
 
     <section data-painel="atas" hidden>
@@ -1028,6 +1059,13 @@
   </main>
   </div>
 </div>
+
+<dialog id="dlg-avisos-escala" aria-labelledby="avisos-escala-titulo">
+  <h2 id="avisos-escala-titulo">Avisos da escala</h2>
+  <p class="dica" id="avisos-escala-mes"></p>
+  <div id="avisos-escala-lista" class="escala-avisos"></div>
+  <div class="dialogo-acoes"><button type="button" class="botao secundario" id="avisos-escala-fechar">Fechar</button></div>
+</dialog>
 
 <dialog id="dlg-escalar">
   <form method="dialog">
@@ -1472,11 +1510,12 @@
 <script src="/comum.js?v=6"></script>
 <script src="/primeiro-acesso.js?v=1"></script>
 <script src="/form-visitante.js?v=2"></script>
-<script src="/menu-lateral.js?v=6"></script>
+<script src="/menu-lateral.js?v=7"></script>
 <script src="/gestao-casa.js?v=1"></script>
-<script src="/atas.js?v=1"></script>
+<script src="/atas.js?v=2"></script>
 <script src="/painel.js?v=26"></script>
 <script src="/acessos-escala.js?v=3"></script>
+<script src="/ministerios.js?v=1"></script>
 <script src="/repertorio-busca.js?v=1"></script>
 <script src="/musica-youtube.js?v=1"></script>
 <script src="/repertorio.js?v=3"></script>
@@ -1486,6 +1525,6 @@
 <script src="/palavras.js?v=7"></script>
 <script src="/palavras-ensaio-tela.js?v=1"></script>
 <script src="/escala-impressao.js?v=3"></script>
-<script src="/escalas.js?v=10"></script>
+<script src="/escalas.js?v=11"></script>
 </body>
 </html>

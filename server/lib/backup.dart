@@ -441,6 +441,10 @@ class Restauracao {
                   (doc['anexos'] is List && (doc['anexos'] as List).any((a) => a is! String || !AnexosCasa.nomeValido(a)))) {
                 throw const FormatException('Ata inválida.');
               }
+            case 'ministerios':
+              if (doc['id'] is! String || doc['nome'] is! String || (doc['nome'] as String).trim().isEmpty) {
+                throw const FormatException('Ministério inválido.');
+              }
           }
         }
         colecoes[nome] = lista;

@@ -35,11 +35,17 @@ function atualizarBadgeAtas() {
   badge.title = 'Encaminhamentos de atas com prazo vencido';
 }
 
+/** Ministérios do cadastro: `podeAtas` diz se a pessoa pode registrar atas dele. */
+let atasMinisterios = [];
+
 async function carregarAtas() {
   try {
-    [atasLista, atasPendentes, atasPessoas] = await Promise.all([
+    let ministerios;
+    [atasLista, atasPendentes, atasPessoas, ministerios] = await Promise.all([
       api('GET', '/api/atas'), api('GET', '/api/atas/encaminhamentos'), api('GET', '/api/atas/pessoas'),
+      api('GET', '/api/ministerios'),
     ]);
+    atasMinisterios = ministerios.ministerios;
     atualizarBadgeAtas();
     preencherAnosAtas();
     renderAtas();
@@ -198,7 +204,11 @@ function abrirEditorAta(atual) {
   const numerada = atual && Number.isInteger(atual.numero);
   const tipo = campoAta('Tipo de reunião', atual?.tipo || 'conselho', { opcoes: Object.entries(tiposAta) });
   if (numerada) tipo.input.disabled = true;
-  const ministerio = campoAta('Ministério / equipe', atual?.ministerio, { max: 100 });
+  // Só os ministérios de que a pessoa participa (ou todos, para quem vê todos); a ata fica só para eles.
+  const podeUsar = atasMinisterios.filter((m) => !m.fixo && (m.podeAtas || m.id === atual?.ministerioId));
+  const ministerio = campoAta('Ministério', atual?.ministerioId || '', {
+    opcoes: [['', 'Escolha…'], ...podeUsar.map((m) => [m.id, m.nome])] });
+  const avisoMinisterio = el('p', { class: 'dica largo', style: 'margin:0' });
   const titulo = campoAta('Título', atual?.titulo, { max: 160, largo: true });
   const data = campoAta('Data', atual?.data || diaIso(new Date()), { tipo: 'date', obrigatorio: true });
   const local = campoAta('Local', atual?.local, { max: 120 });
@@ -220,7 +230,14 @@ function abrirEditorAta(atual) {
 
   function ajustarTipo() {
     const formal = tiposAtaFormais.has(tipo.input.value);
-    ministerio.label.hidden = tipo.input.value !== 'ministerio';
+    const outra = tipo.input.value === 'outra';
+    ministerio.label.hidden = formal;
+    ministerio.input.options[0].textContent = outra ? 'Sem ministério (todos com acesso às atas veem)' : 'Escolha…';
+    ministerio.input.required = tipo.input.value === 'ministerio';
+    const fixo = formal ? atasMinisterios.find((m) => m.id === tipo.input.value) : null;
+    avisoMinisterio.textContent = formal
+      ? `Só quem participa do ${fixo?.nome || tiposAta[tipo.input.value]} vê esta ata${fixo && !fixo.podeAtas ? ' — e você não participa dele' : ''}.`
+      : 'Só quem participa do ministério escolhido vê a ata (além de quem vê todos os ministérios).';
     titulo.input.required = !formal;
     titulo.label.firstChild.textContent = formal ? 'Título (opcional — a ata recebe número ao finalizar)' : 'Título';
   }
@@ -228,7 +245,7 @@ function abrirEditorAta(atual) {
   ajustarTipo();
 
   const erro = el('p', { class: 'largo', role: 'alert' });
-  form.append(tipo.label, ministerio.label, titulo.label, data.label, local.label, inicio.label, fim.label,
+  form.append(tipo.label, ministerio.label, avisoMinisterio, titulo.label, data.label, local.label, inicio.label, fim.label,
     presidente.label, secretario.label, el('h3', { class: 'largo' }, 'Presença'), presentes.bloco, ausentes.bloco,
     pauta.bloco, encaminhamentos.bloco, observacoes.label, rotuloSigilo, erro,
     el('div', { class: 'dialogo-acoes largo' }, botao('Cancelar', () => dlg.close(), 'secundario'),
@@ -238,7 +255,8 @@ function abrirEditorAta(atual) {
   form.addEventListener('submit', async (e) => {
     e.preventDefault();
     const dados = {
-      tipo: tipo.input.value, ministerio: ministerio.input.value.trim(), titulo: titulo.input.value.trim(),
+      tipo: tipo.input.value, ministerioId: tiposAtaFormais.has(tipo.input.value) ? '' : ministerio.input.value,
+      titulo: titulo.input.value.trim(),
       data: data.input.value, local: local.input.value.trim(), horaInicio: inicio.input.value, horaFim: fim.input.value,
       presidente: presidente.input.value.trim(), secretario: secretario.input.value.trim(),
       presentes: presentes.valor(), ausentes: ausentes.valor(), pauta: pauta.valor(),

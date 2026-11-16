@@ -206,6 +206,56 @@ class ServerApi {
     return (j as Map)['holyrics'] as String;
   }
 
+  // ---------- Certificado de batismo ----------
+
+  /// Configuração do certificado: {pastor, cargo, assinatura, carimbo} — as duas
+  /// últimas dizem se já há imagem salva no servidor.
+  Future<Map<String, dynamic>> certificadoConfig() async =>
+      Map<String, dynamic>.from(await _req('GET', '/api/certificado/config') as Map);
+
+  /// Guarda quem assina os certificados e o cargo (pré-preenchido na próxima vez).
+  Future<void> salvarCertificadoConfig(String pastor, String cargo) =>
+      _req('PUT', '/api/certificado/config', json: {'pastor': pastor, 'cargo': cargo});
+
+  /// Envia a assinatura desenhada no tablet ou a imagem do carimbo; fica salva no
+  /// servidor ([tipo]: 'assinatura' ou 'carimbo').
+  Future<void> enviarImagemCertificado(String tipo, List<int> bytes) =>
+      _req('POST', '/api/certificado/$tipo', bytes: bytes);
+
+  Future<void> removerImagemCertificado(String tipo) => _req('DELETE', '/api/certificado/$tipo');
+
+  /// O PDF do certificado de batismo (bytes prontos para salvar e compartilhar).
+  Future<Uint8List> certificadoBatismo(String id,
+      {bool assinatura = false, bool carimbo = false, String pastor = '', String cargo = ''}) async {
+    final c = _config();
+    if (c.base.isEmpty || c.sessao.isEmpty) {
+      throw ServidorException('Configure o endereço do servidor e entre com a senha nas Configurações.');
+    }
+    final q = Uri(queryParameters: {
+      if (assinatura) 'assinatura': '1',
+      if (carimbo) 'carimbo': '1',
+      if (pastor.trim().isNotEmpty) 'pastor': pastor.trim(),
+      if (cargo.trim().isNotEmpty) 'cargo': cargo.trim(),
+    }).query;
+    final r = await _http
+        .get(Uri.parse('$c.base/api/membros/${Uri.encodeComponent(id)}/certificado-batismo${q.isEmpty ? '' : '?$q'}'),
+            headers: {'Authorization': 'Bearer ${c.sessao}'})
+        .timeout(timeout);
+    if (r.statusCode >= 400) {
+      var msg = 'Erro ${r.statusCode} no servidor.';
+      try {
+        final j = jsonDecode(utf8.decode(r.bodyBytes));
+        if (j is Map && j['erro'] is String) msg = j['erro'] as String;
+      } on FormatException {
+        // mantém a mensagem genérica
+      }
+      throw ServidorException(
+          r.statusCode == 401 ? 'Sessão expirada. Entre de novo nas Configurações.' : msg,
+          status: r.statusCode);
+    }
+    return r.bodyBytes;
+  }
+
   /// Repassa uma ação ao Holyrics pelo servidor. Retorna o JSON cru do Holyrics.
   Future<Map<String, dynamic>> holyrics(String acao, Map<String, dynamic> corpo) async =>
       Map<String, dynamic>.from(await _req('POST', '/api/holyrics/$acao', json: corpo) as Map);
