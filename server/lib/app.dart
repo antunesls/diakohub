@@ -141,6 +141,10 @@ class Servidor {
   /// Assinatura e carimbo do certificado de batismo (data/imagens-certificado) — nunca públicos.
   late final ImagensCertificado imagensCertificado = ImagensCertificado(store.pasta);
 
+  /// Fontes do certificado (web/fontes-certificado), lidas na primeira vez que precisa.
+  late final FontesCertificado? fontesCertificado =
+      FontesCertificado.carregar(p.join(pastaWeb, 'fontes-certificado'));
+
   /// Fotos do cadastro de membros (data/fotos-membros) — nunca públicas.
   final FotosMembros fotosMembros;
 
@@ -2399,6 +2403,7 @@ class Servidor {
       logo: logo.existsSync() ? logo.readAsBytesSync() : null,
       assinatura: q['assinatura'] == '1' ? imagem('assinatura') : null,
       carimbo: q['carimbo'] == '1' ? imagem('carimbo') : null,
+      fontes: fontesCertificado,
     );
     return Response.ok(pdf, headers: {
       'content-type': 'application/pdf',

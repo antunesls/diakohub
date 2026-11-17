@@ -52,6 +52,28 @@ void main() {
       expect(pdf.length, greaterThan(800));
     });
 
+    test('modelo clássico com as fontes embutidas (acentos e aspas sem trocar por ?)', () async {
+      final fontes = FontesCertificado.carregar('web/fontes-certificado');
+      expect(fontes, isNotNull, reason: 'web/fontes-certificado precisa ter as 6 fontes');
+      final Uint8List pdf = await gerarCertificadoBatismoPdf(
+        nome: 'Ana Beatriz Conceição de Albuquerque Figueiredo Nascimento', // longo: encolhe
+        dataBatismo: '2025-03-09',
+        sexo: 'F',
+        igreja: 'Igreja Diakonia Tulipas',
+        emissao: DateTime(2026, 11, 16),
+        pastor: 'Pr. Marcos',
+        cargo: 'Pastor',
+        local: 'Jundiaí',
+        fontes: fontes,
+      );
+      expect(latin1.decode(pdf.take(5).toList()), '%PDF-');
+      expect(pdf.length, greaterThan(20000)); // as fontes vão dentro do arquivo
+    });
+
+    test('pasta sem as fontes: carregar devolve null e o PDF sai com as fontes padrão', () {
+      expect(FontesCertificado.carregar(p.join(Directory.systemTemp.path, 'nao-existe-fontes')), isNull);
+    });
+
     test('sem data de batismo válida não gera', () async {
       await expectLater(
           gerarCertificadoBatismoPdf(nome: 'Ana', dataBatismo: '', igreja: 'Igreja', emissao: DateTime(2026)),
