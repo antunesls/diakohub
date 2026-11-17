@@ -99,14 +99,32 @@ if [ "$COM_CADDY" -eq 1 ]; then
     apt-get update -qq
     apt-get install -y -qq caddy >/dev/null
   fi
-  if [ -f /etc/caddy/Caddyfile ] && ! grep -qE "Diako ?News" /etc/caddy/Caddyfile; then
+  if [ -f /etc/caddy/Caddyfile ] && ! grep -qE "Diako ?(News|Hub)" /etc/caddy/Caddyfile; then
     cp /etc/caddy/Caddyfile "/etc/caddy/Caddyfile.antes-diako.$(date +%Y%m%d%H%M%S)"
   fi
+  # Log de acesso (7 dias): serve para cruzar o Ray ID de um erro da Cloudflare
+  # com o que chegou de fato aqui. Chaves e tokens da URL saem mascarados.
+  mkdir -p /var/log/caddy
+  chown caddy:caddy /var/log/caddy 2>/dev/null || true
   cat > /etc/caddy/Caddyfile <<EOF
 # DiakoHub — gerado por instalar-lxc.sh
 $DOMINIO {
 	encode gzip
 	reverse_proxy 127.0.0.1:$PORTA
+	log {
+		output file /var/log/caddy/access.log {
+			roll_size 20MiB
+			roll_keep 10
+			roll_keep_for 168h
+		}
+		format filter {
+			request>uri query {
+				replace chave REDACTED
+				replace token REDACTED
+			}
+			request>headers>Cookie delete
+		}
+	}
 }
 EOF
   systemctl enable caddy >/dev/null

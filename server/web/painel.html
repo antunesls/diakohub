@@ -1442,8 +1442,27 @@
     <div class="dialogo-acoes">
       <button class="botao perigo" id="excluir-da-ficha" type="button">Excluir</button>
       <span class="espaco" style="flex:1"></span>
+      <button class="botao secundario" id="certificado-da-ficha" type="button" hidden>Certificado de batismo</button>
       <button class="botao secundario" id="fechar-ficha" type="button" autofocus>Fechar</button>
       <button class="botao" id="editar-da-ficha" type="button">Editar</button>
+    </div>
+  </div>
+</dialog>
+
+<dialog id="dlg-certificado">
+  <div style="max-width:560px">
+    <h2 style="font-size:20px">Certificado de batismo</h2>
+    <p id="cert-resumo" class="dica"></p>
+    <div id="cert-imagens"></div>
+    <div class="campo"><label for="cert-pastor">Quem assina (ministro)</label>
+      <input id="cert-pastor" maxlength="80" placeholder="Ex.: Pr. Marcos" autocomplete="off"></div>
+    <div class="campo"><label for="cert-cargo">Cargo</label>
+      <input id="cert-cargo" maxlength="60" placeholder="Pastor" autocomplete="off"></div>
+    <p id="cert-resultado" role="status"></p>
+    <div class="dialogo-acoes">
+      <button class="botao secundario" type="button" id="fechar-certificado">Fechar</button>
+      <a class="botao secundario" id="cert-baixar" hidden>Baixar PDF</a>
+      <button class="botao" type="button" id="cert-gerar">Gerar PDF</button>
     </div>
   </div>
 </dialog>
@@ -1513,7 +1532,8 @@
 <script src="/menu-lateral.js?v=7"></script>
 <script src="/gestao-casa.js?v=1"></script>
 <script src="/atas.js?v=2"></script>
-<script src="/painel.js?v=26"></script>
+<script src="/painel.js?v=27"></script>
+<script src="/certificado.js?v=1"></script>
 <script src="/acessos-escala.js?v=3"></script>
 <script src="/ministerios.js?v=1"></script>
 <script src="/repertorio-busca.js?v=1"></script>

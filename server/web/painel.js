@@ -1701,6 +1701,7 @@ function abrirFicha(id) {
   ].filter(Boolean));
 
   hidratarFotos($('ficha-conteudo'), { grande: true });
+  $('certificado-da-ficha').hidden = !m.dataBatismo;
   if (!$('dlg-ficha').open) $('dlg-ficha').showModal();
   $('ficha-conteudo').scrollTop = 0;
 }
@@ -1866,6 +1867,9 @@ async function revogarLgpd(m) {
 }
 
 $('fechar-ficha').addEventListener('click', () => $('dlg-ficha').close());
+$('certificado-da-ficha').addEventListener('click', () => {
+  if (fichaAberta) Certificado.abrir(fichaAberta);
+});
 $('editar-da-ficha').addEventListener('click', () => {
   $('dlg-ficha').close();
   if (fichaAberta) editarMembro(fichaAberta);
