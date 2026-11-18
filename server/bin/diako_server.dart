@@ -128,6 +128,7 @@ Future<void> main(List<String> args) async {
     ),
   );
 
+  await servidor.sincronizarParticipacaoCultos();
   final http = await io.serve(servidor.handler, config.endereco, config.porta);
   final mural = cfg.chaveMural.isEmpty ? '$base/mural' : '$base/mural?chave=${cfg.chaveMural}';
   stdout.writeln('''

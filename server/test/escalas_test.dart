@@ -57,6 +57,7 @@ void main() {
     late Store store;
     late Backup backup;
     late Handler handler;
+    late Servidor servidor;
     late String admin;
     // Quarta-feira, 28/10/2026.
     var agora = DateTime(2026, 10, 28, 10);
@@ -105,7 +106,7 @@ void main() {
       final usuarios = Usuarios(config.pastaDados);
       final auth = Auth(conferirSenha: cfg.conferirSenha, pastaDados: config.pastaDados, usuarios: usuarios);
       backup = Backup(pastaDados: config.pastaDados, configuracoes: cfg.publicas);
-      handler = Servidor(
+      servidor = Servidor(
         store: store,
         auth: auth,
         holyrics: HolyricsDireto(host: 'h', porta: 1, token: 't', cliente: MockClient((_) async => http.Response('{}', 200))),
@@ -117,7 +118,8 @@ void main() {
         historico: Historico(config.pastaDados),
         cfg: cfg,
         relogio: () => agora,
-      ).handler;
+      );
+      handler = servidor.handler;
       final (_, l) = await chamar('POST', '/api/login', json: {'senha': 'senha-principal'});
       admin = l['token'] as String;
     });
@@ -173,6 +175,57 @@ void main() {
       expect(culto(await mes('2026-11'), '2026-11-04')['louvor']['Vocal'].single['nome'], 'Ana');
       await chamar('POST', '/api/escalas/gerar', token: admin, json: {'mes': '2026-12'});
       expect(((await mes('2026-12'))['cultos'] as List).length, 9);
+    });
+
+    test('desativação reconhece culto gerado antes da mudança de horário', () async {
+      await chamar('PUT', '/api/admin/configuracoes', token: admin,
+          json: {'siteCultos': 'Domingo — 09h\nQuarta — 19h\nSábado — 16h'});
+      await chamar('POST', '/api/escalas/gerar', token: admin, json: {'mes': '2026-11'});
+      final antes = await mes('2026-11');
+      final idQuarta = culto(antes, '2026-11-04')['id'];
+      final pessoa = await membro('Ana', ministerios: ['Louvor']);
+      await chamar('PUT', '/api/escalas/$idQuarta', token: admin,
+          json: {'tipo': 'louvor', 'funcao': 'Vocal', 'membros': [pessoa]});
+      final (_, extra) = await chamar('POST', '/api/escalas', token: admin,
+          json: {'data': '2026-11-04', 'hora': '10h', 'nome': 'Encontro especial'});
+      await chamar('PUT', '/api/admin/configuracoes', token: admin, json: {
+        'siteCultos': 'Domingo — 09h\nQuarta — 19h30\nSábado — 17h',
+        'cultosEscalas': {
+          '7@09:00': {'pastoral': true, 'louvor': true},
+          '3@19:30': {'pastoral': false, 'louvor': false},
+          '6@17:00': {'pastoral': false, 'louvor': false},
+        },
+      });
+      final depois = await mes('2026-11');
+      expect((depois['cultos'] as List).length, 6); // domingos + encontro especial
+      expect((depois['cultos'] as List).any((c) => c['id'] == extra['id']), isTrue);
+      expect((await chamar('GET', '/api/escalas/hoje?todos=1', token: admin)).$2['cultos'].any((c) => c['id'] == idQuarta), isFalse);
+      expect(store.buscar('escalas', idQuarta)!['louvor']['Vocal'], [pessoa]);
+      // Instalação sobre dados antigos: a configuração já existe, mas os flags não.
+      final registroAntigo = {...store.buscar('escalas', idQuarta)!}
+        ..remove('escalaPastoral')
+        ..remove('escalaLouvor');
+      await store.salvar('escalas', registroAntigo);
+      await servidor.sincronizarParticipacaoCultos();
+      expect(store.buscar('escalas', idQuarta)!['escalaLouvor'], isFalse);
+      expect(store.buscar('escalas', idQuarta)!['escalaPastoral'], isFalse);
+      agora = DateTime(2026, 11, 5);
+      expect((await mes('2026-11'))['cultos'].any((c) => c['id'] == idQuarta), isFalse,
+          reason: 'O culto desativado permanece fora após passar a data.');
+    });
+
+    test('não associa horário antigo quando há dois cultos no mesmo dia da semana', () async {
+      await chamar('PUT', '/api/admin/configuracoes', token: admin, json: {'siteCultos': 'Domingo — 20h'});
+      await chamar('POST', '/api/escalas/gerar', token: admin, json: {'mes': '2026-11'});
+      await chamar('PUT', '/api/admin/configuracoes', token: admin, json: {
+        'siteCultos': 'Domingo — 09h\nDomingo — 19h',
+        'cultosEscalas': {
+          '7@09:00': {'pastoral': true, 'louvor': true},
+          '7@19:00': {'pastoral': false, 'louvor': false},
+        },
+      });
+      expect((await mes('2026-11'))['cultos'].length, 5);
+      expect(culto(await mes('2026-11'), '2026-11-01')['funcoes']['louvor'], isNotEmpty);
     });
 
     test('configuração das escalas valida tipos e não altera o histórico', () async {

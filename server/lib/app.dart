@@ -3463,9 +3463,36 @@ class Servidor {
 
   /// Regras atuais só afetam hoje em diante; passado usa a participação registrada.
   CultoEscala _participacaoCulto(CultoEscala c) {
-    if (c.data.compareTo(diaEscala(_agora())) < 0) return c;
-    final regra = cfg?.cultosEscalas['${c.dia.weekday}@${c.hora}'] as Map?;
+    final configuracoes = cfg;
+    if (configuracoes == null || c.data.compareTo(diaEscala(_agora())) < 0) return c;
+    final regras = configuracoes.cultosEscalas;
+    var regra = regras['${c.dia.weekday}@${c.hora}'] as Map?;
+    if (regra == null) {
+      final horarios = horariosDosCultos(configuracoes.siteCultos).where((h) => h.diaSemana == c.dia.weekday).toList();
+      // O horário do site pode ter mudado depois de gerar o mês. Só associa
+      // pelo dia/nome quando é inequívoco; encontros extras com outro nome e
+      // dias com vários horários não herdam a configuração de outro culto.
+      if (horarios.length == 1 && horarios.single.nome == c.nome) {
+        final horario = horarios.single;
+        regra = regras['${horario.diaSemana}@${horario.hora}'] as Map?;
+      }
+    }
     return c.copiar(escalaPastoral: regra?['pastoral'] != false, escalaLouvor: regra?['louvor'] != false);
+  }
+
+  /// Persiste a participação vigente sem alterar alocações, músicas ou passado.
+  /// Também roda ao iniciar, para alcançar configurações salvas antes da atualização.
+  Future<void> sincronizarParticipacaoCultos() async {
+    if (cfg == null) return;
+    final hoje = diaEscala(_agora());
+    final alterados = <Map<String, dynamic>>[];
+    for (final culto in _cultos().where((c) => c.data.compareTo(hoje) >= 0)) {
+      final novo = _participacaoCulto(culto);
+      if (novo.escalaPastoral != culto.escalaPastoral || novo.escalaLouvor != culto.escalaLouvor) {
+        alterados.add(novo.toJson());
+      }
+    }
+    if (alterados.isNotEmpty) await store.salvarVarios('escalas', alterados);
   }
 
   List<CultoEscala> _cultosVisiveis() => [
@@ -4908,17 +4935,7 @@ class Servidor {
       return _erro(400, e.message);
     }
     if (corpo.containsKey('cultosEscalas')) {
-      // Registra também nos cultos já gerados, sem apagar alocações ou músicas.
-      // Assim, ao passar a data, permanece a participação que valia naquele dia.
-      final hoje = diaEscala(_agora());
-      final alterados = <Map<String, dynamic>>[];
-      for (final culto in _cultos().where((c) => c.data.compareTo(hoje) >= 0)) {
-        final novo = _participacaoCulto(culto);
-        if (novo.escalaPastoral != culto.escalaPastoral || novo.escalaLouvor != culto.escalaLouvor) {
-          alterados.add(novo.toJson());
-        }
-      }
-      if (alterados.isNotEmpty) await store.salvarVarios('escalas', alterados);
+      await sincronizarParticipacaoCultos();
     }
     // Agenda trocada ou removida: busca na hora (e descarta a cópia antiga).
     if ('${c.agendaUrl}|${c.agendaCalendarioId}' != agendaAntes) await agenda?.atualizarAgora();
