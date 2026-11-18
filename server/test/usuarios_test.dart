@@ -239,6 +239,78 @@ void main() {
       expect(await entrar('joao', 'outra-senha-boa'), isNotNull);
     });
 
+    test('vários perfis: as permissões se somam, o arquivo antigo migra e mudar a lista derruba a sessão', () async {
+      final (st, j) = await chamar('POST', '/api/admin/usuarios',
+          token: admin, json: {'nome': 'Ana', 'login': 'ana', 'perfis': ['recepcao', 'ministro', 'recepcao']});
+      expect(st, 201, reason: '$j');
+      expect(j['usuario']['perfis'], ['recepcao', 'ministro']); // repetido sai
+      expect(j['usuario']['perfilNome'], 'Recepção + Ministro');
+      final id = j['usuario']['id'] as String;
+      var token = (await entrar('ana', j['senhaTemporaria'] as String))!;
+      await chamar('POST', '/api/eu/senha', token: token, json: {'atual': j['senhaTemporaria'], 'nova': 'senha-propria-1'});
+      token = (await entrar('ana', 'senha-propria-1'))!;
+
+      final (_, eu) = await chamar('GET', '/api/eu', token: token);
+      expect(eu['perfis'], ['recepcao', 'ministro']);
+      expect(eu['permissoes'], containsAll(['visitantesCadastrar', 'musicasMinistro']));
+      expect(eu['permissoes'], isNot(contains('membros')));
+      expect(eu['entrada'], '/painel'); // não é mais "só recepção"
+      expect((await chamar('GET', '/api/visitas', token: token)).$1, 200);
+      final (_, minha) = await chamar('GET', '/api/minha-escala', token: token);
+      expect('$minha', contains('vinculada a um membro')); // passou da permissão; falta só o vínculo
+      expect((await chamar('GET', '/api/membros', token: token)).$1, 403);
+
+      // Editar um dos perfis vale na hora para quem o tem junto com outros.
+      await chamar('PUT', '/api/admin/perfis/recepcao', token: admin, json: {'permissoes': ['visitantes', 'visitantesCadastrar', 'membros']});
+      expect((await chamar('GET', '/api/membros', token: token)).$1, 200);
+
+      final (_, lista) = await chamar('GET', '/api/admin/usuarios', token: admin);
+      expect([for (final p in lista['perfis']) if (p['id'] == 'ministro') p['usuarios']].single, 1);
+      final (stEx, ex) = await chamar('DELETE', '/api/admin/perfis/ministro', token: admin);
+      expect(stEx, 400, reason: '$ex');
+
+      // Lista vazia ou perfil inexistente: erro, nada muda.
+      expect((await chamar('PUT', '/api/admin/usuarios/$id', token: admin, json: {'perfis': []})).$1, 400);
+      expect((await chamar('PUT', '/api/admin/usuarios/$id', token: admin, json: {'perfis': ['nao-existe']})).$1, 400);
+      expect((await chamar('GET', '/api/eu', token: token)).$1, 200);
+
+      final (stPut, depois) = await chamar('PUT', '/api/admin/usuarios/$id', token: admin, json: {'perfis': ['ministro']});
+      expect(stPut, 200);
+      expect(depois['perfis'], ['ministro']);
+      expect((await chamar('GET', '/api/eu', token: token)).$1, 401);
+
+      // Formato antigo do arquivo ("perfil": id) continua sendo lido.
+      final antigo = Usuario.fromJson({'id': 'x', 'login': 'x', 'perfil': 'louvor'});
+      expect(antigo.idsPerfis, ['louvor']);
+      expect(antigo.toJson()['perfil'], 'louvor');
+      final novo = Usuario.fromJson({'id': 'y', 'login': 'y', 'perfis': ['recepcao', 'pregador']});
+      expect(novo.perfil.pode(Permissao.palavras) && novo.perfil.pode(Permissao.visitantesCadastrar), isTrue);
+    });
+
+    test('quem cuida dos usuários sem ser administrador não dá permissão que não tem', () async {
+      final (stP, _) = await chamar('POST', '/api/admin/perfis',
+          token: admin, json: {'nome': 'Cuida dos acessos', 'permissoes': ['usuarios', 'membros', 'visitantes', 'visitantesCadastrar']});
+      expect(stP, 201);
+      final (_, cuida) = await criar('cuida', Perfil(id: 'cuida-dos-acessos', nome: '', permissoes: const {}));
+
+      // Pode dar o que tem.
+      final (stOk, ok) = await chamar('POST', '/api/admin/usuarios', token: cuida, json: {'nome': 'Rec', 'login': 'rec', 'perfis': ['recepcao']});
+      expect(stOk, 201, reason: '$ok');
+      // Não cria administrador nem soma um perfil com o que ele não tem.
+      expect((await chamar('POST', '/api/admin/usuarios', token: cuida, json: {'nome': 'X', 'login': 'xx1', 'perfis': ['administrador']})).$1, 403);
+      expect((await chamar('POST', '/api/admin/usuarios', token: cuida, json: {'nome': 'X', 'login': 'xx2', 'perfis': ['recepcao', 'midia']})).$1, 403);
+      expect((await chamar('PUT', '/api/admin/usuarios/${ok['usuario']['id']}', token: cuida, json: {'perfis': ['recepcao', 'pastor']})).$1, 403);
+      // Nem mexe em quem pode mais do que ele.
+      final (pastorId, _) = await criar('pastor1', Perfil.pastor);
+      expect((await chamar('POST', '/api/admin/usuarios/$pastorId/senha', token: cuida)).$1, 403);
+      expect((await chamar('PUT', '/api/admin/usuarios/$pastorId', token: cuida, json: {'ativo': false})).$1, 403);
+      expect((await chamar('DELETE', '/api/admin/usuarios/$pastorId', token: cuida)).$1, 403);
+      // Nem põe num perfil o que não tem.
+      expect((await chamar('PUT', '/api/admin/perfis/recepcao', token: cuida, json: {'permissoes': ['visitantes', 'admin']})).$1, 403);
+      expect((await chamar('POST', '/api/admin/perfis', token: cuida, json: {'nome': 'Turbo', 'permissoes': ['mensagens']})).$1, 403);
+      expect((await chamar('PUT', '/api/admin/perfis/recepcao', token: cuida, json: {'descricao': 'Obreiros da porta'})).$1, 200);
+    });
+
     test('quem projetou fica no histórico', () async {
       final (_, midia) = await criar('midia', Perfil.midia);
       await chamar('POST', '/api/holyrics/ShowImage', token: midia, json: {'file': 'DiakoHub/retiro.jpg'});

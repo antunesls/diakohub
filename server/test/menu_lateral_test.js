@@ -39,6 +39,10 @@ test('menu mantém os avisos nas páginas e respeita autorização para Administ
   assert.ok(!itens.some((i) => i.id === 'admin'));
   assert.ok(menu.gruposPermitidos(['painel', 'admin']).flatMap((g) => g.itens).some((i) => i.id === 'admin'));
   assert.ok(menu.gruposPermitidos(['painel', 'acessosEscala']).flatMap((g) => g.itens).some((i) => i.id === 'acessos'));
+  // Usuários e acessos: página própria, para quem cuida dos usuários (mesmo sem a administração).
+  const usuarios = menu.gruposPermitidos(['painel', 'usuarios']).flatMap((g) => g.itens).find((i) => i.id === 'usuarios');
+  assert.equal(usuarios?.href, '/acessos');
+  assert.ok(!itens.some((i) => i.id === 'usuarios'));
 });
 
 test('painel oferece menu lateral, botão móvel e preserva as páginas existentes', () => {
@@ -63,5 +67,5 @@ test('painel carrega o script das Palavras e o menu na versão nova', () => {
   const html = fs.readFileSync(path.join(__dirname, '../web/painel.html'), 'utf8');
   assert.match(html, /data-painel="palavras"/);
   assert.match(html, /<script src="\/palavras-pdf\.js\?v=1"><\/script>\s*<script src="\/palavras-ensaio\.js\?v=1"><\/script>\s*<script src="\/palavras\.js\?v=7"><\/script>\s*<script src="\/palavras-ensaio-tela\.js\?v=1"><\/script>/);
-  assert.match(html, /<script src="\/menu-lateral\.js\?v=7"><\/script>/);
+  assert.match(html, /<script src="\/menu-lateral\.js\?v=9"><\/script>/);
 });

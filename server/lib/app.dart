@@ -44,6 +44,9 @@ import 'ministerios.dart';
 import 'pagina_inicial.dart';
 import 'perfis.dart';
 import 'palavras.dart';
+import 'casais.dart';
+import 'devocionais.dart';
+import 'email_devocionais.dart';
 import 'permissoes.dart';
 import 'repertorio.dart';
 import 'usuarios.dart';
@@ -76,6 +79,7 @@ class Servidor {
     this.enviarAvisoMensagem,
     this.enviarAvisoCadastro,
     this.enviarAta,
+    this.enviarDevocional,
     this.senhaMinima = 6,
     DateTime Function()? relogio,
     LimiteTaxa? limitePedidos,
@@ -122,6 +126,18 @@ class Servidor {
   late final GestaoCasa casa = GestaoCasa(store, agora: _agora);
   late final AnexosCasa anexosCasa = AnexosCasa(store.pasta);
   late final Atas atas = Atas(store, agora: _agora);
+  late final Devocionais devocionais = Devocionais(store,
+    urlBase: () => _urlBase, igreja: () => nomeIgreja, agora: _agora, ip: _ip,
+    enviar: (email) async {
+      final transporte = enviarDevocional;
+      if (transporte != null) return transporte(email);
+      final configuracao = cfg;
+      if (configuracao == null || !configuracao.smtpConfigurado) {
+        throw StateError('Configure o SMTP na administração antes de enviar devocionais.');
+      }
+      await enviarEmailDevocional(configuracao, email);
+    },
+  );
   late final AnexosCasa anexosAtas = AnexosCasa.atas(store.pasta);
   final Auth auth;
   final PonteHolyrics holyrics;
@@ -169,6 +185,7 @@ class Servidor {
 
   /// Envia uma ata por e-mail (substituível nos testes; sem ele, usa o SMTP do /admin).
   final Future<void> Function(EmailAta email)? enviarAta;
+  final Future<void> Function(EmailDevocional email)? enviarDevocional;
 
   /// Tamanho mínimo da senha ao trocar pelo painel (10 quando o servidor está na internet).
   final int senhaMinima;
@@ -213,6 +230,7 @@ class Servidor {
       ..get('/recepcao', (Request _) => _pagina('recepcao.html'))
       ..get('/visitante', (Request _) => cfg?.visitanteQrAtivo == false ? _paginaDesligada() : _pagina('visitante.html'))
       ..get('/cadastro', (Request _) => _pagina('cadastro.html'))
+      ..get('/devocional', (Request _) => _pagina('devocional.html'))
       ..get('/qr-visitante.png', _qrVisitante)
       ..get('/qr-minha-escala.png', (Request _) => Response.ok(gerarPngQr('$_urlBase/minha-escala', rotulo: 'MINHA ESCALA'),
           headers: {'content-type': 'image/png', 'cache-control': 'no-cache'}))
@@ -275,6 +293,7 @@ class Servidor {
       ..put('/api/mensagens/<id>', _atualizarMensagem)
       ..post('/api/mensagens/<id>/avisar', _reenviarAviso)
       // Recados
+      ..get('/api/casais', _consultarCasais)
       ..get('/api/recados', _listarRecados)
       ..post('/api/recados', _criarRecado)
       ..put('/api/recados/ordem', _ordenarRecados)
@@ -456,6 +475,7 @@ class Servidor {
       ..post('/api/backups/<nome>/restaurar', _restaurarDaLista)
       // Administração
       ..get('/admin', (Request _) => _pagina('admin.html'))
+      ..get('/acessos', (Request _) => _pagina('acessos.html'))
       ..get('/api/public/site', _site)
       ..get('/api/admin/configuracoes', _adminConfiguracoes)
       ..put('/api/admin/configuracoes', _adminSalvar)
@@ -486,7 +506,7 @@ class Servidor {
       ..get('/ws', webSocketHandler(_conectarWs));
 
     final estaticos = createStaticHandler(pastaWeb);
-    final cascata = Cascade().add(r.call).add(estaticos).handler;
+    final cascata = Cascade().add(devocionais.router.call).add(r.call).add(estaticos).handler;
     return const Pipeline()
         .addMiddleware(_cabecalhosSeguranca)
         .addMiddleware(_tratarErros)
@@ -536,6 +556,22 @@ class Servidor {
 
   // ---------- Autenticação ----------
 
+  Response _consultarCasais(Request req) {
+    try {
+      int ler(String chave, int padrao) {
+        final v = req.url.queryParameters[chave];
+        if (v == null) return padrao;
+        final n = int.tryParse(v);
+        if (n == null) throw const FormatException('Mês ou ano inválido.');
+        return n;
+      }
+      final agora = _agora();
+      return _json(consultarCasais(_membros(), mes: ler('mes', agora.month), ano: ler('ano', agora.year)));
+    } on FormatException catch (e) {
+      return _erro(400, e.message);
+    }
+  }
+
   Future<Response> _login(Request req) async {
     final corpo = await _corpo(req);
     try {
@@ -568,6 +604,7 @@ class Servidor {
       'principal': c.ehPrincipal,
       'perfil': c.perfil.id,
       'perfilNome': c.perfil.nome,
+      'perfis': c.perfis,
       'permissoes': [for (final p in c.perfil.permissoes) p.name],
       'trocarSenha': c.trocarSenha,
       'senhaMinima': senhaMinima,
@@ -643,38 +680,88 @@ class Servidor {
 
   String _novaSenhaTemporaria() => gerarSenhaTemporaria(senhaMinima < 10 ? 10 : senhaMinima);
 
-  /// Corpo: {"nome", "login", "perfil"} — devolve a senha temporária (mostrada uma única vez).
+  /// Perfis pedidos no corpo: "perfis" (lista de ids) ou, no formato antigo, "perfil" (um id).
+  /// null se o corpo não fala de perfil; [FormatException] se algum não existe ou a lista vier vazia.
+  List<Perfil>? _perfisDoCorpo(Usuarios usuarios, Map<String, dynamic> corpo) {
+    final Object? bruto = corpo.containsKey('perfis') ? corpo['perfis'] : corpo['perfil'];
+    if (bruto == null) return null;
+    final ids = bruto is List ? [for (final x in bruto) '$x'] : ['$bruto'];
+    final perfis = [
+      for (final id in ids) usuarios.perfis.buscar(id) ?? (throw FormatException('Perfil não encontrado: $id')),
+    ];
+    if (perfis.isEmpty) throw const FormatException('Escolha pelo menos um perfil.');
+    return perfis;
+  }
+
+  /// Ninguém dá permissão que não tem: quem cuida dos usuários sem ser da administração não cria um
+  /// administrador nem põe em perfil o que ele mesmo não pode. Quem tem Administração pode tudo
+  /// (o perfil Administrador não tem, por exemplo, as músicas do ministro, e nem por isso fica preso).
+  static String? _alemDoQuePode(Request req, Iterable<Permissao> permissoes, String oQue) {
+    final conta = Auth.contaDa(req)!;
+    if (conta.pode(Permissao.admin)) return null;
+    final faltam = {for (final p in permissoes) if (!conta.pode(p)) p};
+    if (faltam.isEmpty) return null;
+    return '$oQue: ${faltam.map((p) => p.descricao).join('; ')}. Só quem tem essas permissões pode fazer isso.';
+  }
+
+  /// A conta [u] pode mais do que quem está mexendo nela? (senha, perfis, desativar, excluir)
+  static Response? _contaAcimaDe(Request req, Usuario u) {
+    final erro = _alemDoQuePode(req, u.perfil.permissoes, '${u.nome} tem permissões que você não tem');
+    return erro == null ? null : _erro(403, erro);
+  }
+
+  /// Corpo: {"nome", "login", "perfis": [ids]} ("perfil": id ainda vale) — devolve a senha temporária
+  /// (mostrada uma única vez).
   Future<Response> _criarUsuario(Request req) async {
     final usuarios = _usuarios;
     if (usuarios == null) return _erro(501, 'Usuários indisponíveis.');
     final corpo = await _corpo(req);
-    final perfil = usuarios.perfis.buscar(corpo['perfil'] as String? ?? '');
-    if (perfil == null) return _erro(400, 'Escolha o perfil.');
-    final senha = _novaSenhaTemporaria();
     try {
+      final perfis = _perfisDoCorpo(usuarios, corpo);
+      if (perfis == null) return _erro(400, 'Escolha o perfil.');
+      final proibido = _alemDoQuePode(req, Perfil.combinado(perfis).permissoes, 'Esses perfis dão permissões que você não tem');
+      if (proibido != null) return _erro(403, proibido);
+      final senha = _novaSenhaTemporaria();
       final u = await usuarios.criar(
-          nome: corpo['nome'] as String? ?? '', login: corpo['login'] as String? ?? '', perfil: perfil, senha: senha,
+          nome: corpo['nome'] as String? ?? '', login: corpo['login'] as String? ?? '', perfis: perfis, senha: senha,
           temporaria: true);
-      await _auditar(req, tipo: 'acesso', acao: 'senha-temporaria', alvo: u.nome, detalhe: 'Conta criada (${perfil.nome})');
+      await _auditar(req, tipo: 'acesso', acao: 'senha-temporaria', alvo: u.nome, detalhe: 'Conta criada (${u.perfil.nome})');
       return _json({'usuario': u.toJson(), ..._entregaDeAcesso(u, senha)}, status: 201);
     } on FormatException catch (e) {
       return _erro(400, e.message);
     }
   }
 
-  /// Corpo: {"nome", "perfil", "ativo"} (só o que mudar). Trocar perfil ou desativar desconecta a pessoa.
+  /// Corpo: {"nome", "perfis": [ids], "ativo"} (só o que mudar; "perfil": id troca todos por ele).
+  /// Mudar os perfis ou desativar desconecta a pessoa.
   Future<Response> _atualizarUsuario(Request req, String id) async {
     final usuarios = _usuarios;
     final atual = usuarios?.buscar(id);
     if (usuarios == null || atual == null) return _erro(404, 'Usuário não encontrado.');
     final corpo = await _corpo(req);
-    final perfil = corpo['perfil'] == null ? null : usuarios.perfis.buscar(corpo['perfil'] as String);
-    if (corpo['perfil'] != null && perfil == null) return _erro(400, 'Perfil inválido.');
     if (corpo.containsKey('ativo') && corpo['ativo'] is! bool) return _erro(400, '"ativo" deve ser verdadeiro ou falso.');
-    final perfilAntes = atual.perfil, ativoAntes = atual.ativo;
+    final List<Perfil>? perfis;
     try {
-      final u = await usuarios.atualizar(id, nome: corpo['nome'] as String?, perfil: perfil, ativo: corpo['ativo'] as bool?);
-      if (u.perfil != perfilAntes || u.ativo != ativoAntes) {
+      perfis = _perfisDoCorpo(usuarios, corpo);
+    } on FormatException catch (e) {
+      return _erro(400, e.message);
+    }
+    if (perfis != null || corpo.containsKey('ativo')) {
+      if (_contaAcimaDe(req, atual) case final negado?) return negado;
+    }
+    if (perfis != null) {
+      final proibido = _alemDoQuePode(req, Perfil.combinado(perfis).permissoes, 'Esses perfis dão permissões que você não tem');
+      if (proibido != null) return _erro(403, proibido);
+    }
+    final nomesAntes = atual.perfis.map((p) => p.nome).toList(), idsAntes = atual.idsPerfis.join(','), ativoAntes = atual.ativo;
+    try {
+      final u = await usuarios.atualizar(id, nome: corpo['nome'] as String?, perfis: perfis, ativo: corpo['ativo'] as bool?);
+      final mudouPerfis = u.idsPerfis.join(',') != idsAntes;
+      if (mudouPerfis) {
+        await _auditar(req, tipo: 'acesso', acao: 'perfis-alterados', alvo: u.nome,
+            detalhe: '${nomesAntes.join(' + ')} → ${u.perfis.map((p) => p.nome).join(' + ')}');
+      }
+      if (mudouPerfis || u.ativo != ativoAntes) {
         await auth.encerrarDoUsuario(id);
         agente?.enviarTablets(); // sem "projetar" ou desativado: o tablet perde o acesso local
       }
@@ -689,6 +776,7 @@ class Servidor {
     final usuarios = _usuarios;
     final u = usuarios?.buscar(id);
     if (u == null) return _erro(404, 'Usuário não encontrado.');
+    if (_contaAcimaDe(req, u) case final negado?) return negado;
     final senha = _novaSenhaTemporaria();
     await usuarios!.definirSenha(id, senha, temporaria: true);
     await auth.encerrarDoUsuario(id);
@@ -698,8 +786,12 @@ class Servidor {
   }
 
   Future<Response> _excluirUsuario(Request req, String id) async {
+    final alvo = _usuarios?.buscar(id);
+    if (alvo != null) {
+      if (_contaAcimaDe(req, alvo) case final negado?) return negado;
+    }
     // Lido antes de excluir: a conta vinculada a um membro leva a pessoa para fora das escalas.
-    final membroId = _usuarios?.buscar(id)?.membroId;
+    final membroId = alvo?.membroId;
     if (!(await _usuarios?.excluir(id) ?? false)) return _erro(404, 'Usuário não encontrado.');
     await auth.encerrarDoUsuario(id);
     await tabletsLocais.removerDoUsuario(id);
@@ -753,6 +845,8 @@ class Servidor {
       final base = corpo['copiarDe'] == null ? null : usuarios.perfis.buscar('${corpo['copiarDe']}');
       if (corpo['copiarDe'] != null && base == null) return _erro(400, 'Perfil de origem não encontrado.');
       final permissoes = _permissoesDoCorpo(corpo['permissoes']) ?? base?.permissoes ?? const <Permissao>{};
+      final proibido = _alemDoQuePode(req, permissoes, 'O perfil daria permissões que você não tem');
+      if (proibido != null) return _erro(403, proibido);
       final perfil = await usuarios.perfis.criar(
           nome: corpo['nome'] as String? ?? '',
           descricao: corpo['descricao'] as String? ?? base?.descricao ?? '',
@@ -773,10 +867,11 @@ class Servidor {
     final corpo = await _corpo(req);
     final antes = {...perfil.permissoes}, nomeAntes = perfil.nome;
     try {
-      await usuarios.perfis.atualizar(id,
-          nome: corpo['nome'] as String?,
-          descricao: corpo['descricao'] as String?,
-          permissoes: _permissoesDoCorpo(corpo['permissoes']));
+      final novas = _permissoesDoCorpo(corpo['permissoes']);
+      // Mexer num perfil mexe em quem o usa: só quem tem tudo o que ele dá (antes e depois).
+      final proibido = _alemDoQuePode(req, {...antes, ...?novas}, 'Este perfil envolve permissões que você não tem');
+      if (proibido != null) return _erro(403, proibido);
+      await usuarios.perfis.atualizar(id, nome: corpo['nome'] as String?, descricao: corpo['descricao'] as String?, permissoes: novas);
     } on FormatException catch (e) {
       return _erro(400, e.message);
     }
@@ -793,6 +888,8 @@ class Servidor {
     final usuarios = _usuarios;
     if (usuarios == null) return _erro(501, 'Perfis indisponíveis.');
     final antes = {...?usuarios.perfis.buscar(id)?.permissoes};
+    final proibido = _alemDoQuePode(req, {...antes, ...?PerfilPadrao.porId(id)?.permissoes}, 'Este perfil envolve permissões que você não tem');
+    if (proibido != null) return _erro(403, proibido);
     try {
       final perfil = await usuarios.perfis.restaurar(id);
       usuarios.religarPerfis();
@@ -812,7 +909,7 @@ class Servidor {
     if (usuarios == null || perfil == null) return _erro(404, 'Perfil não encontrado.');
     final emUso = usuarios.quantosUsam(id);
     if (emUso > 0) {
-      return _erro(400, '$emUso ${emUso == 1 ? 'conta usa' : 'contas usam'} este perfil. Troque o perfil delas antes de excluir.');
+      return _erro(400, '$emUso ${emUso == 1 ? 'conta tem' : 'contas têm'} este perfil. Tire-o dessas pessoas antes de excluir.');
     }
     if (id == PerfilPadrao.integrante.id) {
       return _erro(400, 'O perfil Integrante é usado pelas contas criadas em Acessos às escalas e não pode ser excluído.');
@@ -846,6 +943,7 @@ class Servidor {
                 'nome': u.nome,
                 'login': u.login,
                 'perfil': u.perfil.id,
+                'perfis': u.idsPerfis,
                 'perfilNome': u.perfil.nome,
                 'membroId': u.membroId,
                 'ativo': u.ativo,
@@ -862,7 +960,7 @@ class Servidor {
     if (store.buscar('membros', id) == null) return _erro(404, 'Membro não encontrado.');
     if (usuarios.porMembro(id) != null) return _erro(400, 'Este membro já tem acesso.');
     final integrante = usuarios.perfis.buscar(PerfilPadrao.integrante.id);
-    if (integrante == null) return _erro(500, 'O perfil Integrante foi excluído: restaure-o em Administração › Perfis.');
+    if (integrante == null) return _erro(500, 'O perfil Integrante foi excluído: restaure-o em Usuários e acessos › Perfis.');
     final senha = _novaSenhaTemporaria();
     try {
       final u = await usuarios.criar(nome: corpo['nome'] as String? ?? '', login: corpo['login'] as String? ?? '',
@@ -891,7 +989,8 @@ class Servidor {
 
   Future<Response> _senhaAcessoEscala(Request req, String id) async {
     final u = _usuarios?.buscar(id);
-    if (u == null || u.perfil.id != PerfilPadrao.integrante.id || u.membroId == null || store.buscar('membros', u.membroId!) == null) {
+    // Só a conta que é apenas Integrante: quem tem outro perfil junto é da administração de usuários.
+    if (u == null || u.idsPerfis.join() != PerfilPadrao.integrante.id || u.membroId == null || store.buscar('membros', u.membroId!) == null) {
       return _erro(404, 'Acesso não encontrado.');
     }
     return _redefinirSenhaUsuario(req, id);
@@ -904,7 +1003,7 @@ class Servidor {
     if (t.usuario == Auth.idPrincipal) return Conta.principal;
     final u = _usuarios?.buscar(t.usuario);
     if (u == null || !u.ativo || u.trocarSenha || !u.perfil.pode(Permissao.projetar)) return null;
-    return Conta(id: u.id, nome: u.nome, login: u.login, perfil: u.perfil);
+    return Conta(id: u.id, nome: u.nome, login: u.login, perfil: u.perfil, perfis: u.idsPerfis);
   }
 
   /// O que o agente precisa para conferir os tablets sem internet: só o hash do token.
@@ -1022,8 +1121,10 @@ class Servidor {
 
   /// Recados cadastrados mais o automático de aniversariantes (quando houver).
   List<Recado> _recadosComAuto() {
-    final auto = recadoAniversariantes(_membros(), _agora());
-    return [if (auto != null) auto, ...store.listar('recados').map(Recado.fromJson)];
+    final membros = _membros();
+    final auto = recadoAniversariantes(membros, _agora());
+    final casamentos = recadoCasamentos(membros, _agora());
+    return [if (auto != null) auto, if (casamentos != null) casamentos, ...store.listar('recados').map(Recado.fromJson)];
   }
 
   List<Membro> _membros() => store.listar('membros').map(Membro.fromJson).toList();
@@ -1043,7 +1144,7 @@ class Servidor {
   }
 
   Future<Response> _atualizarRecado(Request req, String id) async {
-    if (id == idRecadoAniversariantes) {
+    if (id == idRecadoAniversariantes || id == idRecadoCasamentos) {
       return _erro(400, 'O recado de aniversariantes é automático. Edite os membros.');
     }
     final atual = store.buscar('recados', id);
@@ -1561,6 +1662,9 @@ class Servidor {
     'ano',
     'sexo',
     'estadoCivil',
+    'dataCasamento',
+    'conjugeNome',
+    'casamentoAutorizado',
     'cpf',
     'rg',
     'telefone',
@@ -1646,6 +1750,12 @@ class Servidor {
         return _erro(400, 'Familiar inválido.');
       }
       familiares.add({'nome': nome, 'parentesco': parentesco});
+    }
+    // O nome livre também entra na revisão de vínculos, sem criar uma ficha.
+    final nomeConjuge = dados['conjugeNome'] as String?;
+    if (nomeConjuge != null && !familiares.any((f) => f['parentesco'] == 'conjuge')) {
+      if (familiares.length >= 10) return _erro(400, 'Informe no máximo 10 familiares, incluindo o cônjuge.');
+      familiares.add({'nome': nomeConjuge, 'parentesco': 'conjuge'});
     }
     final id = novoId();
     final candidato =
@@ -1900,10 +2010,26 @@ class Servidor {
         alteracoes['consentimentoEm'] =
             (consentimento['em'] as String).substring(0, 10);
       }
+      final casamentoFinal = Membro.fromJson({...?base, ...alteracoes, 'id': alvoId});
+      final nomeConjugeFinal = casamentoFinal.conjugeId == null ? casamentoFinal.conjugeNome
+          : store.buscar('membros', casamentoFinal.conjugeId!)?['nome'] as String?;
+      final aceiteCasamentoPublico = enviados['casamentoAutorizado'] == true &&
+          casamentoFinal.dataCasamento == enviados['dataCasamento'] &&
+          _nomeComparavel(nomeConjugeFinal ?? '') == _nomeComparavel(enviados['conjugeNome'] as String? ?? '');
+      if (alteracoes['casamentoAutorizado'] == true && !aceiteCasamentoPublico && revisados['casamentoAutorizado'] != true) {
+        // O aceite não pode ser transferido silenciosamente para outro casal/data.
+        alteracoes.remove('casamentoAutorizado');
+      }
       final membro = _montarMembro(
           alteracoes..remove('consentimentoEm'), base ?? {}, alvoId,
           por: Auth.contaDa(req)?.nome);
       final atualizado = membro.toJson();
+      if (alteracoes['casamentoAutorizado'] == true && aceiteCasamentoPublico) {
+        atualizado['casamentoConsentimento'] = {
+          ...membro.casamentoConsentimento!, 'via': 'autocadastro', 'solicitacaoId': id,
+          'aceiteEm': consentimento['em'],
+        };
+      }
       if (base?['consentimentoEm'] == null) {
         atualizado['consentimentoEm'] =
             (consentimento['em'] as String).substring(0, 10);
@@ -2000,8 +2126,9 @@ class Servidor {
     if (corpo.containsKey('status') && StatusMembro.porNome(corpo['status'] as String?) == null) {
       throw const FormatException('Status inválido.');
     }
-    for (final campo in ['dataChegada', 'dataBatismo', 'dataMembresia', 'consentimentoEm']) {
+    for (final campo in ['dataChegada', 'dataBatismo', 'dataMembresia', 'consentimentoEm', 'dataCasamento']) {
       final v = corpo[campo];
+      if (campo == 'dataCasamento' && v != null && v is! String) throw const FormatException('Data de casamento inválida.');
       if (v is String && v.trim().isNotEmpty && Membro.dataDe(v) == null) {
         throw FormatException('Data inválida em "$campo": use dd/mm/aaaa.');
       }
@@ -2017,7 +2144,14 @@ class Servidor {
       ..remove('consentimentoRegistro')
       ..remove('termoAssinado')
       ..remove('consentimentoRevogado')
+      ..remove('casamentoConsentimento')
       ..remove('conviteLgpd');
+    if (corpo.containsKey('casamentoAutorizado') && corpo['casamentoAutorizado'] is! bool) {
+      throw const FormatException('A autorização do casal deve ser verdadeiro ou falso.');
+    }
+    if (corpo['conjugeNome'] != null && corpo['conjugeNome'] is! String) {
+      throw const FormatException('Nome do cônjuge inválido.');
+    }
     // Data da autorização digitada pela secretaria: vale como registro manual, com quem digitou.
     if (editavel.containsKey('consentimentoEm')) {
       final nova = Membro.dataDe(editavel['consentimentoEm']);
@@ -2038,6 +2172,45 @@ class Servidor {
       }
     }
     final m = Membro.fromJson({...base, ...editavel, 'id': id});
+    if (m.conjugeId != null) m.conjugeNome = null;
+    var herdouCasamento = false;
+    final novoVinculo = m.conjugeId != null && m.conjugeId != anterior?.conjugeId;
+    final nomeParceiro = novoVinculo ? (store.buscar('membros', m.conjugeId!)?['nome'] as String?) : null;
+    final mesmoConjugeCadastrado = novoVinculo && anterior?.conjugeId == null && anterior?.conjugeNome != null &&
+        _nomeComparavel(anterior!.conjugeNome!) == _nomeComparavel(nomeParceiro ?? '');
+    if (mesmoConjugeCadastrado && m.dataCasamento == null) m.dataCasamento = anterior.dataCasamento;
+    if (novoVinculo && m.dataCasamento == null) {
+      final docParceiro = store.buscar('membros', m.conjugeId!);
+      final parceiro = docParceiro == null ? null : Membro.fromJson(docParceiro);
+      if (parceiro?.dataCasamento != null) {
+        final mesmoCasal = (parceiro!.conjugeId == null &&
+                _nomeComparavel(parceiro.conjugeNome ?? '') == _nomeComparavel(m.nome)) || parceiro.conjugeId == id;
+        if (!mesmoCasal || anterior?.dataCasamento != null) {
+          throw const FormatException('O cônjuge já tem um casamento registrado. Confira a data e o casal antes de vincular.');
+        }
+        // A ficha nova apenas completa o cadastro de quem já estava identificado
+        // pelo nome: preserva o casamento e o aceite desse mesmo casal.
+        m.dataCasamento = parceiro.dataCasamento;
+        m.casamentoAutorizado = parceiro.casamentoAutorizado;
+        m.casamentoConsentimento = parceiro.casamentoConsentimento;
+        herdouCasamento = true;
+      }
+    }
+    final mudouConjuge = anterior != null && !mesmoConjugeCadastrado &&
+        (m.conjugeId != anterior.conjugeId || m.conjugeNome != anterior.conjugeNome);
+    if (!herdouCasamento && mudouConjuge && corpo['casamentoAutorizado'] != true &&
+        (!corpo.containsKey('dataCasamento') || m.dataCasamento == anterior.dataCasamento)) m.dataCasamento = null;
+    if (!herdouCasamento && (mudouConjuge || m.dataCasamento != anterior?.dataCasamento) && corpo['casamentoAutorizado'] != true) {
+      m.casamentoAutorizado = false;
+    }
+    if (!m.casamentoAutorizado) {
+      m.casamentoConsentimento = null;
+    } else if (!herdouCasamento && corpo['casamentoAutorizado'] == true) {
+      m.casamentoConsentimento = {'em': _agora().toUtc().toIso8601String(), 'por': por ?? 'Secretaria', 'via': 'manual'};
+    }
+    if (m.dataCasamento != null && (m.dataCasamento!.compareTo('1900-01-01') < 0 || m.dataCasamento!.compareTo(diaIso(_agora())) > 0)) {
+      throw const FormatException('Data de casamento inválida: não pode estar no futuro.');
+    }
     final erro = _validarMembro(m);
     if (erro != null) throw FormatException(erro);
     if (m.conjugeId != null && store.buscar('membros', m.conjugeId!) == null) {
@@ -2093,25 +2266,35 @@ class Servidor {
     if (idAntigo != null && idAntigo != novo.conjugeId && idAntigo != novo.id) {
       final doc = store.buscar('membros', idAntigo);
       if (doc != null && doc['conjugeId'] == novo.id) {
-        docs.add({...doc}..remove('conjugeId'));
+        docs.add(_semVinculoCasamento(doc));
       }
     }
     final idNovo = novo.conjugeId;
     if (idNovo != null && idNovo != novo.id) {
       final doc = store.buscar('membros', idNovo);
-      if (doc != null && doc['conjugeId'] != novo.id) {
+      if (doc != null) {
         // O novo cônjuge era casado com outra pessoa no cadastro: desfaz o vínculo antigo
         // (o painel pede confirmação antes), senão essa pessoa continuaria apontando para ele.
         final outroId = doc['conjugeId'] as String?;
-        if (outroId != null && outroId != idAntigo) {
+        if (outroId != null && outroId != idAntigo && outroId != novo.id) {
           final outro = store.buscar('membros', outroId);
-          if (outro != null && outro['conjugeId'] == idNovo) docs.add({...outro}..remove('conjugeId'));
+          if (outro != null && outro['conjugeId'] == idNovo) docs.add(_semVinculoCasamento(outro));
         }
-        docs.add({...doc, 'conjugeId': novo.id});
+        final parceiro = {...doc, 'conjugeId': novo.id, 'dataCasamento': novo.dataCasamento,
+          'casamentoAutorizado': novo.casamentoAutorizado, 'casamentoConsentimento': novo.casamentoConsentimento}
+          ..remove('conjugeNome');
+        docs.add(Membro.fromJson(parceiro).toJson());
       }
     }
     if (docs.isNotEmpty) await store.salvarVarios('membros', docs);
   }
+
+  static Map<String, dynamic> _semVinculoCasamento(Map<String, dynamic> doc) => {...doc}
+    ..remove('conjugeId')
+    ..remove('conjugeNome')
+    ..remove('dataCasamento')
+    ..remove('casamentoAutorizado')
+    ..remove('casamentoConsentimento');
 
   Future<Response> _excluirMembro(Request req, String id) async {
     final atual = store.buscar('membros', id);
@@ -2121,7 +2304,7 @@ class Servidor {
     final docs = <Map<String, dynamic>>[];
     if (m.conjugeId != null) {
       final doc = store.buscar('membros', m.conjugeId!);
-      if (doc != null && doc['conjugeId'] == id) docs.add({...doc}..remove('conjugeId'));
+      if (doc != null && doc['conjugeId'] == id) docs.add(_semVinculoCasamento(doc));
     }
     for (final outro in store.listar('membros')) {
       if (outro['id'] == id) continue;
@@ -2842,7 +3025,10 @@ class Servidor {
     for (final (i, p) in pessoas.indexed) {
       if (p.parentesco != 'conjuge') continue;
       final a = store.buscar('membros', titularId)!, b = store.buscar('membros', ids[i])!;
-      if (a['conjugeId'] == null && b['conjugeId'] == null && ids[i] != titularId) {
+      // A recepção não substitui casamento já registrado, inclusive por nome
+      // livre. Esses vínculos precisam ser conferidos pela secretaria na ficha.
+      if (a['conjugeId'] == null && b['conjugeId'] == null && ids[i] != titularId &&
+          a['conjugeNome'] == null && b['conjugeNome'] == null && a['dataCasamento'] == null && b['dataCasamento'] == null) {
         await store.salvarVarios('membros', [{...a, 'conjugeId': ids[i]}, {...b, 'conjugeId': titularId}]);
         conjugeId = ids[i];
       }
@@ -3006,6 +3192,10 @@ class Servidor {
     if (m.cpf != null && !Membro.cpfValido(m.cpf!)) return 'CPF inválido: confira os números.';
     if (m.email != null && !RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$').hasMatch(m.email!)) return 'E-mail inválido.';
     if (m.conjugeId == m.id) return 'O cônjuge não pode ser a própria pessoa.';
+    if (m.conjugeNome != null && !nomeDePessoaValido(m.conjugeNome!)) return 'Nome do cônjuge inválido (máximo 100 caracteres).';
+    if (m.casamentoAutorizado && (m.dataCasamento == null || (m.conjugeId == null && m.conjugeNome == null))) {
+      return 'Informe a data do casamento e o cônjuge antes de autorizar a divulgação.';
+    }
     if (m.paisIds.contains(m.id)) return 'Os pais não podem ser a própria pessoa.';
     if (m.ministerios.length > 12) return 'Muitos ministérios (máximo 12).';
     if ((m.comoConheceu ?? '').length > 200) return '"Como conheceu" muito longo.';

@@ -25,14 +25,14 @@ async function carregarAcessosEscala() {
     preencherPessoas($('acesso-pastor-membro'), disponiveis);
     // O servidor só lista contas da Minha escala (quem consulta a própria escala, sem administrar acessos).
     $('acesso-pastor').replaceChildren(new Option('Escolha…', ''),
-      ...usuariosAcesso.filter((u) => u.perfil !== 'integrante' && !u.membroId)
+      ...usuariosAcesso.filter((u) => (u.perfis || [u.perfil]).join() !== 'integrante' && !u.membroId)
         .map((u) => new Option(`${u.nome} (${u.login}) · ${u.perfilNome || u.perfil}`, u.id)));
     const lista = $('acessos-lista');
     lista.replaceChildren();
     for (const u of usuariosAcesso.filter((u) => u.membroId)) {
       const linha = document.createElement('p');
       linha.textContent = `${u.nome} · ${u.login} · ${u.perfilNome || u.perfil}${u.trocarSenha ? ' · aguardando primeiro acesso' : ''}`;
-      if (u.perfil === 'integrante') {
+      if ((u.perfis || [u.perfil]).join() === 'integrante') {
         const redefinir = document.createElement('button');
         redefinir.type = 'button'; redefinir.className = 'botao secundario pequeno';
         redefinir.style.marginLeft = '10px'; redefinir.textContent = 'Nova senha e enviar';

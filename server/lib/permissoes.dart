@@ -27,6 +27,8 @@ enum Permissao {
   motivosEditar('Aprovar, editar e marcar pedidos como atendidos', AreaPermissao.oracao, ''),
   mensagens('Caixa de mensagens', AreaPermissao.oracao, 'Mensagens enviadas pelo site (dúvidas, sugestões, críticas).'),
   membros('Cadastro de membros', AreaPermissao.pessoas, 'Aba Membros, fichas, certificado de batismo e contato com visitantes.'),
+  casais('Consultar Casais e Família', AreaPermissao.pessoas, 'Aniversários de casamento por mês e contatos limitados. Não permite consultar ou editar fichas completas.'),
+  devocionais('Escrever, publicar e enviar devocionais', AreaPermissao.comunicacao, 'Gestão dos devocionais de casais e família. Publicação sem aprovação; e-mail enviado somente após confirmação.'),
   ministerios('Cadastro de ministérios', AreaPermissao.pessoas, 'Criar ministérios e dizer quem participa de cada um (decide quem vê as atas de cada ministério).'),
   visitantes('Ver os visitantes do dia e dar as boas-vindas', AreaPermissao.pessoas, ''),
   visitantesHistorico('Ver visitantes de outros dias', AreaPermissao.pessoas, 'Sem esta, só aparecem os visitantes de hoje (como na Recepção).'),
@@ -51,7 +53,7 @@ enum Permissao {
   atasTodosMinisterios('Ver atas de todos os ministérios', AreaPermissao.gestao, 'Sem esta, a pessoa só vê as atas dos ministérios de que participa (pelo cadastro de membro ligado à conta).'),
   resumo('Resumo da semana', AreaPermissao.gestao, ''),
   admin('Administração', AreaPermissao.administracao, 'Página /admin: configurações, backup, integrações e auditoria.'),
-  usuarios('Usuários e perfis', AreaPermissao.administracao, 'Criar contas, redefinir senhas e configurar perfis.');
+  usuarios('Usuários e perfis', AreaPermissao.administracao, 'Página Usuários e acessos: criar contas, dar perfis, redefinir senhas e configurar perfis (só o que a própria pessoa pode).');
 
   const Permissao(this.descricao, this.area, this.dica);
   final String descricao;
@@ -67,6 +69,7 @@ enum Permissao {
         escalaPastoral || escalaLouvor => {escalasVer},
         indisponibilidade || musicasMinistro => {minhaEscala},
         palavrasTodas => {palavras},
+        devocionais => {casais},
         agendaEditar => {agendaVer},
         atasSigilosas || atasTodosMinisterios => {atas},
         _ => const {},
@@ -106,7 +109,7 @@ enum PerfilPadrao {
     Permissao.visitantes, Permissao.visitantesHistorico, Permissao.visitantesCadastrar, Permissao.escalasVer,
     Permissao.escalaPastoral, Permissao.escalaLouvor, Permissao.minhaEscala, Permissao.indisponibilidade,
     Permissao.acessosEscala, Permissao.palavras, Permissao.palavrasTodas, Permissao.atas, Permissao.atasSigilosas,
-    Permissao.ministerios, Permissao.atasTodosMinisterios,
+    Permissao.ministerios, Permissao.atasTodosMinisterios, Permissao.casais, Permissao.devocionais,
   }),
   pastor('Pastor', 'Todo o conteúdo, inclusive pedidos particulares. Sem configurações técnicas.', {
     ..._base, Permissao.motivosParticulares, Permissao.motivosEditar, Permissao.mensagens, Permissao.agendaEditar,
@@ -114,12 +117,12 @@ enum PerfilPadrao {
     Permissao.visitantes, Permissao.visitantesHistorico, Permissao.visitantesCadastrar, Permissao.escalasVer,
     Permissao.escalaPastoral, Permissao.escalaLouvor, Permissao.minhaEscala, Permissao.indisponibilidade,
     Permissao.palavras, Permissao.palavrasTodas, Permissao.atas, Permissao.atasSigilosas,
-    Permissao.ministerios, Permissao.atasTodosMinisterios,
+    Permissao.ministerios, Permissao.atasTodosMinisterios, Permissao.casais, Permissao.devocionais,
   }),
   secretaria('Secretaria', 'Recados, agenda, mensagens, aniversariantes e pedidos públicos.', {
     ..._base, Permissao.motivosEditar, Permissao.mensagens, Permissao.agendaEditar, Permissao.membros, Permissao.gestaoCasa, Permissao.resumo,
     Permissao.visitantes, Permissao.visitantesHistorico, Permissao.visitantesCadastrar, Permissao.escalasVer,
-    Permissao.minhaEscala, Permissao.indisponibilidade, Permissao.acessosEscala, Permissao.atas, Permissao.ministerios,
+    Permissao.minhaEscala, Permissao.indisponibilidade, Permissao.acessosEscala, Permissao.atas, Permissao.ministerios, Permissao.casais,
   }),
   midia('Mídia', 'Cartazes, galeria do site, recados e projeção no telão.', {
     ..._base, Permissao.galeria, Permissao.projetar, Permissao.escalasVer,
@@ -132,6 +135,9 @@ enum PerfilPadrao {
   }),
   gestaoCasa('Gestão da Casa', 'Cuida das pendências, compras planejadas e manutenções preventivas.', {
     Permissao.sessao, Permissao.gestaoCasa,
+  }),
+  liderCasais('Líder de Casais e Família', 'Consulta casais e contatos limitados; escreve, publica e envia devocionais. Sem acesso às fichas completas.', {
+    Permissao.sessao, Permissao.casais, Permissao.devocionais,
   }),
   comissaoLouvor('Comissão do Louvor', 'Membros da comissão: montam a escala e as músicas do louvor e veem a escala pastoral e a agenda.', {
     Permissao.sessao, Permissao.agendaVer, Permissao.escalasVer, Permissao.escalaLouvor, Permissao.minhaEscala,
@@ -187,6 +193,18 @@ class Perfil {
   /// Perfil de uma conta cujo perfil foi apagado ou não existe: só entra, não vê nada.
   factory Perfil.semAcesso(String id) => Perfil(id: id, nome: 'Sem perfil', permissoes: const {});
 
+  /// O que uma conta com vários perfis pode: a soma das permissões (nenhum perfil tira nada).
+  /// Com um perfil só, devolve o próprio objeto (compartilhado com `Perfis`); sem nenhum, sem acesso.
+  /// Calculado na hora: editar um dos perfis já vale para a conta.
+  static Perfil combinado(List<Perfil> perfis) {
+    if (perfis.isEmpty) return Perfil.semAcesso('');
+    if (perfis.length == 1) return perfis.single;
+    return Perfil(
+        id: perfis.first.id,
+        nome: perfis.map((p) => p.nome).join(' + '),
+        permissoes: {for (final p in perfis) ...p.permissoes});
+  }
+
   // Os padrões de fábrica, para código e testes que precisam de um perfil conhecido.
   static final administrador = PerfilPadrao.administrador.criar();
   static final pastor = PerfilPadrao.pastor.criar();
@@ -195,6 +213,7 @@ class Perfil {
   static final telao = PerfilPadrao.telao.criar();
   static final recepcao = PerfilPadrao.recepcao.criar();
   static final gestaoCasa = PerfilPadrao.gestaoCasa.criar();
+  static final liderCasais = PerfilPadrao.liderCasais.criar();
   static final comissaoLouvor = PerfilPadrao.comissaoLouvor.criar();
   static final louvor = PerfilPadrao.louvor.criar();
   static final ministro = PerfilPadrao.ministro.criar();
@@ -205,7 +224,7 @@ class Perfil {
   /// Os padrões de fábrica, na ordem de [PerfilPadrao].
   static final List<Perfil> values = [
     administrador, pastor, secretaria, midia, telao, recepcao, gestaoCasa, comissaoLouvor, louvor, ministro, pregador,
-    integrante, player,
+    integrante, player, liderCasais,
   ];
 
   /// Padrão de fábrica com este id (os perfis configurados ficam em `Perfis`).
@@ -249,6 +268,8 @@ Permissao permissaoDaRota(String metodo, String caminho) {
   if (comeca('api/cartazes')) return Permissao.cartazes;
   if (comeca('api/galeria')) return Permissao.galeria;
   if (comeca('api/membros')) return Permissao.membros;
+  if (comeca('api/casais')) return Permissao.casais;
+  if (comeca('api/devocionais')) return Permissao.devocionais;
   if (comeca('api/solicitacoes-membros')) return Permissao.membros;
   // Certificado de batismo (geração do PDF e as imagens de assinatura/carimbo salvas).
   if (comeca('api/certificado')) return Permissao.membros;

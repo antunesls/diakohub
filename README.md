@@ -31,7 +31,7 @@ Menu organizado por área; cada pessoa vê só o que o seu perfil permite.
 | Área | Páginas |
 |---|---|
 | Início | Visão geral |
-| Acompanhamento | Motivos de oração (aprovação, testemunhos), Mensagens (*Nova*, *Em análise*, *Resolvida*), Membros (cadastro completo, família, visitantes, acompanhamento, LGPD) |
+| Acompanhamento | Motivos de oração (aprovação, testemunhos), Mensagens (*Nova*, *Em análise*, *Resolvida*), Membros (cadastro completo, família, visitantes, acompanhamento, LGPD), Casais e Família |
 | Cultos | Escalas pastoral e do louvor, Repertório, Roteiros do Modo Culto, Palavras (sermões) |
 | Comunicação | Agenda (Google), Recados, Cartazes, Galeria do site, Resumo da semana para o WhatsApp |
 | Operação | Gestão da Casa, Atas de reunião, Histórico do que foi projetado, Status (Holyrics, agente, QR codes), Acessos às escalas, Administração |
@@ -48,6 +48,16 @@ Opera o telão durante o culto: recados, cartazes, motivos de oração, boas-vin
 - **Solicitações de cadastro:** envio público com dados, foto opcional e familiares por nome; só após a aprovação da secretaria entra no cadastro. A secretaria escolhe Congregado ou Membro, pode aproveitar a ficha existente e rejeitar solicitações; pedidos rejeitados são guardados até exclusão manual.
 - **Visitantes:** ficam na mesma lista de pessoas, com a situação *Visitante*. Não entram em aniversariantes, escalas nem na contagem de ativos até virarem *Congregado* ou *Membro*. Três formas de cadastrar (QR da recepção, obreiro pelo celular em `/recepcao`, secretaria pelo painel), quem veio junto, interesses e acompanhamento com mensagem pronta de WhatsApp.
 - **LGPD:** autorização com prova (link individual, termo assinado anexado ou QR), revogação e termo versionado. Aniversariantes só aparecem para quem autorizou.
+- **Aniversários de casamento:** informe a data em **Membros → Família**, selecionando o cônjuge ou preenchendo o nome quando não há cadastro. A data e a autorização do casal são compartilhadas entre os cônjuges vinculados. Com autorização específica do casal e LGPD dos cadastrados, um recado automático mostra os nomes, a data e os anos de casamento na semana (domingo a sábado), no mural, telão e resumo do WhatsApp, sem duplicar casais vinculados. O formulário público também recebe esses dados, sempre sujeitos à revisão da secretaria. Trocar o cônjuge ou a data exige nova autorização; sem aniversários autorizados na semana, o recado não aparece.
+
+### Casais e Família
+- **Aniversários do mês:** seleção de mês e ano, casal, data e anos de casamento. Usa exclusivamente os vínculos e nomes já registrados em Membros; não há um segundo cadastro de pessoas. A consulta interna é distinta da autorização para divulgação no mural/telão. Casamentos de 29/02 aparecem em 28/02 nos anos não bissextos.
+- **Perfil Líder de Casais e Família:** consulta os casais e os contatos autorizados, sem acesso a CPF, endereço, observações ou edição da ficha completa. Pode escrever, publicar e enviar devocionais sem aprovação prévia. Administração e pastor também gerenciam os devocionais; secretaria tem consulta dos casais.
+- **Devocionais:** rascunho e publicação, título, autoria, data, tema (Casais ou Família), referência bíblica, reflexão, aplicação e oração. Permite importar texto/Word como na Palavra, mas não tem controles de culto, slides ou apresentação.
+- **Compartilhamento:** copiar o texto formatado para WhatsApp ou compartilhar uma introdução com o link. Qualquer pessoa com o link de um devocional publicado pode ler sem login; rascunhos ficam privados e retirar a publicação interrompe a leitura pública.
+- **E-mail manual:** configure o SMTP na Administração. Depois de publicar, selecione membros com contato e consentimento ou os assinantes confirmados do tema, confira a prévia e confirme o envio. Publicar não dispara mensagens. Cada destinatário recebe sua mensagem individualmente, sem expor a lista; endereços repetidos e destinatários já enviados são ignorados.
+- **Assinaturas:** qualquer leitor pode informar seu e-mail e escolher Casais, Família ou ambos. Exige autorização específica e confirmação por link; não cria ficha de membro e não usa a autorização de casamento como assinatura. O leitor pode cancelar pelo link recebido, sem login. Os links de confirmação e cancelamento exigem uma ação explícita na página, não são acionados por robôs que apenas abrem o endereço.
+- **Segurança dos envios:** recibos persistentes evitam repetição em pedidos simultâneos e reinícios. Uma interrupção durante o SMTP pode deixar o resultado incerto; esses destinatários não são reenviados automaticamente, para evitar duplicação. As coleções da área participam do backup existente.
 
 ### Gestão da Casa
 - **Pendências:** tarefas por local, prioridade, prazo e responsável; andamento, conclusão, histórico, fotos e comprovantes privados.
@@ -90,6 +100,7 @@ Opera o telão durante o culto: recados, cartazes, motivos de oração, boas-vin
 | Comissão do Louvor | Monta a escala e as músicas do louvor; vê a escala pastoral e a agenda. |
 | Ministro | Escolhe as músicas dos cultos em que ministra. |
 | Pregador | Prepara as próprias Palavras no painel. |
+| Líder de Casais e Família | Consulta casamentos e contatos limitados; escreve, publica e envia devocionais. Sem acesso às fichas completas. |
 | Louvor / Integrante | Consulta a própria escala e avisa indisponibilidades. |
 | DiakoPlayer | Conta do PC do som: o [DiakoPlayer](https://github.com/antunesls/DiakoPlayer) lê as escalas e o repertório para montar a fila do louvor. Não entra no painel. O endereço do controle vai em `/admin › DiakoPlayer` e faz aparecer o botão "Abrir no DiakoPlayer" nas músicas da escala. |
 

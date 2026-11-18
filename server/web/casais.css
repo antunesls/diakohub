@@ -1,0 +1,23 @@
+[data-painel="casais"] > section + section { margin-top: 36px; border-top: 1px solid var(--linha); padding-top: 28px; }
+#casais-filtro { align-items: end; }
+#casais-filtro label { margin: 0; }
+#casais-filtro input { max-width: 130px; }
+#devocional-editor { margin-top: 20px; }
+.devocional-grade { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 18px; }
+.devocional-grade .largo { grid-column: 1 / -1; }
+.devocional-acoes { display: flex; flex-wrap: wrap; gap: 8px; margin: 16px 0; }
+.devocional-leitura { max-width: 72ch; overflow-wrap: anywhere; }
+.devocional-leitura p { white-space: pre-wrap; line-height: 1.8; }
+.devocional-leitura h2, .devocional-leitura h3 { margin-top: 1.4em; }
+.devocional-previa { padding: 20px; background: var(--campo); border: 1px solid var(--linha); border-radius: var(--raio); margin-top: 20px; }
+.devocional-destinatarios { max-height: 260px; overflow-y: auto; margin: 12px 0; }
+.devocional-email-texto { white-space: pre-wrap; overflow-wrap: anywhere; font: inherit; max-height: 360px; overflow-y: auto; }
+body.devocional-publico main { max-width: 800px; padding: 30px 20px 60px; }
+.devocional-publico header { justify-content: flex-start; }
+.devocional-publico header img { max-width: 210px; height: auto; }
+.devocional-publico article { margin-bottom: 40px; }
+.devocional-publico h1 { font-size: clamp(30px, 6vw, 44px); }
+.devocional-publico fieldset { min-width: 0; border: 1px solid var(--linha); border-radius: 12px; margin: 0 0 20px; padding: 16px; }
+.devocional-publico .marcar { margin: 12px 0; }
+.devocional-publico a:focus-visible, [data-painel="casais"] a:focus-visible { outline: 3px solid var(--primaria); outline-offset: 3px; }
+@media (max-width: 600px) { .devocional-grade { grid-template-columns: minmax(0, 1fr); } #devocional-editor { padding: 16px; } }

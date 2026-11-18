@@ -6,6 +6,7 @@
 <title>Painel — DiakoHub</title>
 <link rel="icon" href="/logo.png" type="image/png">
 <link rel="stylesheet" href="/estilo.css?v=5">
+<link rel="stylesheet" href="/casais.css?v=1">
 <style>
   .topo {
     display: flex; flex-wrap: wrap; align-items: center; gap: 16px;
@@ -894,6 +895,27 @@
       <div id="casa-rotinas" class="lista"></div>
     </section>
 
+    <section data-painel="casais" hidden>
+      <h1>Casais e Família</h1>
+      <p class="dica">Aniversários de casamento e devocionais para cultivar a vida em família.</p>
+      <section aria-labelledby="casais-titulo">
+        <h2 id="casais-titulo">Aniversários de casamento</h2>
+        <form id="casais-filtro" class="barra">
+          <label>Mês <select id="casais-mes" aria-label="Mês dos aniversários"></select></label>
+          <label>Ano <input id="casais-ano" type="number" min="1900" max="9999" required></label>
+          <button class="botao secundario" type="submit">Consultar</button>
+        </form>
+        <p id="casais-resultado" role="status"></p>
+        <div id="casais-lista" class="lista"></div>
+      </section>
+      <section id="devocionais-gestao" data-permissao="devocionais" aria-labelledby="devocionais-titulo">
+        <div class="barra"><h2 id="devocionais-titulo">Devocionais</h2><button id="devocional-novo" class="botao" type="button">Criar devocional</button></div>
+        <p id="devocionais-resultado" role="status"></p>
+        <div id="devocionais-lista" class="lista"></div>
+        <div id="devocional-editor" class="cartao" hidden></div>
+      </section>
+    </section>
+
     <section data-painel="ministerios" hidden>
       <div class="duas">
         <div class="cartao">
@@ -1052,7 +1074,7 @@
           <p><strong>TV de boas-vindas</strong> (logo depois da recepção): <a id="link-mural-boas-vindas" href="/mural" target="_blank"></a></p>
           <p class="dica">Mostra "Sejam bem-vindos!" com os nomes dos visitantes de hoje que autorizaram ser citados (aparecem segundos depois do cadastro). Sem visitantes, mostra o QR do cadastro.</p>
           <p><strong>Recepção (celular do obreiro):</strong> <a id="link-recepcao" href="/recepcao" target="_blank"></a></p>
-          <p class="dica">Crie para cada obreiro um usuário com o perfil <em>Recepção</em> em Administração › Usuários. Ele só cadastra visitantes e vê os do dia. <a href="/ajuda/visitantes" target="_blank">Como funciona</a></p>
+          <p class="dica">Crie para cada obreiro um usuário com o perfil <em>Recepção</em> em <a href="/acessos">Usuários e acessos</a>. Ele só cadastra visitantes e vê os do dia. <a href="/ajuda/visitantes" target="_blank">Como funciona</a></p>
         </div>
       </div>
     </section>
@@ -1402,9 +1424,14 @@
         <div class="grade-campos">
           <div class="campo"><label for="b-conjuge">Cônjuge</label><input type="text" id="b-conjuge" list="dl-pessoas" autocomplete="off" placeholder="(nenhum)">
             <p class="aviso-campo dica" id="b-conjuge-aviso" hidden></p></div>
+          <div class="campo"><label class="marcar"><input type="checkbox" id="b-conjuge-externo">Cônjuge sem cadastro</label></div>
+          <div class="campo" id="b-conjuge-nome-campo" hidden><label for="b-conjuge-nome">Nome do cônjuge sem cadastro</label><input type="text" id="b-conjuge-nome" maxlength="100" autocomplete="off"></div>
+          <div class="campo"><label for="b-data-casamento">Data do casamento</label><input type="date" id="b-data-casamento" min="1900-01-01"></div>
           <div class="campo"><label for="b-pai-1">Pai, mãe ou responsável</label><input type="text" id="b-pai-1" list="dl-pessoas" autocomplete="off" placeholder="(nenhum)"></div>
           <div class="campo"><label for="b-pai-2">Pai, mãe ou responsável</label><input type="text" id="b-pai-2" list="dl-pessoas" autocomplete="off" placeholder="(nenhum)"></div>
         </div>
+        <label class="marcar"><input type="checkbox" id="b-casamento-autorizado"><span>O casal autorizou divulgar os nomes, a data e os anos de casamento no mural, telão e resumo da semana, inclusive quando o cônjuge não tem cadastro.</span></label>
+        <p class="dica">Opcional. Para cônjuges cadastrados, a data e esta autorização valem para os dois. Ambos precisam autorizar o uso dos dados (LGPD). Sem autorização, a informação fica somente na ficha.</p>
       </div>
     </div>
     <p class="erro" id="erro-membro" hidden></p>
@@ -1529,12 +1556,13 @@
 <script src="/comum.js?v=6"></script>
 <script src="/primeiro-acesso.js?v=1"></script>
 <script src="/form-visitante.js?v=2"></script>
-<script src="/menu-lateral.js?v=7"></script>
+<script src="/menu-lateral.js?v=9"></script>
 <script src="/gestao-casa.js?v=1"></script>
 <script src="/atas.js?v=2"></script>
-<script src="/painel.js?v=27"></script>
+<script src="/casais.js?v=1"></script>
+<script src="/painel.js?v=28"></script>
 <script src="/certificado.js?v=1"></script>
-<script src="/acessos-escala.js?v=3"></script>
+<script src="/acessos-escala.js?v=4"></script>
 <script src="/ministerios.js?v=1"></script>
 <script src="/repertorio-busca.js?v=1"></script>
 <script src="/musica-youtube.js?v=1"></script>

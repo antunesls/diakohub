@@ -91,6 +91,16 @@ CadastroLimpo limparCadastroPublico(Map<String, dynamic> corpo, DateTime hoje) {
       dados['estadoCivil'] = valido;
     }
 
+    final conjuge = texto('conjugeNome', 100);
+    if (conjuge != null) {
+      if (!nomeDePessoaValido(conjuge)) return falha('Nome do cônjuge inválido.');
+      dados['conjugeNome'] = conjuge;
+    }
+    if (corpo.containsKey('casamentoAutorizado')) {
+      if (corpo['casamentoAutorizado'] is! bool) return falha('Autorização do casal inválida.');
+      dados['casamentoAutorizado'] = corpo['casamentoAutorizado'];
+    }
+
     final cpf = texto('cpf', 14);
     if (cpf != null) {
       final d = cpf.replaceAll(RegExp(r'\D'), '');
@@ -156,13 +166,16 @@ CadastroLimpo limparCadastroPublico(Map<String, dynamic> corpo, DateTime hoje) {
     }
 
     final hojeIso = '${hoje.year}-${hoje.month.toString().padLeft(2, '0')}-${hoje.day.toString().padLeft(2, '0')}';
-    for (final (campo, rotulo) in [('dataChegada', 'chegada'), ('dataBatismo', 'batismo'), ('dataMembresia', 'membresia')]) {
+    for (final (campo, rotulo) in [('dataChegada', 'chegada'), ('dataBatismo', 'batismo'), ('dataMembresia', 'membresia'), ('dataCasamento', 'casamento')]) {
       final valor = texto(campo, 10);
       if (valor == null) continue;
       final iso = Membro.dataDe(valor);
       if (iso == null || iso.compareTo('1900-01-01') < 0) return falha('Data de $rotulo inválida.');
       if (iso.compareTo(hojeIso) > 0) return falha('A data de $rotulo não pode estar no futuro.');
       dados[campo] = iso;
+    }
+    if (dados['casamentoAutorizado'] == true && (dados['conjugeNome'] == null || dados['dataCasamento'] == null)) {
+      return falha('Informe o nome do cônjuge e a data do casamento para autorizar a divulgação.');
     }
 
     final ministerios = corpo['ministerios'];

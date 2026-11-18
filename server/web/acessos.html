@@ -1,0 +1,248 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Acessos — DiakoHub</title>
+<link rel="stylesheet" href="/estilo.css?v=5">
+<style>
+  .topo { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; padding: 14px max(20px, calc((100% - 1160px) / 2)); background: var(--superficie); border-bottom: 1px solid var(--linha); }
+  .topo img { height: 40px; width: auto; }
+  .topo h1 { font-size: 22px; margin: 0; }
+  .topo .espaco { flex: 1; }
+  .layout { max-width: 1200px; margin: 0 auto; padding: 28px 20px; display: flex; flex-wrap: wrap; gap: 24px; align-items: flex-start; }
+  nav.secoes { flex: 0 0 190px; position: sticky; top: 16px; display: flex; flex-direction: column; gap: 2px; }
+  nav.secoes a { padding: 10px 14px; border-radius: 12px; color: var(--texto); text-decoration: none; font-weight: 500; }
+  nav.secoes a:hover { background: var(--neutro); }
+  nav.secoes a[aria-current="page"] { background: var(--primaria-suave); color: var(--primaria-escura); font-weight: 600; }
+  main { flex: 999 1 640px; min-width: 0; display: flex; flex-direction: column; gap: 20px; }
+  .cartao h2 { font-size: 22px; margin-bottom: 4px; }
+  .cartao > .dica { margin: 0 0 16px; }
+  .acoes { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+  .grade2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 0 16px; }
+  table { width: 100%; border-collapse: collapse; font-size: 14px; }
+  th, td { text-align: left; padding: 10px 8px; border-bottom: 1px solid var(--linha); vertical-align: middle; }
+  th { color: var(--suave); font-weight: 600; }
+  .tabela-rolagem { overflow-x: auto; }
+  #login { max-width: 380px; margin: 10vh auto 0; padding: 0 16px; text-align: center; }
+  #login img { width: 260px; max-width: 80%; margin-bottom: 24px; }
+  #login form { text-align: left; }
+  @media (max-width: 760px) { nav.secoes { position: static; flex-basis: 100%; flex-direction: row; flex-wrap: wrap; } }
+
+  /* Pessoas: lista à esquerda, ficha à direita (empilha no celular). */
+  .filtros { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 14px; }
+  .filtros input { flex: 1 1 220px; width: auto; }
+  .filtros select { flex: 0 1 230px; width: auto; }
+  .pessoas-grade { display: grid; grid-template-columns: minmax(0, 300px) minmax(0, 1fr); gap: 20px; align-items: start; }
+  @media (max-width: 900px) { .pessoas-grade { grid-template-columns: 1fr; } }
+  .lista-pessoas { display: flex; flex-direction: column; gap: 4px; max-height: 70vh; overflow-y: auto; padding-right: 4px; }
+  .item-pessoa { all: unset; box-sizing: border-box; cursor: pointer; display: flex; flex-direction: column; gap: 5px; padding: 10px 12px; border-radius: 12px; border: 1px solid transparent; }
+  .item-pessoa:hover { background: var(--neutro); }
+  .item-pessoa[aria-current="true"] { border-color: var(--primaria); background: var(--primaria-suave); }
+  .item-pessoa:focus-visible { outline: 3px solid var(--primaria-suave); }
+  .item-pessoa .nome { font-weight: 600; overflow-wrap: anywhere; }
+  .item-pessoa.inativo { opacity: .55; }
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+  .chip { display: inline-flex; align-items: center; gap: 4px; font-size: 13px; padding: 2px 10px; border-radius: 999px; background: var(--primaria-suave); color: var(--primaria-escura); white-space: nowrap; }
+  .chip.suave { background: var(--neutro); color: var(--suave); }
+  .chip.alerta { background: #fff4e5; color: #6b3d00; }
+  .chip button { all: unset; cursor: pointer; font-size: 16px; line-height: 1; padding: 0 2px; color: inherit; opacity: .7; }
+  .chip button:hover { opacity: 1; color: var(--perigo); }
+  .chip button:focus-visible { outline: 2px solid var(--primaria); border-radius: 4px; }
+  select.adicionar { width: auto; font-size: 13px; padding: 3px 10px; border-radius: 999px; border: 1px dashed var(--borda); background: transparent; color: var(--primaria); cursor: pointer; }
+  .ficha { border: 1px solid var(--linha); border-radius: 16px; padding: 20px 22px; display: flex; flex-direction: column; gap: 18px; background: var(--superficie); min-width: 0; }
+  .ficha-topo { display: flex; flex-wrap: wrap; gap: 6px 14px; align-items: baseline; }
+  .ficha-topo h3 { font-size: 24px; margin: 0; overflow-wrap: anywhere; }
+  .bloco { display: flex; flex-direction: column; gap: 8px; }
+  .rotulo { font-size: 12px; font-weight: 600; letter-spacing: .1em; text-transform: uppercase; color: var(--suave); }
+  .perms { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 14px; }
+  .grupo h4 { margin: 0 0 4px; font-size: 13px; font-weight: 600; color: var(--suave); font-family: inherit; }
+  .perm { font-size: 14px; display: grid; grid-template-columns: 16px 1fr; gap: 6px; margin-bottom: 4px; }
+  .perm::before { content: "✓"; color: var(--ok); font-weight: 700; }
+  .perm small { display: block; color: var(--suave); font-size: 12px; }
+  .pendente { padding: 10px 14px; border-radius: 10px; background: #fff4e5; color: #6b3d00; font-size: 14px; display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+  .vazio { color: var(--suave); }
+  .marcas { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 6px 16px; }
+  .marcas label { font-weight: 400; display: flex; gap: 8px; align-items: flex-start; margin: 0; }
+  .marcas label small { display: block; color: var(--suave); font-size: 12px; }
+  .marcas input { margin-top: 4px; }
+  .estado-senha { display: block; font-size: 12px; color: #6b3d00; }
+
+  /* Perfis (cartões e editor), como era no /admin. */
+  .lista-perfis { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 12px; }
+  .perfil { border: 1px solid var(--linha); border-radius: 12px; padding: 14px 16px; display: flex; flex-direction: column; gap: 6px; background: var(--superficie); }
+  .perfil-topo { display: flex; gap: 8px; align-items: baseline; justify-content: space-between; }
+  .perfil-topo strong { font-size: 17px; overflow-wrap: anywhere; }
+  .perfil p { margin: 0; font-size: 14px; }
+  .selos { display: flex; flex-wrap: wrap; gap: 6px; }
+  .selo { padding: 1px 9px; border-radius: 10px; font-size: 12px; font-weight: 600; background: var(--neutro); color: var(--suave); }
+  .selo.proprio { background: var(--primaria-suave); color: var(--primaria-escura); }
+  .selo.alterado { background: #fff4e5; color: #6b3d00; }
+  .perfil .acoes { margin-top: auto; padding-top: 6px; }
+  .perfil-usuarios { color: var(--suave); font-size: 13px; }
+  dialog.grande { border: 0; border-radius: 16px; padding: 0; width: min(720px, calc(100vw - 24px)); max-height: calc(100vh - 32px); }
+  dialog.grande form { display: flex; flex-direction: column; max-height: calc(100vh - 32px); }
+  dialog.grande .corpo { padding: 22px 24px 8px; overflow-y: auto; }
+  dialog.grande .rodape { padding: 14px 24px; border-top: 1px solid var(--linha); display: flex; flex-wrap: wrap; gap: 8px; align-items: center; justify-content: flex-end; }
+  dialog.grande .rodape .dica { margin-right: auto; }
+  #dlg-perfil fieldset { border: 1px solid var(--linha); border-radius: 12px; padding: 10px 14px 4px; margin: 0 0 12px; }
+  #dlg-perfil legend { font-weight: 600; padding: 0 6px; }
+  #dlg-perfil .marcar { margin-bottom: 10px; }
+  #dlg-perfil .marcar small { display: block; color: var(--suave); font-size: 13px; }
+  #dlg-perfil .marcar .incluida { color: var(--primaria); font-weight: 600; }
+  .matriz th, .matriz td { text-align: center; }
+  .matriz th:first-child, .matriz td:first-child { text-align: left; }
+  .registro td:first-child { white-space: nowrap; color: var(--suave); }
+</style>
+</head>
+<body>
+
+<section id="login" hidden>
+  <img src="/logo.png" alt="Igreja Diakonia Tulipas">
+  <form id="form-login" class="cartao">
+    <h1 style="font-size:20px">Acessos</h1>
+    <div class="campo">
+      <label for="usuario-login">Usuário</label>
+      <input type="text" id="usuario-login" autocomplete="username" autocapitalize="none" spellcheck="false">
+      <span class="dica">Conta principal: deixe em branco ou use "admin".</span>
+    </div>
+    <div class="campo">
+      <label for="senha-login">Senha</label>
+      <input type="password" id="senha-login" autocomplete="current-password" required>
+    </div>
+    <p id="erro-login" class="erro" role="alert" hidden></p>
+    <button class="botao" style="width:100%">Entrar</button>
+  </form>
+</section>
+
+<div id="app" hidden>
+  <header class="topo">
+    <img src="/logo.png" alt="Igreja Diakonia Tulipas">
+    <h1>Usuários e acessos</h1>
+    <span class="espaco"></span>
+    <a class="botao secundario pequeno" href="/admin" id="link-admin" hidden>Administração</a>
+    <a class="botao secundario pequeno" href="/painel">Voltar ao painel</a>
+    <button class="botao secundario pequeno" id="sair">Sair</button>
+  </header>
+
+  <section id="sem-acesso" class="cartao" style="max-width:520px;margin:10vh auto 0" hidden>
+    <h2>Sem acesso a esta página</h2>
+    <p id="texto-sem-acesso"></p>
+    <a class="botao" href="/painel">Ir para o painel</a>
+  </section>
+
+  <div class="layout" id="layout" hidden>
+    <nav class="secoes" aria-label="Seções">
+      <a href="#pessoas" data-secao="pessoas">Pessoas</a>
+      <a href="#perfis" data-secao="perfis">Perfis</a>
+      <a href="#comparar" data-secao="comparar">Comparar perfis</a>
+      <a href="#registro" data-secao="registro" id="nav-registro" hidden>Registro</a>
+    </nav>
+
+    <main>
+      <section class="cartao" id="secao-pessoas" data-secao="pessoas">
+        <h2>Pessoas</h2>
+        <p class="dica">Cada pessoa entra no painel e no tablet com o próprio usuário e senha. Ela pode ter <strong>vários perfis</strong> e pode tudo o que qualquer um deles permite: quem é da Recepção e também ministra louvor recebe os dois. <a href="/ajuda/usuarios" target="_blank" rel="noopener">Como funciona</a></p>
+        <div class="filtros">
+          <input type="search" id="busca" placeholder="Buscar por nome ou usuário" aria-label="Buscar pessoa">
+          <select id="filtro" aria-label="Mostrar">
+            <option value="">Todas as pessoas</option>
+            <option value="ativos">Só ativas</option>
+            <option value="desativados">Desativadas</option>
+            <option value="aguardando">Aguardando primeiro acesso</option>
+            <option value="parados">Sem entrar há mais de 90 dias</option>
+          </select>
+          <select id="filtro-perfil" aria-label="Com o perfil"></select>
+          <button class="botao pequeno" type="button" id="nova-pessoa">Adicionar pessoa</button>
+        </div>
+        <span id="res-pessoas" role="status"></span>
+        <div id="senha-gerada" class="cartao" style="margin:12px 0" role="status" hidden></div>
+        <div class="pessoas-grade">
+          <div class="lista-pessoas" id="lista-pessoas" aria-label="Pessoas"></div>
+          <div class="ficha" id="ficha"></div>
+        </div>
+      </section>
+
+      <section class="cartao" id="secao-perfis" data-secao="perfis" hidden>
+        <h2>Perfis</h2>
+        <p class="dica">O perfil é um conjunto de permissões. Dê a cada pessoa os perfis das funções que ela tem, em vez de criar um perfil para cada combinação. A mudança num perfil vale na hora para todos que o têm. O Administrador é travado, para ninguém perder o acesso. <a href="/ajuda/usuarios#perfis" target="_blank" rel="noopener">Como funciona</a></p>
+        <div class="acoes" style="margin-bottom:14px">
+          <button class="botao" type="button" id="novo-perfil">Novo perfil</button>
+          <span id="res-perfis" role="status"></span>
+        </div>
+        <div class="lista-perfis" id="lista-perfis"></div>
+        <div id="padroes-excluidos" class="acoes" style="margin-top:12px" hidden></div>
+      </section>
+
+      <section class="cartao" id="secao-comparar" data-secao="comparar" hidden>
+        <h2>Comparar perfis</h2>
+        <p class="dica">O que cada perfil permite. Quem tem mais de um perfil soma as colunas.</p>
+        <div class="tabela-rolagem"><table class="matriz" id="matriz-perfis"></table></div>
+      </section>
+
+      <section class="cartao" id="secao-registro" data-secao="registro" hidden>
+        <h2>Registro</h2>
+        <p class="dica">Contas criadas, senhas geradas, perfis dados ou tirados e perfis editados, com quem fez.</p>
+        <div class="tabela-rolagem"><table class="registro" id="tabela-registro"></table></div>
+      </section>
+    </main>
+  </div>
+</div>
+
+<dialog id="dlg-confirmar">
+  <form method="dialog">
+    <h2 style="font-size:20px" id="titulo-confirmar">Confirmar</h2>
+    <p id="texto-confirmar"></p>
+    <div style="display:flex;justify-content:flex-end;gap:8px">
+      <button class="botao secundario" value="cancelar">Cancelar</button>
+      <button class="botao perigo" value="ok" id="botao-confirmar">Confirmar</button>
+    </div>
+  </form>
+</dialog>
+
+<dialog id="dlg-pessoa" class="grande" aria-labelledby="titulo-pessoa">
+  <form id="form-pessoa" novalidate>
+    <div class="corpo">
+      <h2 style="font-size:22px" id="titulo-pessoa">Adicionar pessoa</h2>
+      <div class="grade2">
+        <div class="campo"><label for="n-nome">Nome da pessoa</label><input type="text" id="n-nome" maxlength="60" required></div>
+        <div class="campo"><label for="n-login">Usuário (para entrar)</label><input type="text" id="n-login" maxlength="30" required autocapitalize="none" spellcheck="false" placeholder="ex.: maria.silva"></div>
+      </div>
+      <p style="font-weight:600;margin:0 0 8px">Perfis</p>
+      <div class="marcas" id="n-perfis"></div>
+      <p class="dica">A conta nova recebe uma senha temporária: envie pelo WhatsApp e, no primeiro acesso, a pessoa cria a própria senha.</p>
+    </div>
+    <div class="rodape">
+      <p class="erro" id="erro-pessoa" role="alert" hidden style="flex-basis:100%;margin:0"></p>
+      <button class="botao secundario" type="button" value="cancelar" id="cancelar-pessoa">Cancelar</button>
+      <button class="botao" type="submit">Adicionar</button>
+    </div>
+  </form>
+</dialog>
+
+<dialog id="dlg-perfil" class="grande" aria-labelledby="titulo-perfil">
+  <form id="form-perfil" novalidate>
+    <div class="corpo">
+      <h2 style="font-size:22px" id="titulo-perfil">Perfil</h2>
+      <div class="grade2">
+        <div class="campo"><label for="p-nome">Nome do perfil</label><input type="text" id="p-nome" maxlength="40" required placeholder="ex.: Líder de jovens"></div>
+        <div class="campo" id="campo-base"><label for="p-base">Começar a partir de</label><select id="p-base"></select></div>
+      </div>
+      <div class="campo"><label for="p-descricao">Descrição <span class="dica">(aparece ao escolher o perfil de alguém)</span></label><input type="text" id="p-descricao" maxlength="200"></div>
+      <h3 style="font-size:17px;margin:8px 0 10px">O que este perfil pode</h3>
+      <div id="p-permissoes"></div>
+    </div>
+    <div class="rodape">
+      <span class="dica" id="p-uso"></span>
+      <p class="erro" id="erro-perfil" role="alert" hidden style="flex-basis:100%;margin:0"></p>
+      <button class="botao secundario" type="button" id="cancelar-perfil">Cancelar</button>
+      <button class="botao" type="submit" id="salvar-perfil">Salvar perfil</button>
+    </div>
+  </form>
+</dialog>
+
+<script src="/comum.js?v=6"></script>
+<script src="/primeiro-acesso.js?v=1"></script>
+<script src="/acessos.js?v=1"></script>
+</body>
+</html>

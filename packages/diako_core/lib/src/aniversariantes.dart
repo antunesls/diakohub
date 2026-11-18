@@ -2,6 +2,7 @@ import 'membro.dart';
 import 'recado.dart';
 
 const idRecadoAniversariantes = 'auto-aniversariantes';
+const idRecadoCasamentos = 'auto-casamentos';
 
 /// Domingo a sábado da semana de [hoje].
 List<DateTime> diasDaSemana(DateTime hoje) {
@@ -48,4 +49,47 @@ Recado? recadoAniversariantes(List<Membro> membros, DateTime hoje) {
     ordem: -1,
     auto: true,
   );
+}
+
+/// Segue a mesma semana e as regras de divulgação dos aniversariantes.
+/// A autorização específica do casal é adicional à LGPD de cada cadastrado.
+Recado? recadoCasamentos(List<Membro> membros, DateTime hoje) {
+  final porId = {for (final m in membros) m.id: m};
+  final vistos = <String>{};
+  final linhas = <String>[];
+  bool elegivel(Membro m) {
+    final civil = semAcento((m.estadoCivil ?? '').toLowerCase()) ?? '';
+    return podeDivulgarAniversario(m) && m.casamentoAutorizado && m.casamentoConsentimento != null &&
+        (civil.isEmpty || civil.startsWith('casad') || civil == 'uniao estavel');
+  }
+  for (final dia in diasDaSemana(hoje)) {
+    for (final m in membros) {
+      if (!elegivel(m) || m.dataCasamento == null) continue;
+      final casamento = DateTime.tryParse(m.dataCasamento!);
+      if (casamento == null) continue;
+      var d = casamento.day;
+      if (d == 29 && casamento.month == 2 && !_bissexto(dia.year)) d = 28;
+      final anos = dia.year - casamento.year;
+      if (d != dia.day || casamento.month != dia.month || anos < 1) continue;
+      String nome;
+      String chave;
+      if (m.conjugeId != null) {
+        final outro = porId[m.conjugeId];
+        if (outro == null || outro.conjugeId != m.id || !elegivel(outro) || outro.dataCasamento != m.dataCasamento) continue;
+        final ids = [m.id, outro.id]..sort();
+        chave = ids.join('|');
+        nome = '${m.nome} e ${outro.nome}';
+      } else {
+        if ((m.conjugeNome ?? '').isEmpty) continue;
+        chave = m.id;
+        nome = '${m.nome} e ${m.conjugeNome}';
+      }
+      if (!vistos.add(chave)) continue;
+      final data = '${dia.day.toString().padLeft(2, '0')}/${dia.month.toString().padLeft(2, '0')}';
+      linhas.add('$nome ($data) · $anos ${anos == 1 ? 'ano' : 'anos'}');
+    }
+  }
+  if (linhas.isEmpty) return null;
+  return Recado(id: idRecadoCasamentos, titulo: 'Aniversários de casamento da semana',
+      texto: linhas.join('\n'), categoria: Categoria.aniversario, fixo: true, ordem: 0, auto: true);
 }

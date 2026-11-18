@@ -34,17 +34,18 @@
   <header class="topo-ajuda">
     <a href="/painel"><img src="/logo.png" alt="Igreja Diakonia Tulipas"></a>
     <span class="espaco"></span>
-    <a class="botao secundario pequeno" href="/admin#usuarios">Ir para Usuários</a>
+    <a class="botao secundario pequeno" href="/acessos">Ir para Usuários e acessos</a>
   </header>
 
   <p class="sobretitulo">Ajuda</p>
   <h1>Usuários e perfis de acesso</h1>
-  <p class="lead">Cada pessoa da equipe entra no painel e no tablet com o próprio usuário e senha. O <strong>perfil</strong> define o que ela vê e pode fazer. Os perfis são da igreja: dá para ajustar os que vêm prontos e criar novos.</p>
+  <p class="lead">Cada pessoa da equipe entra no painel e no tablet com o próprio usuário e senha. Os <strong>perfis</strong> dela definem o que ela vê e pode fazer. Uma pessoa pode ter <strong>vários perfis</strong> e pode tudo o que qualquer um deles permite. Os perfis são da igreja: dá para ajustar os que vêm prontos e criar novos.</p>
+  <p>Tudo isso fica na página <a href="/acessos">Usuários e acessos</a> (no menu do painel, em Operação, ou pelo botão em Administração). Quem tem a permissão <em>Usuários e perfis</em> entra nela mesmo sem ser da administração.</p>
 
   <h2 id="criar">Cadastrar uma pessoa e entregar o acesso pelo WhatsApp</h2>
   <ol>
-    <li>Em <a href="/admin#usuarios">Administração › Usuários</a>, preencha o nome, o usuário (ex.: <code>maria.silva</code>) e escolha o perfil.</li>
-    <li>Clique em <strong>Adicionar pessoa</strong>. Aparece a <strong>senha temporária</strong> e, logo abaixo, o texto pronto para o WhatsApp, com o endereço certo para o perfil (painel, Minha escala ou recepção), o usuário e a senha.</li>
+    <li>Em <a href="/acessos">Usuários e acessos › Pessoas</a>, clique em <strong>Adicionar pessoa</strong>, preencha o nome, o usuário (ex.: <code>maria.silva</code>) e marque os perfis.</li>
+    <li>Clique em <strong>Adicionar</strong>. Aparece a <strong>senha temporária</strong> e, logo abaixo, o texto pronto para o WhatsApp, com o endereço certo para o perfil (painel, Minha escala ou recepção), o usuário e a senha.</li>
     <li>Revise o texto (dá para editar) e clique em <strong>Abrir no WhatsApp</strong>. Se a conta estiver ligada a um cadastro de membro com WhatsApp, abre direto a conversa da pessoa; senão, você escolhe o contato. Também dá para <strong>Copiar</strong> e colar onde quiser. O sistema nunca manda mensagens sozinho.</li>
   </ol>
   <p>Em <strong>Acessos às escalas</strong> (no painel), a criação da conta de um integrante funciona do mesmo jeito, já com o WhatsApp do cadastro de membros.</p>
@@ -53,20 +54,30 @@
   <p>A senha temporária só serve para o primeiro acesso. Ao entrar com ela (no painel, na Minha escala, na recepção ou no app do tablet), a pessoa vê a tela <strong>Crie a sua senha</strong> e só continua depois de escolher uma senha própria. Até lá, nada mais funciona com essa conta.</p>
   <ul>
     <li>A senha temporária <strong>vale 7 dias</strong>. Depois disso, o login é recusado e é preciso gerar outra.</li>
-    <li>Na lista de usuários aparece <strong>Aguardando primeiro acesso</strong> enquanto a pessoa não criar a senha, ou <strong>Senha temporária vencida</strong>.</li>
+    <li>Na lista de pessoas aparece <strong>aguardando 1º acesso</strong> enquanto a pessoa não criar a senha, ou <strong>Senha temporária vencida</strong>.</li>
     <li>Esqueceu a senha? Clique em <strong>Nova senha e enviar</strong>: a pessoa sai dos aparelhos, recebe uma nova senha temporária e cria outra no primeiro acesso.</li>
   </ul>
 
+  <h2 id="varios">Uma pessoa com vários perfis</h2>
+  <p>Quem serve em mais de uma frente recebe um perfil para cada uma, em vez de um perfil feito sob medida. Exemplo: uma obreira da recepção que também ministra louvor fica com <strong>Recepção</strong> e <strong>Ministro</strong>.</p>
+  <ul>
+    <li>Na ficha da pessoa, em <strong>Perfis</strong>, use <strong>+ adicionar perfil</strong> ou o <strong>×</strong> de cada um, e clique em <strong>Salvar perfis</strong>. A pessoa sai dos aparelhos e entra de novo já com o novo acesso.</li>
+    <li>Logo abaixo, <strong>O que pode fazer</strong> mostra a soma das permissões e de qual perfil veio cada uma.</li>
+    <li>Nenhum perfil tira permissão de outro: se um dos perfis permite, a pessoa pode.</li>
+    <li>A pessoa sempre fica com pelo menos um perfil. Para tirar todo o acesso, use <strong>Desativar</strong>.</li>
+  </ul>
+  <div class="nota"><p><strong>Ninguém dá mais do que tem.</strong> Quem cuida dos usuários sem ser da administração só dá perfis com permissões que ele mesmo tem, não mexe em contas que podem mais do que ele e não põe num perfil o que não pode. A administração pode tudo.</p></div>
+
   <h2 id="perfis">Criar e ajustar perfis</h2>
-  <p>Em <a href="/admin#perfis">Administração › Perfis</a> ficam todos os perfis, com quantas pessoas usam cada um.</p>
+  <p>Em <a href="/acessos#perfis">Usuários e acessos › Perfis</a> ficam todos os perfis, com quantas pessoas têm cada um (clique no número para ver quem).</p>
   <ul>
     <li><strong>Novo perfil</strong>: dê um nome (ex.: <em>Líder de jovens</em>) e marque o que ele pode. O mais fácil é escolher <strong>Começar a partir de</strong> um perfil parecido, ou clicar em <strong>Duplicar</strong>, e só ajustar.</li>
     <li><strong>Editar</strong>: as permissões ficam agrupadas por área (painel e telão, oração, pessoas, escalas, comunicação, gestão e administração), cada uma com uma explicação curta. Algumas trazem outras junto: quem edita pedidos também os vê, por exemplo. Essas aparecem marcadas como <em>Incluída por…</em>.</li>
     <li><strong>A mudança vale na hora</strong> para todas as pessoas do perfil, sem precisar entrar de novo (o tablet atualiza sozinho).</li>
     <li><strong>Restaurar padrão</strong>: os perfis que vêm prontos e foram alterados podem voltar ao original. Um perfil padrão excluído também pode ser trazido de volta.</li>
-    <li><strong>Excluir</strong>: só perfis que ninguém usa. Troque antes o perfil das pessoas. O perfil <strong>Integrante</strong> não pode ser excluído, porque as contas criadas em Acessos às escalas usam ele.</li>
+    <li><strong>Excluir</strong>: só perfis que ninguém tem. Tire antes o perfil das pessoas. O perfil <strong>Integrante</strong> não pode ser excluído, porque as contas criadas em Acessos às escalas usam ele.</li>
   </ul>
-  <div class="nota"><p>O <strong>Administrador</strong> é travado (não pode ser alterado nem excluído), para ninguém perder o acesso à administração por engano. Todas as mudanças de perfil e as senhas geradas ficam registradas na <strong>Auditoria</strong> do painel (filtro <em>Acessos</em>).</p></div>
+  <div class="nota"><p>O <strong>Administrador</strong> é travado (não pode ser alterado nem excluído), para ninguém perder o acesso à administração por engano. Todas as mudanças de perfil e as senhas geradas ficam registradas em <a href="/acessos#registro">Usuários e acessos › Registro</a> (visível para a administração) e na <strong>Auditoria</strong> do painel (filtro <em>Acessos</em>).</p></div>
   <p>Algumas permissões mudam o que a pessoa vê fora do painel:</p>
   <ul>
     <li><strong>Ver visitantes de outros dias</strong>: sem ela (como na Recepção), só aparecem os visitantes de hoje, e o cadastro conta como feito na recepção.</li>
@@ -78,6 +89,7 @@
   <div class="perfis" id="lista-perfis"><p class="dica">Carregando…</p></div>
 
   <h2 id="matriz">O que cada perfil pode fazer</h2>
+  <p>Quem tem mais de um perfil soma as colunas.</p>
   <div class="rolagem"><table id="matriz-perfis"></table></div>
   <div class="nota"><p><strong>Pedidos de oração particulares</strong> (e o nome de quem pediu) aparecem só para quem tem a permissão de vê-los (nos perfis prontos, Pastor e Administrador), como o formulário promete. Os outros veem apenas os pedidos públicos, sem o nome de quem enviou.</p></div>
 
@@ -88,7 +100,8 @@
 
   <h2 id="dia-a-dia">No dia a dia</h2>
   <ul>
-    <li><strong>Trocar o perfil de alguém</strong>: escolha outro na lista. A pessoa sai dos aparelhos e entra de novo já com o novo acesso.</li>
+    <li><strong>Mudar os perfis de alguém</strong>: na ficha da pessoa, adicione ou tire perfis e clique em <strong>Salvar perfis</strong>. A pessoa sai dos aparelhos e entra de novo já com o novo acesso.</li>
+    <li><strong>Achar alguém</strong>: busque pelo nome ou usuário, ou filtre por perfil, por quem está aguardando o primeiro acesso ou por quem não entra há mais de 90 dias.</li>
     <li><strong>Esqueceu a senha</strong>: o administrador clica em <strong>Nova senha e enviar</strong> e manda o texto pelo WhatsApp.</li>
     <li><strong>Alguém saiu da equipe</strong>: <strong>Desativar</strong> (pode reativar depois) ou <strong>Excluir</strong>. O acesso acaba na hora, em todos os aparelhos.</li>
     <li><strong>Quem fez o quê</strong>: o Histórico mostra quem projetou cada coisa, e os pedidos aprovados guardam quem aprovou.</li>

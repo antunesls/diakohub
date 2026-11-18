@@ -14,7 +14,7 @@ class Usuario {
     required this.id,
     required this.nome,
     required this.login,
-    required this.perfil,
+    required List<Perfil> perfis,
     this.senhaHash = '',
     this.senhaSal = '',
     this.ativo = true,
@@ -23,14 +23,31 @@ class Usuario {
     this.membroId,
     this.trocarSenha = false,
     this.senhaTemporariaEm,
-  });
+  }) : perfis = _semRepetir(perfis);
 
   final String id;
   String nome;
   final String login;
 
-  /// Objeto compartilhado com [Perfis]: editar o perfil vale na hora para a conta.
-  Perfil perfil;
+  /// Perfis da conta (objetos compartilhados com [Perfis]: editar um perfil vale na hora para a conta).
+  /// A pessoa pode tudo o que qualquer um deles permite.
+  List<Perfil> perfis;
+
+  /// O efeito somado dos [perfis] (nome "Recepção + Ministro"); com um só, o próprio perfil.
+  Perfil get perfil => Perfil.combinado(perfis);
+
+  /// Ids dos perfis, na ordem.
+  List<String> get idsPerfis => [for (final p in perfis) p.id];
+
+  bool temPerfil(String id) => perfis.any((p) => p.id == id);
+
+  static List<Perfil> _semRepetir(List<Perfil> lista) {
+    final r = <Perfil>[];
+    for (final p in lista) {
+      if (!r.any((x) => x.id == p.id)) r.add(p);
+    }
+    return r;
+  }
   String senhaHash;
   String senhaSal;
   bool ativo;
@@ -45,13 +62,16 @@ class Usuario {
   DateTime? senhaTemporariaEm;
 
   /// [perfilDe] resolve o id gravado no perfil configurado (perfil apagado: sem acesso).
+  /// Arquivos antigos têm só "perfil" (um id); os novos têm "perfis" (lista).
   factory Usuario.fromJson(Map<String, dynamic> j, {Perfil Function(String id)? perfilDe}) {
-    final idPerfil = j['perfil'] as String? ?? '';
+    final ids = j['perfis'] is List
+        ? [for (final x in j['perfis'] as List) if (x is String && x.isNotEmpty) x]
+        : [if ((j['perfil'] as String? ?? '').isNotEmpty) j['perfil'] as String];
     return Usuario(
       id: j['id'] as String,
       nome: j['nome'] as String? ?? '',
       login: j['login'] as String,
-      perfil: perfilDe?.call(idPerfil) ?? Perfil.porNome(idPerfil) ?? Perfil.semAcesso(idPerfil),
+      perfis: [for (final id in ids) perfilDe?.call(id) ?? Perfil.porNome(id) ?? Perfil.semAcesso(id)],
       senhaHash: j['senhaHash'] as String? ?? '',
       senhaSal: j['senhaSal'] as String? ?? '',
       ativo: j['ativo'] as bool? ?? true,
@@ -75,8 +95,11 @@ class Usuario {
         'id': id,
         'nome': nome,
         'login': login,
-        'perfil': perfil.id,
+        // "perfil" (o primeiro) fica para quem lê o formato antigo (app do tablet, versão anterior do servidor).
+        'perfil': perfis.isEmpty ? '' : perfis.first.id,
+        'perfis': idsPerfis,
         'perfilNome': perfil.nome,
+        if (!comSenha) 'perfisNomes': [for (final p in perfis) p.nome],
         'ativo': ativo,
         'criadoEm': criadoEm.toIso8601String(),
         'ultimoAcesso': ultimoAcesso?.toIso8601String(),
@@ -106,6 +129,7 @@ class Usuarios {
   Future<void> _fila = Future.value();
 
   static const maximo = 100;
+  static const maximoPerfis = 8;
   static const validadeSenhaTemporaria = Duration(days: 7);
   static final _formatoLogin = RegExp(r'^[a-z0-9][a-z0-9._-]{2,29}$');
 
@@ -114,8 +138,8 @@ class Usuarios {
   /// Perfil configurado com este id; sem ele, a conta fica sem acesso.
   Perfil perfilDe(String id) => perfis.buscar(id) ?? Perfil.semAcesso(id);
 
-  /// Contas que usam o perfil.
-  int quantosUsam(String idPerfil) => _lista.where((u) => u.perfil.id == idPerfil).length;
+  /// Contas que têm o perfil (entre outros).
+  int quantosUsam(String idPerfil) => _lista.where((u) => u.temPerfil(idPerfil)).length;
 
   Future<void> carregar() async {
     await perfis.carregar();
@@ -129,7 +153,7 @@ class Usuarios {
   /// Depois de restaurar ou excluir perfis: as contas voltam a apontar para os objetos atuais.
   void religarPerfis() {
     for (final u in _lista) {
-      u.perfil = perfilDe(u.perfil.id);
+      u.perfis = [for (final p in u.perfis) perfilDe(p.id)];
     }
   }
 
@@ -169,7 +193,8 @@ class Usuarios {
   Future<Usuario> criar({
     required String nome,
     required String login,
-    required Perfil perfil,
+    Perfil? perfil,
+    List<Perfil>? perfis,
     required String senha,
     String? membroId,
     bool temporaria = false,
@@ -183,12 +208,13 @@ class Usuarios {
     if (l == Auth.idPrincipal) throw const FormatException('"admin" é reservado para a conta principal.');
     if (porLogin(l) != null) throw const FormatException('Já existe um usuário com esse nome de acesso.');
     if (membroId != null && porMembro(membroId) != null) throw const FormatException('Este membro já tem uma conta vinculada.');
+    final escolhidos = _resolver(perfis ?? [if (perfil != null) perfil]);
     final h = gerarHashSenha(senha);
     final u = Usuario(
         id: novoId(),
         nome: nome.trim(),
         login: l,
-        perfil: perfis.buscar(perfil.id) ?? perfil,
+        perfis: escolhidos,
         senhaHash: h.hash,
         senhaSal: h.sal,
         membroId: membroId,
@@ -200,14 +226,15 @@ class Usuarios {
     return u;
   }
 
-  Future<Usuario> atualizar(String id, {String? nome, Perfil? perfil, bool? ativo}) async {
+  /// [perfis] define a lista inteira; [perfil] (um só) substitui todos por ele.
+  Future<Usuario> atualizar(String id, {String? nome, Perfil? perfil, List<Perfil>? perfis, bool? ativo}) async {
     final u = buscar(id);
     if (u == null) throw const FormatException('Usuário não encontrado.');
     if (nome != null) {
       _validarNome(nome);
       u.nome = nome.trim();
     }
-    if (perfil != null) u.perfil = perfis.buscar(perfil.id) ?? perfil;
+    if (perfis != null || perfil != null) u.perfis = _resolver(perfis ?? [perfil!]);
     if (ativo != null) u.ativo = ativo;
     await _salvar();
     return u;
@@ -237,6 +264,18 @@ class Usuarios {
     if (_lista.length == antes) return false;
     await _salvar();
     return true;
+  }
+
+  /// Troca cada perfil pelo objeto configurado (o que o admin edita), tira repetidos e confere a lista.
+  List<Perfil> _resolver(List<Perfil> lista) {
+    final r = <Perfil>[];
+    for (final p in lista) {
+      final atual = perfis.buscar(p.id) ?? p;
+      if (!r.any((x) => x.id == atual.id)) r.add(atual);
+    }
+    if (r.isEmpty) throw const FormatException('Escolha pelo menos um perfil.');
+    if (r.length > maximoPerfis) throw const FormatException('No máximo $maximoPerfis perfis por pessoa.');
+    return r;
   }
 
   static void _validarNome(String nome) {

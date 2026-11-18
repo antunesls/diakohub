@@ -124,6 +124,11 @@
       <label>Como conheceu a igreja?<input id="comoConheceu" name="comoConheceu" maxlength="200"></label>
     </div></fieldset>
     <fieldset><legend>Família</legend><p>Informe nomes e parentesco. A secretaria fará os vínculos depois.</p>
+      <div class="campos">
+        <label class="c4">Nome do cônjuge (mesmo sem cadastro)<input id="conjugeNome" name="conjugeNome" maxlength="100" autocapitalize="words"></label>
+        <label class="c2">Data do casamento<input id="dataCasamento" name="dataCasamento" type="date"></label>
+      </div>
+      <label class="aceite"><input id="casamentoAutorizado" type="checkbox"><span>O casal autorizou divulgar os nomes, a data e os anos de casamento no mural, telão e resumo da semana. Tenho também a autorização do meu cônjuge, mesmo que ele não esteja cadastrado. Opcional.</span></label>
       <div id="familiares"></div><button type="button" class="botao secundario" id="adicionar-familiar">+ Adicionar familiar</button>
     </fieldset>
     <fieldset><legend>Contato de emergência</legend><div class="campos">
@@ -278,6 +283,7 @@
       return erro('Informe pelo menos um contato: telefone, WhatsApp ou e-mail.', $('whatsapp'));
     }
     dados.autorizo = $('autorizo').checked;
+    dados.casamentoAutorizado = $('casamentoAutorizado').checked;
     dados.ministerios = dados.ministerios ? dados.ministerios.split(',').map((s) => s.trim()).filter(Boolean) : [];
     dados.familiares = [...$('familiares').children].map((linha) => ({
       nome: linha.querySelector('input').value.trim(), parentesco: linha.querySelector('select').value,

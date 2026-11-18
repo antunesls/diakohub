@@ -217,7 +217,7 @@ void main() {
       expect((await chamar('GET', '/api/estado', token: midia)).$1, 403);
       final (stEx, ex) = await chamar('DELETE', '/api/admin/perfis/midia', token: admin);
       expect(stEx, 400);
-      expect(ex['erro'], contains('1 conta usa'));
+      expect(ex['erro'], contains('1 conta tem'));
 
       final (_, perfis) = await chamar('GET', '/api/admin/perfis', token: admin);
       expect((perfis['perfis'] as List).firstWhere((x) => x['id'] == 'midia')['alterado'], isTrue);

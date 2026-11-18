@@ -54,6 +54,8 @@ String montarResumoSemanal({
   secao('🎂 *Aniversariantes da semana*', [
     for (final a in aniversariantesDaSemana(membros, agora)) '${a.membro.nome} (${_dm(a.data)})',
   ]);
+  final casamentos = recadoCasamentos(membros, agora);
+  secao('💍 *Aniversários de casamento da semana*', casamentos?.texto.split('\n') ?? []);
 
   secao('🙏 *Motivos de oração*', [for (final m in motivos.where((m) => m.projetavel)) m.linhaPublica(textoMotivos)]);
 

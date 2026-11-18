@@ -54,29 +54,6 @@
   .previa-arte-qr { width: 100%; height: auto; aspect-ratio: 16 / 9; border-radius: 8px; border: 1px solid var(--linha); display: block; background: #fff; }
   .modos-arte-qr { display: flex; flex-wrap: wrap; gap: 6px 18px; margin-bottom: 12px; }
   .arte-qr textarea { width: 100%; }
-  /* Perfis: cartões com o que cada um pode e o editor de permissões por área. */
-  .lista-perfis { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 12px; }
-  .perfil { border: 1px solid var(--linha); border-radius: 12px; padding: 14px 16px; display: flex; flex-direction: column; gap: 6px; background: var(--superficie); }
-  .perfil-topo { display: flex; gap: 8px; align-items: baseline; justify-content: space-between; }
-  .perfil-topo strong { font-size: 17px; overflow-wrap: anywhere; }
-  .perfil p { margin: 0; font-size: 14px; }
-  .selos { display: flex; flex-wrap: wrap; gap: 6px; }
-  .selo { padding: 1px 9px; border-radius: 10px; font-size: 12px; font-weight: 600; background: var(--neutro); color: var(--suave); }
-  .selo.proprio { background: var(--primaria-suave); color: var(--primaria-escura); }
-  .selo.alterado { background: #fff4e5; color: #6b3d00; }
-  .perfil .acoes { margin-top: auto; padding-top: 6px; }
-  .perfil-usuarios { color: var(--suave); font-size: 13px; }
-  dialog#dlg-perfil { border: 0; border-radius: 16px; padding: 0; width: min(720px, calc(100vw - 24px)); max-height: calc(100vh - 32px); }
-  #dlg-perfil form { display: flex; flex-direction: column; max-height: calc(100vh - 32px); }
-  #dlg-perfil .corpo { padding: 22px 24px 8px; overflow-y: auto; }
-  #dlg-perfil .rodape { padding: 14px 24px; border-top: 1px solid var(--linha); display: flex; flex-wrap: wrap; gap: 8px; align-items: center; justify-content: flex-end; }
-  #dlg-perfil .rodape .dica { margin-right: auto; }
-  #dlg-perfil fieldset { border: 1px solid var(--linha); border-radius: 12px; padding: 10px 14px 4px; margin: 0 0 12px; }
-  #dlg-perfil legend { font-weight: 600; padding: 0 6px; }
-  #dlg-perfil .marcar { margin-bottom: 10px; }
-  #dlg-perfil .marcar small { display: block; color: var(--suave); font-size: 13px; }
-  #dlg-perfil .marcar .incluida { color: var(--primaria); font-weight: 600; }
-  .estado-senha { display: block; font-size: 12px; color: #6b3d00; }
 </style>
 </head>
 <body>
@@ -127,8 +104,7 @@
       <a href="#projecao">Projeção</a>
       <a href="#qr-telao">QR codes do telão</a>
       <a href="#backup">Backup e restauração</a>
-      <a href="#usuarios">Usuários</a>
-      <a href="#perfis">Perfis</a>
+      <a href="#usuarios">Usuários e perfis</a>
       <a href="#seguranca">Senha e aparelhos</a>
     </nav>
 
@@ -301,7 +277,7 @@
 
       <section class="cartao" id="diakoplayer">
         <h2>DiakoPlayer</h2>
-        <p class="dica">O DiakoPlayer (PC do som) lê a escala e o repertório para montar a fila do louvor. Crie em <a href="#usuarios">Usuários e perfis</a> um usuário com o perfil <strong>DiakoPlayer</strong> e informe-o no menu <em>DiakoPlayer › Integração DiakoHub</em> do PC.</p>
+        <p class="dica">O DiakoPlayer (PC do som) lê a escala e o repertório para montar a fila do louvor. Crie em <a href="/acessos">Usuários e acessos</a> um usuário com o perfil <strong>DiakoPlayer</strong> e informe-o no menu <em>DiakoPlayer › Integração DiakoHub</em> do PC.</p>
         <form id="form-diakoplayer">
           <div class="campo">
             <label for="diakoPlayerUrl">Endereço do controle <span class="dica">(opcional: mostra "Abrir no DiakoPlayer" nas músicas da escala)</span></label>
@@ -477,23 +453,9 @@
       </section>
 
       <section class="cartao" id="usuarios">
-        <h2>Usuários</h2>
-        <p class="dica">Cada pessoa entra no painel e no tablet com o próprio usuário e senha. O perfil define o que ela vê e pode fazer (configure em <a href="#perfis">Perfis</a>). A conta nova recebe uma senha temporária: envie pelo WhatsApp e, no primeiro acesso, a pessoa cria a própria senha. A conta principal ("admin", com a senha da seção abaixo) continua valendo. <a href="/ajuda/usuarios" target="_blank" rel="noopener">Como funciona</a></p>
-        <form id="form-usuario">
-          <div class="grade2">
-            <div class="campo"><label for="u-nome">Nome da pessoa</label><input type="text" id="u-nome" maxlength="60" required></div>
-            <div class="campo"><label for="u-login">Usuário (para entrar)</label><input type="text" id="u-login" maxlength="30" required autocapitalize="none" spellcheck="false" placeholder="ex.: maria.silva"></div>
-          </div>
-          <div class="campo"><label for="u-perfil">Perfil</label><select id="u-perfil"></select><span class="dica" id="u-perfil-dica"></span></div>
-          <div class="acoes"><button class="botao">Adicionar pessoa</button><span id="res-usuario" role="status"></span></div>
-        </form>
-        <div id="senha-gerada" class="aviso" role="status" hidden></div>
-        <div class="tabela-rolagem" style="margin-top:12px">
-          <table id="tabela-usuarios">
-            <thead><tr><th>Nome</th><th>Usuário</th><th>Perfil</th><th>Último acesso</th><th><span class="escondido">Ações</span></th></tr></thead>
-            <tbody></tbody>
-          </table>
-        </div>
+        <h2>Usuários e perfis</h2>
+        <p class="dica">As contas das pessoas e os perfis de acesso têm uma página própria. Cada pessoa pode ter vários perfis e pode tudo o que qualquer um deles permite. A conta principal ("admin", com a senha da seção abaixo) continua valendo. <a href="/ajuda/usuarios" target="_blank" rel="noopener">Como funciona</a></p>
+        <div class="acoes"><a class="botao" href="/acessos">Abrir Usuários e acessos</a></div>
         <div id="bloco-tablets" hidden>
           <h3 style="margin-top:24px">Tablets na rede da igreja</h3>
           <p class="dica">Tablets pareados em Configurações › PC da igreja projetam direto pelo agente, sem passar pela internet (e continuam funcionando se ela cair). Remover aqui corta esse atalho assim que o PC da igreja estiver conectado; o tablet volta a usar a internet. <a href="/ajuda/rede-local" target="_blank" rel="noopener">Como funciona</a></p>
@@ -507,20 +469,6 @@
         </div>
       </section>
 
-      <section class="cartao" id="perfis">
-        <h2>Perfis</h2>
-        <p class="dica">O perfil define o que a pessoa vê e pode fazer. Ajuste os perfis que já vêm prontos ou crie um para cada função da igreja (dica: comece duplicando o mais parecido). A mudança vale na hora para quem usa o perfil, sem precisar entrar de novo. O Administrador é travado, para ninguém perder o acesso a esta página. <a href="/ajuda/usuarios#perfis" target="_blank" rel="noopener">Como funciona</a></p>
-        <div class="acoes" style="margin-bottom:14px">
-          <button class="botao" type="button" id="novo-perfil">Novo perfil</button>
-          <span id="res-perfis" role="status"></span>
-        </div>
-        <div class="lista-perfis" id="lista-perfis"></div>
-        <div id="padroes-excluidos" class="acoes" style="margin-top:12px" hidden></div>
-        <details style="margin-top:16px">
-          <summary style="cursor:pointer;font-weight:600">Comparar os perfis (tabela)</summary>
-          <div class="tabela-rolagem"><table id="matriz-perfis"></table></div>
-        </details>
-      </section>
 
       <section class="cartao" id="seguranca">
         <h2>Senha e aparelhos</h2>
@@ -553,31 +501,10 @@
   </form>
 </dialog>
 
-<dialog id="dlg-perfil" aria-labelledby="titulo-perfil">
-  <form id="form-perfil" novalidate>
-    <div class="corpo">
-      <h2 style="font-size:22px" id="titulo-perfil">Perfil</h2>
-      <div class="grade2">
-        <div class="campo"><label for="p-nome">Nome do perfil</label><input type="text" id="p-nome" maxlength="40" required placeholder="ex.: Líder de jovens"></div>
-        <div class="campo" id="campo-base"><label for="p-base">Começar a partir de</label><select id="p-base"></select></div>
-      </div>
-      <div class="campo"><label for="p-descricao">Descrição <span class="dica">(aparece ao escolher o perfil de alguém)</span></label><input type="text" id="p-descricao" maxlength="200"></div>
-      <h3 style="font-size:17px;margin:8px 0 10px">O que este perfil pode</h3>
-      <div id="p-permissoes"></div>
-    </div>
-    <div class="rodape">
-      <span class="dica" id="p-uso"></span>
-      <p class="erro" id="erro-perfil" role="alert" hidden style="flex-basis:100%;margin:0"></p>
-      <button class="botao secundario" type="button" id="cancelar-perfil">Cancelar</button>
-      <button class="botao" type="submit" id="salvar-perfil">Salvar perfil</button>
-    </div>
-  </form>
-</dialog>
-
 <script src="/comum.js?v=6"></script>
 <script src="/primeiro-acesso.js?v=1"></script>
 <script src="/arte-qr.js?v=2"></script>
 <script src="/horarios-escalas.js?v=1"></script>
-<script src="/admin.js?v=17"></script>
+<script src="/admin.js?v=18"></script>
 </body>
 </html>

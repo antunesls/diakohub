@@ -14,7 +14,7 @@ test('sem senha temporária, o primeiro acesso só devolve /api/eu (sem tela)', 
 });
 
 test('todas as entradas passam pela tela de primeiro acesso e lembram a senha digitada', () => {
-  for (const [arquivo, pagina] of [['painel.js', 'painel.html'], ['admin.js', 'admin.html']]) {
+  for (const [arquivo, pagina] of [['painel.js', 'painel.html'], ['admin.js', 'admin.html'], ['acessos.js', 'acessos.html']]) {
     assert.match(web(arquivo), /PrimeiroAcesso\.garantir\(\{ token, buscarEu: \(\) => api\('GET', '\/api\/eu'\), aoSair: sair \}\)/, arquivo);
     assert.match(web(arquivo), /if \(j\.trocarSenha\) PrimeiroAcesso\.lembrar\(/, arquivo);
     assert.match(web(pagina), /<script src="\/primeiro-acesso\.js\?v=\d+"><\/script>/, pagina);
@@ -44,19 +44,32 @@ test('entrega do acesso: prévia editável, copiar e WhatsApp com ou sem número
   assert.match(js, /function cartaoEntregaAcesso\(nome, login, r\)/);
   assert.match(js, /abrir\.href = 'https:\/\/wa\.me\/' \+ \(r\.whatsapp \|\| ''\) \+ '\?text=' \+ encodeURIComponent\(texto\.value\);/);
   assert.match(js, /texto\.addEventListener\('input', atualizar\);/);
-  assert.match(web('admin.js'), /caixa\.replaceChildren\(cartaoEntregaAcesso\(nome, login, r\)\);/);
+  assert.match(web('acessos.js'), /caixa\.replaceChildren\(cartaoEntregaAcesso\(nome, login, r\),/);
   assert.match(web('acessos-escala.js'), /caixa\.replaceChildren\(cartaoEntregaAcesso\(nome, login, r\)\);/);
   assert.match(web('painel.html'), /<div id="acesso-entrega" hidden><\/div>/);
 });
 
-test('admin: seção Perfis com editor por área e dependências entre permissões', () => {
-  const html = web('admin.html');
-  assert.match(html, /<a href="#perfis">Perfis<\/a>/);
-  assert.match(html, /<section class="cartao" id="perfis">/);
+test('usuários e perfis saem do /admin e ficam em /acessos', () => {
+  const admin = web('admin.html');
+  assert.doesNotMatch(admin, /id="tabela-usuarios"|id="lista-perfis"|<dialog id="dlg-perfil"/);
+  assert.match(admin, /<a class="botao" href="\/acessos">/);
+  assert.match(web('admin.js'), /location\.replace\('\/acessos'\)/); // quem só cuida dos usuários vai direto
+  const html = web('acessos.html');
+  for (const secao of ['pessoas', 'perfis', 'comparar', 'registro']) assert.match(html, new RegExp(`data-secao="${secao}"`));
   assert.match(html, /<dialog id="dlg-perfil"/);
-  const js = web('admin.js');
+  assert.match(html, /<script src="\/acessos\.js\?v=\d+"><\/script>/);
+});
+
+test('acessos: vários perfis por pessoa, salvos juntos, e editor de perfis por área', () => {
+  const js = web('acessos.js');
+  assert.match(js, /eu\.permissoes\.includes\('usuarios'\)/); // a página é de quem cuida dos usuários
+  assert.match(js, /api\('PUT', '\/api\/admin\/usuarios\/' \+ u\.id, \{ perfis: rascunho \}\)/);
+  assert.match(js, /api\('POST', '\/api\/admin\/usuarios', \{ nome: valor\('n-nome'\), login: valor\('n-login'\), perfis: escolhidos \}\)/);
+  assert.match(js, /'A pessoa precisa de pelo menos um perfil/);
+  assert.match(js, /'de ' \+ origem\.get\(c\.id\)\.join\(', '\)/); // de qual perfil veio cada permissão
+  assert.match(js, /function foraDoAlcance\(perfil\)/); // ninguém dá o que não tem
   assert.match(js, /api\('GET', '\/api\/admin\/perfis'\)/);
   assert.match(js, /api\('POST', `\/api\/admin\/perfis\/\$\{encodeURIComponent\(p\.id\)\}\/restaurar`\)/);
   assert.match(js, /'Incluída por: '/);
-  assert.match(js, /p\.travado \? null : excluir/);
+  assert.match(js, /api\('GET', '\/api\/auditoria\?tipo=acesso&limite=200'\)/);
 });

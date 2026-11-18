@@ -11,7 +11,9 @@ import 'usuarios.dart';
 
 /// Quem está usando o painel/app nesta requisição.
 class Conta {
-  const Conta({required this.id, required this.nome, required this.login, required this.perfil, this.trocarSenha = false});
+  const Conta(
+      {required this.id, required this.nome, required this.login, required this.perfil, List<String>? perfis, this.trocarSenha = false})
+      : _perfis = perfis;
 
   /// A conta principal: a senha do painel definida na instalação (config.json / /admin).
   static final principal =
@@ -20,7 +22,13 @@ class Conta {
   final String id;
   final String nome;
   final String login;
+
+  /// O que a conta pode: a soma dos perfis dela ([Perfil.combinado]).
   final Perfil perfil;
+  final List<String>? _perfis;
+
+  /// Ids dos perfis da conta (sem a lista, o do [perfil]).
+  List<String> get perfis => _perfis ?? [perfil.id];
 
   /// Entrou com senha temporária: só pode criar a própria senha (rotas de sessão).
   final bool trocarSenha;
@@ -125,7 +133,7 @@ class Auth {
     if (s.usuario == idPrincipal) return Conta.principal;
     final u = usuarios?.buscar(s.usuario);
     if (u == null || !u.ativo) return null;
-    return Conta(id: u.id, nome: u.nome, login: u.login, perfil: u.perfil, trocarSenha: u.trocarSenha);
+    return Conta(id: u.id, nome: u.nome, login: u.login, perfil: u.perfil, perfis: u.idsPerfis, trocarSenha: u.trocarSenha);
   }
 
   bool valido(String? token) => contaDe(token) != null;

@@ -10,6 +10,7 @@ const MENU_GRUPOS = [
     { id: 'motivos', titulo: 'Motivos de oração', permissao: 'motivosVer', badge: 'badge' },
     { id: 'mensagens', titulo: 'Mensagens', permissao: 'mensagens', badge: 'badge-mensagens' },
     { id: 'membros', titulo: 'Membros', permissao: 'membros', badge: 'badge-cadastros' },
+    { id: 'casais', titulo: 'Casais e Família', permissao: 'casais' },
     { id: 'ministerios', titulo: 'Ministérios', permissao: 'ministerios' },
   ] },
   { nome: 'Cultos', itens: [
@@ -32,6 +33,7 @@ const MENU_GRUPOS = [
     { id: 'auditoria', titulo: 'Auditoria', permissao: 'admin' },
     { id: 'status', titulo: 'Status', permissao: 'painel' },
     { id: 'acessos', titulo: 'Acessos às escalas', permissao: 'acessosEscala' },
+    { id: 'usuarios', titulo: 'Usuários e acessos', permissao: 'usuarios', href: '/acessos' },
     { id: 'admin', titulo: 'Administração', permissao: 'admin', href: '/admin' },
   ] },
 ];

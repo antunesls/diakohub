@@ -107,6 +107,10 @@ class Membro {
     this.consentimentoRevogado,
     this.conviteLgpd,
     this.conjugeId,
+    this.conjugeNome,
+    this.dataCasamento,
+    this.casamentoAutorizado = false,
+    this.casamentoConsentimento,
     this.paisIds = const [],
     this.emergenciaNome,
     this.emergenciaTelefone,
@@ -181,6 +185,12 @@ class Membro {
 
   /// Id do cônjuge (o servidor mantém o vínculo nos dois lados).
   String? conjugeId;
+
+  /// Nome livre somente quando o cônjuge não tem cadastro.
+  String? conjugeNome;
+  String? dataCasamento;
+  bool casamentoAutorizado;
+  Map<String, dynamic>? casamentoConsentimento;
 
   /// Ids dos pais (cada um também é um membro). Os filhos de alguém são todos os
   /// membros que têm o id dele aqui — não há vínculo duplicado para limpar.
@@ -281,6 +291,10 @@ class Membro {
         if (consentimentoRevogado != null) 'consentimentoRevogado': consentimentoRevogado,
         if (conviteLgpd != null) 'conviteLgpd': conviteLgpd,
         if (conjugeId != null) 'conjugeId': conjugeId,
+        if (conjugeNome != null) 'conjugeNome': conjugeNome,
+        if (dataCasamento != null) 'dataCasamento': dataCasamento,
+        if (casamentoAutorizado) 'casamentoAutorizado': true,
+        if (casamentoConsentimento != null) 'casamentoConsentimento': casamentoConsentimento,
         if (paisIds.isNotEmpty) 'paisIds': paisIds,
         if (!(emergenciaNome ?? '').isEmpty) 'emergenciaNome': emergenciaNome,
         if (!(emergenciaTelefone ?? '').isEmpty) 'emergenciaTelefone': emergenciaTelefone,
@@ -331,6 +345,10 @@ class Membro {
       consentimentoRevogado: _mapa(j['consentimentoRevogado']),
       conviteLgpd: _mapa(j['conviteLgpd']),
       conjugeId: _texto(j['conjugeId']),
+      conjugeNome: _texto(j['conjugeNome']),
+      dataCasamento: dataDe(j['dataCasamento']),
+      casamentoAutorizado: j['casamentoAutorizado'] == true,
+      casamentoConsentimento: _mapa(j['casamentoConsentimento']),
       paisIds: lista(j['paisIds']),
       emergenciaNome: _texto(j['emergenciaNome']),
       emergenciaTelefone: _texto(j['emergenciaTelefone']),

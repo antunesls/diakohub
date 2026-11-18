@@ -63,7 +63,9 @@ $('form-login').addEventListener('submit', async (e) => {
   iniciar();
 });
 
-$('sair').addEventListener('click', sair);
+$('sair').addEventListener('click', () => {
+  if (confirmarSaidaDevocional()) sair();
+});
 
 // ---------- Menu lateral ----------
 
@@ -99,6 +101,7 @@ window.matchMedia('(max-width: 800px)').addEventListener('change', () => fecharM
 fecharMenu();
 
 function mostrarAba(nome) {
+  if (abaAtual === 'casais' && nome !== 'casais' && !confirmarSaidaDevocional()) return;
   const botoes = [...$('menu-lateral').querySelectorAll('button[data-aba]')];
   // Aba fora do perfil (a comissão, por exemplo, não tem Visão geral): abre a primeira que a pessoa pode ver.
   if (!botoes.some((b) => b.dataset.aba === nome)) {
@@ -124,6 +127,7 @@ const carregar = {
   cartazes: carregarCartazes,
   galeria: carregarGaleria,
   membros: carregarMembros,
+  casais: carregarCasais,
   gestaoCasa: carregarCasa,
   atas: carregarAtas,
   resumo: carregarResumo,
@@ -1167,6 +1171,8 @@ const GRUPOS_REVISAO = [
   ['Dados pessoais', [['nome', 'Nome', 'texto'], ['nascimento', 'Nascimento', 'data'], ['sexo', 'Sexo', 'sexo'],
     ['estadoCivil', 'Estado civil', 'civil'], ['cpf', 'CPF', 'cpf'], ['rg', 'RG', 'texto']]],
   ['Contato', [['whatsapp', 'WhatsApp', 'tel'], ['telefone', 'Telefone', 'tel'], ['email', 'E-mail', 'email']]],
+  ['Casamento', [['conjugeNome', 'Nome do cônjuge', 'texto'], ['dataCasamento', 'Data do casamento', 'data'],
+    ['casamentoAutorizado', 'Divulgação do casamento', 'booleano']]],
   ['Endereço', [['cep', 'CEP', 'cep'], ['rua', 'Rua', 'texto'], ['numero', 'Número', 'texto'], ['complemento', 'Complemento', 'texto'],
     ['bairro', 'Bairro', 'texto'], ['cidade', 'Cidade', 'texto'], ['estado', 'UF', 'uf']]],
   ['Vida na igreja', [['dataChegada', 'Chegada', 'data'], ['dataBatismo', 'Batismo', 'data'], ['dataMembresia', 'Membresia', 'data'],
@@ -1196,6 +1202,7 @@ function exibirRevisao(tipo, v) {
   if (tipo === 'cpf') return mascaraCpf(v);
   if (tipo === 'cep') return mascaraCep(v);
   if (tipo === 'data') return dataBr(v);
+  if (tipo === 'booleano') return v === 'true' ? 'Autorizada pelo casal' : 'Não autorizada';
   if (tipo === 'sexo') return v === 'F' ? 'Feminino' : v === 'M' ? 'Masculino' : v;
   return v;
 }
@@ -1207,6 +1214,7 @@ function controleRevisao(tipo, valor) {
     return s;
   };
   if (tipo === 'sexo') return opcoes([['F', 'Feminino'], ['M', 'Masculino']], 'Não informado');
+  if (tipo === 'booleano') return opcoes([['false', 'Não autorizada'], ['true', 'Autorizada pelo casal']], 'Não informado');
   if (tipo === 'civil') return opcoes(ESTADOS_CIVIS.map((x) => [x, x]), 'Não informado');
   if (tipo === 'uf') return opcoes(UFS.map((x) => [x, x]), '—');
   const mascara = { tel: mascaraTelefone, cpf: mascaraCpf, cep: mascaraCep }[tipo];
@@ -1372,7 +1380,9 @@ function revisarSolicitacao(s) {
       const nota = el('p', { class: 'dica' });
       if (f.parentesco === 'outro') { select.disabled = true; nota.textContent = 'O cadastro só liga cônjuge, pais e filhos. Anote em observações, se precisar.'; }
       else if (sugeridos.length === 1) select.value = sugeridos[0].id;
-      else if (!sugeridos.length) nota.textContent = 'Não achamos ficha com este nome. Cadastre depois e faça o vínculo na ficha.';
+      else if (!sugeridos.length) nota.textContent = f.parentesco === 'conjuge'
+        ? 'Sem ficha: pode deixar sem vínculo. O nome e a data do casamento ficam registrados sem criar outro membro.'
+        : 'Não achamos ficha com este nome. Cadastre depois e faça o vínculo na ficha.';
       select.addEventListener('change', atualizarResumo);
       lista.append(el('div', { class: 'familiar-revisao' },
         el('div', {}, el('strong', {}, f.nome), ' ', el('span', { class: 'etiqueta' }, PARENTESCOS[f.parentesco] || f.parentesco)),
@@ -1418,6 +1428,7 @@ function revisarSolicitacao(s) {
         const [ano, mes, dia] = final ? final.split('-').map(Number) : [null, null, null];
         Object.assign(dados, { ano, mes, dia });
       } else if (l.chave === 'ministerios') dados.ministerios = final ? final.split(', ') : [];
+      else if (l.tipo === 'booleano') dados[l.chave] = final === 'true';
       else dados[l.chave] = final || null;
     }
     return dados;
@@ -1691,7 +1702,11 @@ function abrirFicha(id) {
     par('Chegou em', dataBr(m.dataChegada)), par('Batismo', dataBr(m.dataBatismo)), par('Membresia', dataBr(m.dataMembresia)),
     par('Como conheceu', m.comoConheceu),
     par('Ministérios', (m.ministerios || []).join(', ') || null), par('Função', m.funcao),
-    par('Cônjuge', linkMembro(conjuge)),
+    par('Cônjuge', conjuge ? linkMembro(conjuge) : m.conjugeNome),
+    par('Data do casamento', dataBr(m.dataCasamento)),
+    m.dataCasamento ? par('Divulgação do casamento', m.casamentoAutorizado
+      ? 'Autorizada pelo casal' + (m.casamentoConsentimento?.em ? ' · registrada em ' + dataHoraBr(m.casamentoConsentimento.em) : '')
+      : 'Não autorizada') : null,
     pais.length ? par('Pais', juntar(pais.map(linkMembro))) : null,
     filhos.length ? par('Filhos', juntar(filhos.map(linkMembro))) : null,
     par('Emergência', [m.emergenciaNome, m.emergenciaVinculo, m.emergenciaTelefone].filter(Boolean).join(' · ')),
@@ -1980,6 +1995,25 @@ $('dlg-membro').addEventListener('cancel', (e) => {
 });
 
 let membroEmEdicao = null; // o registro que o formulário edita (vira o criado depois do primeiro salvar)
+// ----- Campos do casamento -----
+function atualizarCamposCasamento() {
+  const externo = $('b-conjuge-externo').checked;
+  $('b-conjuge').disabled = externo;
+  $('b-conjuge-nome-campo').hidden = !externo;
+  $('b-conjuge-nome').disabled = !externo;
+  const completo = $('b-data-casamento').value && (externo ? $('b-conjuge-nome').value.trim() : $('b-conjuge').value.trim());
+  $('b-casamento-autorizado').disabled = !completo;
+  if (!completo) $('b-casamento-autorizado').checked = false;
+}
+for (const [id, evento] of [['b-conjuge-externo', 'change'], ['b-conjuge', 'input'],
+  ['b-conjuge-nome', 'input'], ['b-data-casamento', 'input']]) {
+  $(id).addEventListener(evento, () => {
+    $('b-casamento-autorizado').checked = false;
+    if (id !== 'b-data-casamento') $('b-data-casamento').value = '';
+    atualizarCamposCasamento();
+  });
+}
+// ----- Fim dos campos do casamento -----
 const DICA_CONSENTIMENTO = $('b-consentimento-dica').textContent.replace(/\s+/g, ' ').trim();
 $('b-nome').addEventListener('input', () => avisoDuplicado($('b-nome'), $('b-nome-aviso'), membroEmEdicao?.id, fecharFormulario));
 $('b-conjuge').addEventListener('input', () => avisoConjuge(membroEmEdicao));
@@ -1991,6 +2025,12 @@ function editarMembro(m) {
   for (const b of document.querySelectorAll('#form-membro .abas-form button')) b.classList.remove('com-erro');
   for (const c of $('form-membro').querySelectorAll('input, select, textarea')) c.setCustomValidity('');
   montarPessoas(m);
+  $('b-conjuge-externo').checked = !m?.conjugeId && !!m?.conjugeNome;
+  $('b-conjuge-nome').value = m?.conjugeNome || '';
+  $('b-data-casamento').value = m?.dataCasamento || '';
+  $('b-data-casamento').max = hojeIso();
+  $('b-casamento-autorizado').checked = m?.casamentoAutorizado === true;
+  atualizarCamposCasamento();
   $('b-nome').value = m ? m.nome : '';
   $('b-aniversario').value = m ? aniversarioDe(m) : '';
   $('b-sexo').value = m?.sexo || '';
@@ -2065,7 +2105,7 @@ function editarMembro(m) {
       mostrarSecao('pessoal');
       throw new Error('CPF inválido: confira os números.');
     }
-    const conjugeId = pessoaDoCampo('b-conjuge', 'Cônjuge');
+    const conjugeId = $('b-conjuge-externo').checked ? null : pessoaDoCampo('b-conjuge', 'Cônjuge');
     const paisIds = [...new Set([pessoaDoCampo('b-pai-1', 'Pai/mãe'), pessoaDoCampo('b-pai-2', 'Pai/mãe')].filter(Boolean))];
     const troca = conjugeId !== (atual?.conjugeId || null) ? avisoConjuge(atual) : null;
     if (troca && !confirm(`${troca.escolhido.nome} hoje é cônjuge de ${troca.atualDele.nome}. Desfazer esse vínculo e ligar a esta pessoa?`)) {
@@ -2102,6 +2142,9 @@ function editarMembro(m) {
       funcao: texto('b-funcao'),
       comoConheceu: texto('b-como-conheceu'),
       conjugeId,
+      conjugeNome: $('b-conjuge-externo').checked ? texto('b-conjuge-nome') : null,
+      dataCasamento: $('b-data-casamento').value || null,
+      casamentoAutorizado: $('b-casamento-autorizado').checked,
       paisIds,
       emergenciaNome: texto('b-emerg-nome'),
       emergenciaTelefone: texto('b-emerg-telefone'),
