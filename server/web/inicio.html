@@ -66,6 +66,20 @@
   .aviso strong { display: block; font-size: 17px; }
   .aviso p { margin: 4px 0 0; color: var(--suave); white-space: pre-line; }
   .aviso .ate { font-size: 13px; color: var(--suave); margin-top: 6px; }
+  .cartaz-abrir { display: block; position: relative; color: var(--texto); cursor: zoom-in; }
+  .cartaz-abrir:focus-visible { outline: 3px solid var(--primaria); outline-offset: -3px; }
+  .cartaz-abrir span { position: absolute; right: 10px; bottom: 10px; padding: 5px 12px; border-radius: 16px; background: rgba(0, 0, 0, .75); color: #fff; font-size: 13px; }
+  #visualizador-cartaz { width: calc(100vw - 24px); max-width: 1400px; height: calc(100dvh - 24px); max-height: none; padding: 0; border: 0; border-radius: 16px; background: var(--superficie); color: var(--texto); overflow: hidden; }
+  #visualizador-cartaz[open] { display: flex; flex-direction: column; }
+  #visualizador-cartaz::backdrop { background: rgba(0, 0, 0, .85); }
+  .cartaz-barra { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; padding: 12px 16px; border-bottom: 1px solid var(--linha); }
+  .cartaz-barra h2 { flex: 1; min-width: 140px; margin: 0; font-size: 18px; overflow-wrap: anywhere; }
+  .cartaz-controles { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+  #cartaz-area { flex: 1; min-height: 0; overflow: auto; background: #171717; padding: 16px; }
+  #cartaz-completo { display: block; max-width: none; height: auto; margin: 0 auto; }
+  #cartaz-completo[hidden] { display: none; }
+  #cartaz-estado { margin: 0; padding: 6px 16px; font-size: 14px; }
+  #cartaz-estado:empty { display: none; }
   .acoes-site { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; }
   .acao { display: grid; grid-template-columns: auto minmax(0, 1fr); column-gap: 14px; row-gap: 2px; align-items: center; padding: 16px 18px; border-radius: 18px; text-decoration: none; background: var(--superficie); border: 1px solid var(--linha); color: var(--texto); }
   .acao.principal { background: var(--primaria); border-color: var(--primaria); color: #fff; }
@@ -178,6 +192,7 @@
 
 <main class="conteudo" id="conteudo">
   <p class="carregando largura-toda" id="carregando">Carregando…</p>
+  <section class="largura-toda" id="avisos" aria-labelledby="avisos-t" hidden></section>
   <section class="destaque largura-toda" id="hoje" aria-labelledby="hoje-t" hidden></section>
   <nav class="acoes-site largura-toda" id="atalhos" aria-label="Fale com a igreja" hidden></nav>
   <div class="coluna" id="principal" hidden></div>
@@ -185,6 +200,23 @@
 </main>
 <section class="faixa-redes" id="redes" aria-labelledby="redes-t" hidden></section>
 <footer class="rodape-site" id="rodape" hidden></footer>
+
+<dialog id="visualizador-cartaz" aria-labelledby="cartaz-titulo">
+  <div class="cartaz-barra">
+    <h2 id="cartaz-titulo">Cartaz</h2>
+    <div class="cartaz-controles" role="group" aria-label="Zoom do cartaz">
+      <button type="button" class="botao secundario pequeno" id="cartaz-reduzir" aria-label="Reduzir cartaz">−</button>
+      <output id="cartaz-zoom" aria-live="polite" aria-label="Nível de zoom">100%</output>
+      <button type="button" class="botao secundario pequeno" id="cartaz-ampliar" aria-label="Ampliar cartaz">+</button>
+      <button type="button" class="botao secundario pequeno" id="cartaz-ajustar">Ajustar à tela</button>
+    </div>
+    <button type="button" class="botao pequeno" id="cartaz-fechar" autofocus>Fechar</button>
+  </div>
+  <p id="cartaz-estado" role="status"></p>
+  <div id="cartaz-area" tabindex="0" role="region" aria-label="Cartaz completo. Após ampliar, role para ver os detalhes.">
+    <img id="cartaz-completo" alt="">
+  </div>
+</dialog>
 
 <script>
   'use strict';
@@ -212,6 +244,78 @@
   const dataCurta = (iso) => new Date(iso).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
   const diaIso = (d) => `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
 
+  let zoomCartaz = 1;
+  let larguraCartaz = 0;
+  let rolagemAnterior = '';
+
+  function atualizarZoomCartaz(zoom) {
+    zoomCartaz = Math.max(1, Math.min(4, zoom));
+    $('cartaz-completo').style.width = `${larguraCartaz * zoomCartaz}px`;
+    $('cartaz-zoom').textContent = `${Math.round(zoomCartaz * 100)}%`;
+    $('cartaz-reduzir').disabled = !larguraCartaz || zoomCartaz === 1;
+    $('cartaz-ampliar').disabled = !larguraCartaz || zoomCartaz === 4;
+    $('cartaz-ajustar').disabled = !larguraCartaz;
+  }
+
+  function ajustarCartaz() {
+    const imagem = $('cartaz-completo');
+    if (!imagem.naturalWidth || !imagem.naturalHeight) return;
+    const area = $('cartaz-area');
+    larguraCartaz = Math.max(1, Math.min(imagem.naturalWidth, area.clientWidth - 32,
+      imagem.naturalWidth * Math.max(1, area.clientHeight - 32) / imagem.naturalHeight));
+    atualizarZoomCartaz(zoomCartaz);
+  }
+
+  function abrirCartaz(url, titulo) {
+    const dialogo = $('visualizador-cartaz');
+    $('cartaz-titulo').textContent = titulo;
+    $('cartaz-estado').textContent = 'Carregando cartaz…';
+    const imagem = $('cartaz-completo');
+    imagem.hidden = true;
+    imagem.alt = titulo;
+    larguraCartaz = 0;
+    atualizarZoomCartaz(1);
+    if (!dialogo.open) {
+      rolagemAnterior = document.body.style.overflow;
+      dialogo.showModal();
+      document.body.style.overflow = 'hidden';
+    }
+    $('cartaz-area').scrollTop = 0;
+    $('cartaz-area').scrollLeft = 0;
+    imagem.src = url;
+  }
+
+  $('cartaz-completo').addEventListener('load', () => {
+    $('cartaz-completo').hidden = false;
+    $('cartaz-estado').textContent = '';
+    ajustarCartaz();
+  });
+  $('cartaz-completo').addEventListener('error', () => {
+    larguraCartaz = 0;
+    atualizarZoomCartaz(1);
+    $('cartaz-completo').hidden = true;
+    $('cartaz-estado').textContent = 'Não foi possível carregar o cartaz. Feche e tente abrir novamente.';
+  });
+  $('cartaz-ampliar').addEventListener('click', () => atualizarZoomCartaz(zoomCartaz + .25));
+  $('cartaz-reduzir').addEventListener('click', () => atualizarZoomCartaz(zoomCartaz - .25));
+  $('cartaz-ajustar').addEventListener('click', () => {
+    zoomCartaz = 1;
+    ajustarCartaz();
+    $('cartaz-area').scrollTop = 0;
+    $('cartaz-area').scrollLeft = 0;
+  });
+  $('cartaz-fechar').addEventListener('click', () => $('visualizador-cartaz').close());
+  $('visualizador-cartaz').addEventListener('click', (evento) => {
+    if (evento.target === $('visualizador-cartaz')) $('visualizador-cartaz').close();
+  });
+  $('visualizador-cartaz').addEventListener('close', () => {
+    document.body.style.overflow = rolagemAnterior;
+    $('cartaz-completo').removeAttribute('src');
+  });
+  window.addEventListener('resize', () => {
+    if ($('visualizador-cartaz').open && larguraCartaz) ajustarCartaz();
+  });
+
   function secao(id, titulo, ...conteudo) {
     return el('section', { id, 'aria-labelledby': id + '-t' }, el('h2', { id: id + '-t' }, titulo), ...conteudo);
   }
@@ -229,19 +333,27 @@
     montarCarrossel(s.galeria || []);
 
     const principal = [];
+    $('avisos').replaceChildren();
+    $('avisos').hidden = !s.avisos.length;
     if (s.avisos.length) {
       menu.push(['avisos', 'Avisos']);
-      principal.push(el('section', { id: 'avisos', 'aria-labelledby': 'avisos-t' },
+      $('avisos').replaceChildren(
         el('h1', { id: 'avisos-t' }, 'Avisos da semana'),
         el('div', { class: 'avisos' }, s.avisos.map((a) => el('article', { class: 'aviso' + (a.imagem ? ' com-imagem' : '') },
-          a.imagem ? el('img', { src: a.imagem, alt: a.titulo, loading: 'lazy' }) : null,
+          a.imagem ? el('a', { class: 'cartaz-abrir', href: a.imagem, target: '_blank', rel: 'noopener',
+            'aria-label': 'Ver cartaz completo: ' + a.titulo,
+            onclick: (evento) => {
+              if (typeof $('visualizador-cartaz').showModal !== 'function') return;
+              evento.preventDefault();
+              abrirCartaz(a.imagem, a.titulo);
+            } }, el('img', { src: a.imagem, alt: a.titulo, loading: 'lazy' }), el('span', {}, 'Ampliar cartaz')) : null,
           el('div', { class: 'texto' },
             el('strong', {}, a.titulo),
             a.texto ? el('p', {}, a.texto) : null,
-            a.validoAte ? el('div', { class: 'ate' }, 'Até ' + dataCurta(a.validoAte)) : null))))));
+            a.validoAte ? el('div', { class: 'ate' }, 'Até ' + dataCurta(a.validoAte)) : null)))));
     }
 
-    // Destaque no topo: os eventos de hoje ou, sem nada hoje, o próximo encontro. Esses saem da lista abaixo.
+    // Depois dos avisos: eventos de hoje ou o próximo encontro. Esses saem da lista abaixo.
     let restantes = [];
     if (s.agenda && s.eventos.length) {
       const doDia = s.eventos.filter((e) => diaIso(new Date(e.inicio)) === diaIso(new Date()));
@@ -342,8 +454,10 @@
     $('lateral').replaceChildren(...lateral);
     $('principal').hidden = principal.length === 0;
     $('lateral').hidden = lateral.length === 0;
-    if (!principal.length || !lateral.length) $('conteudo').style.gridTemplateColumns = 'minmax(0, 760px)';
-    if (!principal.length || !lateral.length) $('conteudo').style.justifyContent = 'center';
+    // Avisos continuam alinhados ao carrossel mesmo quando só há uma coluna abaixo.
+    for (const id of ['principal', 'lateral']) {
+      $(id).style.gridColumn = !principal.length || !lateral.length ? '1 / -1' : '';
+    }
 
     // Faixa "Acompanhe a igreja" com as redes cadastradas; sem redes, fica só o rodapé simples.
     const botoes = [
