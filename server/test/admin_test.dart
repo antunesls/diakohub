@@ -383,14 +383,23 @@ void main() {
       expect(comArte, isNot(equals(padrao)));
       expect(img.decodePng(Uint8List.fromList(comArte))!.getPixel(40, 40).r, greaterThan(70), reason: 'o fundo é a arte');
       expect(await (await req('GET', '/api/qr-projetado?qr=visitante')).read().expand((b) => b).toList(), comArte);
+      final download = await req('GET', '/qr-visitante.png');
+      expect(download.statusCode, 200);
+      expect(download.headers['content-type'], 'image/png');
+      expect(download.headers['cache-control'], 'no-cache');
+      expect(await download.read().expand((b) => b).toList(), comArte,
+          reason: 'Status, download e mural devem mostrar a mesma arte do telão e tablet');
       await req('PUT', '/api/admin/configuracoes', json: {'arteQrVisitantePosicao': 'centro-baixo', 'arteQrVisitanteTamanho': 'P'});
       expect(projetado().readAsBytesSync(), isNot(equals(comArte)), reason: 'posição nova recompõe');
+      expect(await (await req('GET', '/qr-visitante.png')).read().expand((b) => b).toList(), projetado().readAsBytesSync(),
+          reason: 'a prévia pública não pode ficar presa à arte anterior em cache');
 
       // Cadastro pela recepção desligado: o QR do telão some (o tablet e o painel deixam de oferecer).
       await req('PUT', '/api/admin/configuracoes', json: {'visitanteQrAtivo': false});
       expect(projetado().existsSync(), isFalse);
       expect((await estado())['qrVisitanteHolyrics'], isNull);
       expect((await req('GET', '/api/admin/arte-qr/previa?qr=visitante')).statusCode, 404);
+      expect((await req('GET', '/qr-visitante.png')).statusCode, 404);
       await req('PUT', '/api/admin/configuracoes', json: {'visitanteQrAtivo': true});
       expect(projetado().existsSync(), isTrue, reason: 'religado, volta com a mesma arte');
       expect(ehArquivoDeQr(arquivoQrVisitante), isTrue, reason: 'o agente copia para o PC da igreja');

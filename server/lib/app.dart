@@ -2983,9 +2983,12 @@ class Servidor {
   Uint8List? _qrVisitantePng;
   String? _qrVisitanteUrl;
 
-  /// QR code da página /visitante, para imprimir e deixar na recepção (gerado na hora).
+  /// Mesma arte do telão/tablet no Status, no download e no mural da recepção.
   Response _qrVisitante(Request _) {
     if (cfg?.visitanteQrAtivo == false) return Response.notFound('O cadastro pela recepção está desligado.');
+    final projetado = File(p.join(cartazes.pasta, arquivoQrVisitante));
+    if (projetado.existsSync()) return _arquivo(projetado);
+    // Compatibilidade com instalações que ainda não geraram o arquivo projetado.
     final url = '$_urlBase/visitante';
     if (_qrVisitanteUrl != url) {
       _qrVisitantePng = gerarPngQr(url, rotulo: 'CADASTRO DE VISITANTE');
