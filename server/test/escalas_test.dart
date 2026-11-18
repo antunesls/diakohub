@@ -59,7 +59,7 @@ void main() {
     late Handler handler;
     late String admin;
     // Quarta-feira, 28/10/2026.
-    final agora = DateTime(2026, 10, 28, 10);
+    var agora = DateTime(2026, 10, 28, 10);
 
     Future<(int, dynamic)> chamar(String metodo, String caminho, {String? token, Object? json}) async {
       final r = await handler(Request(metodo, Uri.parse('http://x$caminho'),
@@ -96,6 +96,7 @@ void main() {
     Map culto(Map escalas, String data) => (escalas['cultos'] as List).firstWhere((c) => c['data'] == data) as Map;
 
     setUp(() async {
+      agora = DateTime(2026, 10, 28, 10);
       tmp = await Directory.systemTemp.createTemp('diako_escalas');
       final config = Config.lerJson('{"senhaAdmin":"senha-principal"}', pastaBase: tmp.path);
       store = Store(config.pastaDados);
@@ -123,6 +124,69 @@ void main() {
     tearDown(() async {
       await store.fechar();
       await tmp.delete(recursive: true);
+    });
+
+    test('horários do site têm participação independente e reversível nas escalas', () async {
+      const horarios = 'Domingo — 19h\nQuarta — 20h — Culto de oração';
+      await chamar('PUT', '/api/admin/configuracoes', token: admin, json: {'siteCultos': horarios});
+      await chamar('POST', '/api/escalas/gerar', token: admin, json: {'mes': '2026-11'});
+      final quarta = culto(await mes('2026-11'), '2026-11-04');
+      final id = quarta['id'];
+      final pessoa = await membro('Ana', ministerios: ['Louvor']);
+      await chamar('PUT', '/api/escalas/$id', token: admin,
+          json: {'tipo': 'louvor', 'funcao': 'Vocal', 'membros': [pessoa]});
+      final (st, _) = await chamar('PUT', '/api/admin/configuracoes', token: admin, json: {
+        'cultosEscalas': {'3@20:00': {'pastoral': true, 'louvor': false}},
+      });
+      expect(st, 200);
+      final (stExtra, extra) = await chamar('POST', '/api/escalas', token: admin,
+          json: {'data': '2027-01-06', 'hora': '20h', 'nome': 'Culto extra'});
+      expect(stExtra, 201);
+      expect(extra['funcoes']['louvor'], isEmpty);
+      var nov = await mes('2026-11');
+      expect(culto(nov, '2026-11-04')['funcoes']['pastoral'], isNotEmpty);
+      expect(culto(nov, '2026-11-04')['funcoes']['louvor'], isEmpty);
+      expect(culto(nov, '2026-11-04')['louvor'], isEmpty);
+      expect(nov['whatsapp']['louvor'], isNot(contains('04/11')));
+      expect(nov['avisos']['louvor'].toString(), isNot(contains('04/11')));
+      expect((await chamar('PUT', '/api/escalas/$id', token: admin,
+          json: {'tipo': 'louvor', 'funcao': 'Vocal', 'membros': [pessoa]})).$1, 400);
+      expect((await chamar('PUT', '/api/escalas/$id', token: admin, json: {'musicas': []})).$1, 400);
+      final publico = (await chamar('GET', '/api/public/inicio')).$2;
+      expect(publico['cultos'].toString(), contains('Quarta'));
+      expect((await chamar('GET', '/api/escalas/pdf?mes=2026-11&tipo=louvor&formato=paisagem', token: admin)).$1, 400);
+      await chamar('PUT', '/api/admin/configuracoes', token: admin, json: {
+        'cultosEscalas': {'3@20:00': {'pastoral': false, 'louvor': false}},
+      });
+      nov = await mes('2026-11');
+      expect((nov['cultos'] as List).length, 5);
+      final futuros = (await chamar('GET', '/api/escalas/hoje?todos=1', token: admin)).$2['cultos'] as List;
+      expect(futuros.any((c) => c['data'] == '2026-11-04'), isFalse);
+      await chamar('POST', '/api/escalas/gerar', token: admin, json: {'mes': '2026-12'});
+      expect(((await mes('2026-12'))['cultos'] as List).length, 4);
+      agora = DateTime(2026, 11, 5, 10);
+      expect((await mes('2026-11'))['cultos'].any((c) => c['id'] == id), isFalse,
+          reason: 'Ao passar o dia, o culto desativado não reaparece no histórico.');
+      agora = DateTime(2026, 10, 28, 10);
+      // Não apaga alocações: reativar recupera o que já estava salvo.
+      await chamar('PUT', '/api/admin/configuracoes', token: admin, json: {'cultosEscalas': {}});
+      expect(culto(await mes('2026-11'), '2026-11-04')['louvor']['Vocal'].single['nome'], 'Ana');
+      await chamar('POST', '/api/escalas/gerar', token: admin, json: {'mes': '2026-12'});
+      expect(((await mes('2026-12'))['cultos'] as List).length, 9);
+    });
+
+    test('configuração das escalas valida tipos e não altera o histórico', () async {
+      await chamar('PUT', '/api/admin/configuracoes', token: admin, json: {'siteCultos': 'Quarta — 20h'});
+      await chamar('POST', '/api/escalas/gerar', token: admin, json: {'mes': '2026-10'});
+      for (final valor in [[], {'8@20:00': {'louvor': false}}, {'3@20:00': {'louvor': 'não'}}, {'3@20:00': {'outro': false}}]) {
+        expect((await chamar('PUT', '/api/admin/configuracoes', token: admin, json: {'cultosEscalas': valor})).$1, 400);
+      }
+      await chamar('PUT', '/api/admin/configuracoes', token: admin, json: {
+        'cultosEscalas': {'3@20:00': {'pastoral': false, 'louvor': false}},
+      });
+      final out = await mes('2026-10');
+      expect((out['cultos'] as List).length, 3); // 7, 14 e 21; hoje (28) já segue a regra.
+      expect(culto(out, '2026-10-21')['funcoes']['louvor'], isNotEmpty);
     });
 
     test('gera os cultos, escala, avisa conflitos e monta o texto do WhatsApp', () async {

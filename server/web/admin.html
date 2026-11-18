@@ -161,6 +161,11 @@
             <label for="siteCultos">Horários dos cultos <span class="dica">(um por linha, ex.: Domingo — 19h)</span></label>
             <textarea id="siteCultos" maxlength="500" style="min-height:80px" placeholder="Domingo — 19h&#10;Quarta (oração) — 19h30"></textarea>
           </div>
+          <fieldset class="campo">
+            <legend>Participação nas escalas</legend>
+            <p class="dica">Desmarque as escalas que não se aplicam a cada culto. O horário continua no site. Vale para hoje e datas futuras, inclusive cultos já gerados; o histórico e as pessoas e músicas salvas são preservados. Reativar recupera a escala anterior; para datas ainda não geradas, use Gerar cultos no painel.</p>
+            <div id="cultos-escalas"></div>
+          </fieldset>
           <div class="campo"><label for="siteEndereco">Endereço <span class="dica">(o botão "Como chegar" abre no Google Maps)</span></label><input type="text" id="siteEndereco" maxlength="200" placeholder="Rua, número, bairro, cidade"></div>
           <h3 style="font-size:17px;margin:22px 0 6px">PIX para dízimos e ofertas</h3>
           <p class="dica" style="margin-top:0">Preencha os três campos para mostrar a chave e o QR code. Nome e cidade são os do recebedor, como aparecem no banco.</p>
@@ -572,6 +577,7 @@
 <script src="/comum.js?v=6"></script>
 <script src="/primeiro-acesso.js?v=1"></script>
 <script src="/arte-qr.js?v=2"></script>
-<script src="/admin.js?v=16"></script>
+<script src="/horarios-escalas.js?v=1"></script>
+<script src="/admin.js?v=17"></script>
 </body>
 </html>

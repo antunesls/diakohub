@@ -65,6 +65,7 @@ Opera o telão durante o culto: recados, cartazes, motivos de oração, boas-vin
 
 ### Escalas, repertório e PDF
 - **Escalas pastoral e do louvor:** cultos do mês gerados pelos horários cadastrados, sugestão de pessoas por ministério, avisos de conflito e de indisponibilidade, texto pronto para o WhatsApp.
+- **Cultos sem escala:** em `/admin → Página inicial → Participação nas escalas`, marque Pastoral e Louvor independentemente por horário. Desmarcar não tira o culto do site e vale para hoje e datas futuras, inclusive cultos já gerados, sem apagar pessoas ou músicas; o histórico passado é preservado. Para novas datas após reativar um horário, gere os cultos do mês novamente.
 - **Repertório pesquisável:** a busca procura título, cantor e compositor sem diferenciar acentos, aceita palavras fora de ordem e tolera pequenos erros; há filtros por status e tom. O tom usa 12 maiores, 12 menores e "Não definido". O status **OK** disponibiliza a música para novas escalas; **Em análise** e **Inativo** não.
 - **Importação da planilha:** CSV exportado do Google Sheets. Músicas já cadastradas não são alteradas, exceto para ganhar o link do vídeo quando ainda não têm um.
 - **Músicas da escala:** a escolha abre uma janela com busca, miniatura e link do YouTube, tom e BPM; a ordem e o tom de cada música são definidos na escala do culto.

@@ -255,6 +255,9 @@ class Configuracoes {
 
   /// Uma linha por culto, ex.: "Domingo — 19h".
   String get siteCultos => _s('siteCultos');
+
+  /// Dia da semana e hora (ex.: 3@20:00) → participação nas duas escalas.
+  Map<String, dynamic> get cultosEscalas => Map<String, dynamic>.from(_valores['cultosEscalas'] as Map? ?? const {});
   String get siteEndereco => _s('siteEndereco');
   String get sitePixChave => _s('sitePixChave');
   String get sitePixNome => _s('sitePixNome');
@@ -369,6 +372,20 @@ class Configuracoes {
           novos[k] = mudancas[k];
         case 'siteCultos':
           novos[k] = texto(k, 500);
+        case 'cultosEscalas':
+          final v = mudancas[k];
+          if (v is! Map || v.length > 100) throw const FormatException('Participação dos cultos inválida.');
+          final regras = <String, dynamic>{};
+          for (final e in v.entries) {
+            if (e.key is! String || !RegExp(r'^[1-7]@([01]\d|2[0-3]):[0-5]\d$').hasMatch(e.key as String) ||
+                e.value is! Map) throw const FormatException('Horário da escala inválido.');
+            final opcoes = e.value as Map;
+            if (opcoes.keys.any((x) => x != 'pastoral' && x != 'louvor') || opcoes.values.any((x) => x is! bool)) {
+              throw const FormatException('Marque Pastoral e Louvor com verdadeiro ou falso.');
+            }
+            regras[e.key as String] = {'pastoral': opcoes['pastoral'] != false, 'louvor': opcoes['louvor'] != false};
+          }
+          novos[k] = regras;
         case 'siteEndereco':
           novos[k] = texto(k, 200);
         case 'sitePixChave':
@@ -479,7 +496,7 @@ class Configuracoes {
       'holyricsHost', 'holyricsPorta', 'motivosPorSlide', 'segundosPorSlide', 'diasRespondidas',
       'temaPadrao', 'horaBackup', 'backupsManter', 'agendaMostrarDescricao', 'agendaDiasMural', 'agendaCalendarioId',
       'smtpHost', 'smtpPorta', 'smtpSsl', 'smtpUsuario', 'smtpRemetente', 'smtpDestinatario', 'emailCadastros',
-      'siteAtivo', 'siteAgenda', 'sitePix', 'siteGaleria', 'siteCultos', 'siteEndereco', 'sitePixChave', 'sitePixNome', 'sitePixCidade',
+      'siteAtivo', 'siteAgenda', 'sitePix', 'siteGaleria', 'siteCultos', 'cultosEscalas', 'siteEndereco', 'sitePixChave', 'sitePixNome', 'sitePixCidade',
       'siteInstagram', 'siteYoutube', 'siteWhatsapp', 'diakoPlayerUrl', 'termoLgpdTexto', 'termoLgpdVersao', 'visitanteQrAtivo', 'muralBoasVindas',
       'textoMotivos', 'muralFundoCor', 'muralFundoImagem', 'muralFundoEscurecer',
       'boasVindasFundoCor', 'boasVindasFundoImagem', 'boasVindasFundoEscurecer',

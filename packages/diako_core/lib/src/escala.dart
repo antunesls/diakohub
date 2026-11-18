@@ -49,6 +49,8 @@ class CultoEscala {
     this.nome = 'Culto',
     this.ceia = false,
     this.tema = '',
+    this.escalaPastoral = true,
+    this.escalaLouvor = true,
     Map<String, List<String>>? pastoral,
     Map<String, List<String>>? louvor,
     List<Musica>? musicas,
@@ -68,16 +70,20 @@ class CultoEscala {
 
   /// Tema da pregação (opcional).
   final String tema;
+  final bool escalaPastoral;
+  final bool escalaLouvor;
   final Map<String, List<String>> pastoral;
   final Map<String, List<String>> louvor;
   final List<Musica> musicas;
 
   Map<String, List<String>> da(TipoEscala tipo) => tipo == TipoEscala.pastoral ? pastoral : louvor;
 
+  bool participa(TipoEscala tipo) => tipo == TipoEscala.pastoral ? escalaPastoral : escalaLouvor;
+
   /// Funções deste culto: a Santa Ceia só aparece no culto de ceia.
   List<String> funcoes(TipoEscala tipo) => [
         for (final f in tipo.funcoes)
-          if (f != funcaoCeia || ceia) f,
+          if (participa(tipo) && (f != funcaoCeia || ceia)) f,
       ];
 
   /// Quem serve neste culto, em qualquer função das duas escalas.
@@ -98,6 +104,8 @@ class CultoEscala {
     String? hora,
     bool? ceia,
     String? tema,
+    bool? escalaPastoral,
+    bool? escalaLouvor,
     Map<String, List<String>>? pastoral,
     Map<String, List<String>>? louvor,
     List<Musica>? musicas,
@@ -109,6 +117,8 @@ class CultoEscala {
         nome: nome ?? this.nome,
         ceia: ceia ?? this.ceia,
         tema: tema ?? this.tema,
+        escalaPastoral: escalaPastoral ?? this.escalaPastoral,
+        escalaLouvor: escalaLouvor ?? this.escalaLouvor,
         pastoral: pastoral ?? this.pastoral,
         louvor: louvor ?? this.louvor,
         musicas: musicas ?? this.musicas,
@@ -119,6 +129,8 @@ class CultoEscala {
         'data': data,
         'hora': hora,
         'nome': nome,
+        if (!escalaPastoral) 'escalaPastoral': false,
+        if (!escalaLouvor) 'escalaLouvor': false,
         if (ceia) 'ceia': true,
         if (tema.isNotEmpty) 'tema': tema,
         'pastoral': {for (final e in pastoral.entries) if (e.value.isNotEmpty) e.key: e.value},
@@ -145,6 +157,8 @@ class CultoEscala {
       nome: nome.isEmpty ? 'Culto' : nome,
       ceia: j['ceia'] == true,
       tema: tema,
+      escalaPastoral: j['escalaPastoral'] != false,
+      escalaLouvor: j['escalaLouvor'] != false,
       pastoral: lerFuncoes(TipoEscala.pastoral, j['pastoral']),
       louvor: lerFuncoes(TipoEscala.louvor, j['louvor']),
       musicas: [for (final m in (j['musicas'] as List? ?? const [])) Musica.fromJson(Map<String, dynamic>.from(m as Map))],
@@ -361,6 +375,7 @@ String nomeCurto(String nome) {
 String textoEscalaWhatsapp(List<CultoEscala> cultos, TipoEscala tipo, int mes, String Function(String membroId) nomeDe) {
   final linhas = <String>['*Escala ${tipo == TipoEscala.pastoral ? 'pastoral' : 'do louvor'} — ${nomesMeses[mes - 1]}*'];
   for (final c in cultos) {
+    if (!c.participa(tipo)) continue;
     final partes = <String>[
       for (final f in c.funcoes(tipo))
         if ((c.da(tipo)[f] ?? const []).isNotEmpty) '$f: ${c.da(tipo)[f]!.map((id) => nomeCurto(nomeDe(id))).join(', ')}',

@@ -65,6 +65,42 @@ async function salvar(campos, saida) {
 const valor = (id) => $(id).value.trim();
 const numero = (id) => Number($(id).value);
 
+let participacaoCultos = {};
+
+function preencherParticipacaoCultos() {
+  const lista = $('cultos-escalas');
+  lista.replaceChildren();
+  const horarios = horariosParaEscalas($('siteCultos').value);
+  if (!horarios.length) {
+    const dica = document.createElement('p');
+    dica.className = 'dica';
+    dica.textContent = 'Informe acima o dia e o horário de cada culto para definir suas escalas.';
+    lista.append(dica);
+  }
+  for (const { chave, rotulo } of horarios) {
+    const linha = document.createElement('div');
+    linha.style.cssText = 'display:flex;flex-wrap:wrap;gap:12px;align-items:center;margin:12px 0';
+    const nome = document.createElement('strong');
+    nome.textContent = rotulo;
+    linha.append(nome);
+    for (const [tipo, titulo] of [['pastoral', 'Escala pastoral'], ['louvor', 'Escala de louvor']]) {
+      const label = document.createElement('label');
+      label.className = 'marcar';
+      const caixa = document.createElement('input');
+      caixa.type = 'checkbox';
+      caixa.checked = participacaoCultos[chave]?.[tipo] !== false;
+      caixa.setAttribute('aria-label', `${titulo}: ${rotulo}`);
+      caixa.addEventListener('change', () => {
+        participacaoCultos[chave] = { ...participacaoCultos[chave], [tipo]: caixa.checked };
+      });
+      label.append(caixa, document.createTextNode(titulo));
+      linha.append(label);
+    }
+    lista.append(linha);
+  }
+}
+$('siteCultos').addEventListener('input', preencherParticipacaoCultos);
+
 // ---------- Carregar ----------
 
 async function carregar() {
@@ -80,6 +116,8 @@ function preencher() {
     if ($(id) && document.activeElement !== $(id)) $(id).value = cfg[id] ?? '';
   }
   $('siteAtivo').checked = cfg.siteAtivo !== false;
+  participacaoCultos = structuredClone(cfg.cultosEscalas || {});
+  preencherParticipacaoCultos();
   $('siteAgenda').checked = cfg.siteAgenda === true;
   $('sitePix').checked = cfg.sitePix !== false;
   $('siteGaleria').checked = cfg.siteGaleria !== false;
@@ -160,6 +198,10 @@ $('form-inicio').addEventListener('submit', (e) => {
   for (const id of ['siteCultos', 'siteEndereco', 'sitePixChave', 'sitePixNome', 'sitePixCidade', 'siteInstagram', 'siteYoutube', 'siteWhatsapp']) {
     campos[id] = $(id).value.trim();
   }
+  campos.cultosEscalas = Object.fromEntries(horariosParaEscalas(campos.siteCultos).map(({ chave }) => [chave, {
+    pastoral: participacaoCultos[chave]?.pastoral !== false,
+    louvor: participacaoCultos[chave]?.louvor !== false,
+  }]));
   salvar(campos, $('res-inicio'));
 });
 

@@ -50,9 +50,9 @@ function colunasDoMes(d, tipo) {
 }
 
 function desenharEscala() {
-  const d = escala.dados;
-  if (!d) return;
+  if (!escala.dados) return;
   const tipo = escala.tipo;
+  const d = { ...escala.dados, cultos: cultosDaEscala(escala.dados.cultos, tipo) };
   const podeTipo = d.pode[tipo];
   const algum = d.pode.pastoral || d.pode.louvor;
   document.querySelectorAll('[data-escala]').forEach((b) => b.setAttribute('aria-selected', String(b.dataset.escala === tipo)));

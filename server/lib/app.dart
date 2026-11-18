@@ -3461,6 +3461,18 @@ class Servidor {
   List<CultoEscala> _cultos() => [for (final d in store.listar('escalas')) CultoEscala.fromJson(d)]
     ..sort((a, b) => '${a.data} ${a.hora}'.compareTo('${b.data} ${b.hora}'));
 
+  /// Regras atuais só afetam hoje em diante; passado usa a participação registrada.
+  CultoEscala _participacaoCulto(CultoEscala c) {
+    if (c.data.compareTo(diaEscala(_agora())) < 0) return c;
+    final regra = cfg?.cultosEscalas['${c.dia.weekday}@${c.hora}'] as Map?;
+    return c.copiar(escalaPastoral: regra?['pastoral'] != false, escalaLouvor: regra?['louvor'] != false);
+  }
+
+  List<CultoEscala> _cultosVisiveis() => [
+    for (final c in _cultos().map(_participacaoCulto))
+      if (c.escalaPastoral || c.escalaLouvor) c,
+  ];
+
   List<Indisponibilidade> _indisponibilidades() =>
       [for (final d in store.listar('indisponibilidades')) Indisponibilidade.fromJson(d)];
 
@@ -3489,6 +3501,7 @@ class Servidor {
   /// Culto como o painel e o tablet mostram: nomes e avisos já resolvidos por função.
   Map<String, dynamic> _cultoParaTela(CultoEscala c, Map<String, Membro> membros, List<Indisponibilidade> ind) => {
         ...c.toJson(),
+        if (!c.escalaLouvor) 'musicas': [],
         'rotulo': rotuloDia(c.data),
         'horaTexto': horaCurtaEscala(c.hora),
         'funcoes': {for (final t in TipoEscala.values) t.name: c.funcoes(t)},
@@ -3514,7 +3527,7 @@ class Servidor {
     final membros = _membrosPorId();
     final ind = _indisponibilidades();
     final nome = _nomeDe(membros);
-    final cultos = _cultos().where((c) => c.data.startsWith(prefixo)).toList();
+    final cultos = _cultosVisiveis().where((c) => c.data.startsWith(prefixo)).toList();
     final editor = _podeAlgumaEscala(req);
     return _json({
       'mes': prefixo,
@@ -3549,7 +3562,7 @@ class Servidor {
   Response _escalaDeHoje(Request req) {
     final hoje = diaEscala(_agora());
     final limite = diaEscala(_agora().add(const Duration(days: 7)));
-    final cultos = _cultos();
+    final cultos = _cultosVisiveis();
     final dataPedida = req.url.queryParameters['data'];
     var lista = cultos.where((c) => c.data == hoje).toList();
     var ehHoje = lista.isNotEmpty;
@@ -3595,7 +3608,7 @@ class Servidor {
     }
     final prefixo = _prefixoMes(mes.ano, mes.mes);
     final membros = _membrosPorId();
-    final cultos = _cultos()
+    final cultos = _cultosVisiveis()
         .where((c) =>
             c.data.startsWith(prefixo) &&
             c.funcoes(tipo).any((f) => (c.da(tipo)[f] ?? const <String>[]).isNotEmpty))
@@ -3645,7 +3658,8 @@ class Servidor {
     final novos = [
       for (final c in cultosDoMes(mes.ano, mes.mes, horarios))
         if (!existentes.contains('${c.data} ${c.hora}'))
-          CultoEscala(id: novoId(), data: c.data, hora: c.hora, nome: c.nome, ceia: c.ceia).toJson(),
+          for (final culto in [_participacaoCulto(CultoEscala(id: novoId(), data: c.data, hora: c.hora, nome: c.nome, ceia: c.ceia))])
+            if (culto.escalaPastoral || culto.escalaLouvor) culto.toJson(),
     ];
     if (novos.isNotEmpty) {
       await store.salvarVarios('escalas', novos);
@@ -3668,10 +3682,11 @@ class Servidor {
     final todos = _cultos();
     final atuais = todos.where((c) => c.data.startsWith(_prefixoMes(mes.ano, mes.mes))).toList();
     if (atuais.isEmpty) return _erro(400, 'Gere os cultos do mês antes de repetir a escala.');
-    final anteriores = todos.where((c) => c.data.startsWith(prefixoAnterior)).toList();
+    final anteriores = todos.where((c) => c.data.startsWith(prefixoAnterior) && _participacaoCulto(c).participa(tipo)).toList();
     var preenchidas = 0;
     final alterados = <Map<String, dynamic>>[];
     for (final c in atuais) {
+      if (!_participacaoCulto(c).participa(tipo)) continue;
       final parecidos = anteriores.where((a) => a.dia.weekday == c.dia.weekday && a.hora == c.hora).toList();
       // 5ª quarta sem par no mês anterior: usa a última.
       final base = parecidos.where((a) => ocorrenciaNoMes(a.data) == ocorrenciaNoMes(c.data)).firstOrNull ?? parecidos.lastOrNull;
@@ -3702,7 +3717,7 @@ class Servidor {
     final corpo = await _corpo(req);
     final CultoEscala culto;
     try {
-      culto = CultoEscala.fromJson({'id': novoId(), 'data': corpo['data'], 'hora': corpo['hora'], 'nome': corpo['nome'], 'ceia': corpo['ceia']});
+      culto = _participacaoCulto(CultoEscala.fromJson({'id': novoId(), 'data': corpo['data'], 'hora': corpo['hora'], 'nome': corpo['nome'], 'ceia': corpo['ceia']}));
     } on FormatException catch (e) {
       return _erro(400, e.message);
     }
@@ -3723,11 +3738,13 @@ class Servidor {
     if (atual == null) return _erro(404, 'Culto não encontrado.');
     final corpo = await _corpo(req);
     final doc = {...atual};
+    final participacao = _participacaoCulto(CultoEscala.fromJson(atual));
     final eventos = <({String tipo, String acao, String detalhe})>[];
     if (corpo.containsKey('funcao')) {
       final tipo = TipoEscala.porNome(corpo['tipo']);
       if (tipo == null) return _erro(400, 'Escala inválida.');
       if (!_podeEscala(req, tipo)) return _semPermissaoEscala(tipo);
+      if (!participacao.participa(tipo)) return _erro(400, 'Este culto não participa desta escala. Altere em Administração → Página inicial.');
       final membros = corpo['membros'];
       final existentes = _membrosPorId();
       if (membros is! List || membros.any((m) => !existentes.containsKey(m))) return _erro(400, 'Pessoa não encontrada no cadastro.');
@@ -3740,6 +3757,7 @@ class Servidor {
     }
     if (corpo.containsKey('musicas')) {
       if (!_podeEscala(req, TipoEscala.louvor)) return _semPermissaoEscala(TipoEscala.louvor);
+      if (!participacao.escalaLouvor) return _erro(400, 'Este culto não participa da escala de louvor.');
       try {
         doc['musicas'] = _selecionarMusicas(atual, corpo['musicas']);
       } on FormatException catch (e) {
@@ -3757,7 +3775,7 @@ class Servidor {
     }
     final CultoEscala culto;
     try {
-      culto = CultoEscala.fromJson(doc);
+      culto = _participacaoCulto(CultoEscala.fromJson(doc));
     } on FormatException catch (e) {
       return _erro(400, e.message);
     }
@@ -3887,7 +3905,7 @@ class Servidor {
     if (atual == null) return _erro(404, 'Culto não encontrado.');
     final culto = CultoEscala.fromJson(atual);
     final hoje = diaEscala(_agora());
-    if (culto.data.compareTo(hoje) < 0 ||
+    if (!_participacaoCulto(culto).escalaLouvor || culto.data.compareTo(hoje) < 0 ||
         !(culto.da(TipoEscala.louvor)['Ministro'] ?? const <String>[]).contains(membroId)) {
       return _erro(403, 'Você não está escalado como ministro neste culto.');
     }
@@ -3925,11 +3943,11 @@ class Servidor {
         'repertorio': [for (final m in store.listar('repertorio')) if (m['ativo'] == true)
           {'id': m['id'], 'titulo': m['titulo'], 'cantor': m['cantor'], 'tomDiakonia': m['tomDiakonia']}],
       'cultos': [
-        for (final c in _cultos())
+        for (final c in _cultosVisiveis())
           if (c.data.compareTo(hoje) >= 0 && c.data.compareTo(limite) <= 0 && c.servindo.any((s) => s.membroId == id))
             {
               'id': c.id,
-              'podeEscolherMusicas': _podeNaConta(req, Permissao.musicasMinistro) &&
+              'podeEscolherMusicas': c.escalaLouvor && _podeNaConta(req, Permissao.musicasMinistro) &&
                   (c.da(TipoEscala.louvor)['Ministro'] ?? const <String>[]).contains(id),
               'data': c.data,
               'hora': c.hora,
@@ -3939,7 +3957,7 @@ class Servidor {
               'ceia': c.ceia,
               'funcoes': [for (final s in c.servindo) if (s.membroId == id) {'tipo': s.tipo.name, 'funcao': s.funcao}],
               'musicas': [
-                for (final m in c.musicas)
+                for (final m in c.escalaLouvor ? c.musicas : <Musica>[])
                   {
                     ...m.toJson(),
                     if (idVideoYoutube(referencias[m.repertorioId] is String ? referencias[m.repertorioId] as String : '') case final video?)
@@ -4888,6 +4906,19 @@ class Servidor {
       await c.atualizar(corpo);
     } on FormatException catch (e) {
       return _erro(400, e.message);
+    }
+    if (corpo.containsKey('cultosEscalas')) {
+      // Registra também nos cultos já gerados, sem apagar alocações ou músicas.
+      // Assim, ao passar a data, permanece a participação que valia naquele dia.
+      final hoje = diaEscala(_agora());
+      final alterados = <Map<String, dynamic>>[];
+      for (final culto in _cultos().where((c) => c.data.compareTo(hoje) >= 0)) {
+        final novo = _participacaoCulto(culto);
+        if (novo.escalaPastoral != culto.escalaPastoral || novo.escalaLouvor != culto.escalaLouvor) {
+          alterados.add(novo.toJson());
+        }
+      }
+      if (alterados.isNotEmpty) await store.salvarVarios('escalas', alterados);
     }
     // Agenda trocada ou removida: busca na hora (e descarta a cópia antiga).
     if ('${c.agendaUrl}|${c.agendaCalendarioId}' != agendaAntes) await agenda?.atualizarAgora();

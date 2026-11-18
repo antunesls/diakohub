@@ -18,6 +18,7 @@ function tela() {
     return elementos.get(id);
   };
   const contexto = vm.createContext({ $, el: criar, document: { querySelectorAll: () => [] }, carregar: {} });
+  vm.runInContext(fs.readFileSync(path.join(__dirname, '../web/horarios-escalas.js'), 'utf8'), contexto);
   vm.runInContext(fs.readFileSync(path.join(__dirname, '../web/escalas.js'), 'utf8'), contexto);
   vm.runInContext(`
     escala.mes = '2026-11';
@@ -74,6 +75,18 @@ test('sem avisos não há contador clicável', () => {
   executar('desenharEscala();');
   assert.equal($('escala-resumo').filhos.some((f) => f.tag === 'button'), false);
   assert.match(texto($('escala-avisos')), /Nenhum aviso/);
+});
+
+test('trocar a aba esconde somente a escala desmarcada e ajusta a contagem', () => {
+  const { $, executar } = tela();
+  executar(`escala.dados.cultos.push({ rotulo: 'Qua 04/11', horaTexto: '20h', nome: 'Oração',
+    escalaLouvor: false, funcoes: { pastoral: [], louvor: [] }, pastoral: {}, louvor: {}, musicas: [] });
+    desenharEscala();`);
+  assert.match(texto($('escala-resumo')), /1 culto no mês/);
+  assert.doesNotMatch(texto($('escala-grade')), /Qua 04/);
+  executar(`escala.tipo = 'pastoral'; desenharEscala();`);
+  assert.match(texto($('escala-resumo')), /2 cultos no mês/);
+  assert.match(texto($('escala-grade')), /Qua 04/);
 });
 
 test('página contém modal acessível com botão Fechar e script atualizado', () => {
