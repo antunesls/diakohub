@@ -135,7 +135,7 @@ class Servidor {
       if (configuracao == null || !configuracao.smtpConfigurado) {
         throw StateError('Configure o SMTP na administração antes de enviar devocionais.');
       }
-      await enviarEmailDevocional(configuracao, email);
+      await enviarEmailDevocional(configuracao, email, arquivoLogo: p.join(pastaWeb, 'logo.png'));
     },
   );
   late final AnexosCasa anexosAtas = AnexosCasa.atas(store.pasta);
