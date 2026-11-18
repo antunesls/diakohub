@@ -263,6 +263,8 @@ class Servidor {
       ..get('/agente/backups/<nome>', _agenteBaixarBackup)
       ..get('/qr-oracao.png', (Request _) => _arquivo(File(p.join(cartazes.pasta, arquivoQr))))
       ..get('/qr-mensagens.png', (Request _) => _arquivo(File(p.join(cartazes.pasta, arquivoQrMensagens))))
+      ..get('/qr-devocional.png', (Request _) => Response.ok(gerarPngQr('$_urlBase/devocional', rotulo: 'DEVOCIONAIS'),
+          headers: {'content-type': 'image/png', 'cache-control': 'no-cache'}))
       ..get('/cartazes/<nome>', (Request _, String nome) => _arquivo(cartazes.arquivo(nome)))
       ..get('/galeria/<arquivo>', _fotoGaleria)
       ..get('/fundo-tv/<arquivo>', _imagemFundoTv)
@@ -1092,6 +1094,10 @@ class Servidor {
       'urlVisitante': '$_urlBase/visitante',
       'visitanteQrAtivo': cfg?.visitanteQrAtivo ?? true,
       'qrMensagensHolyrics': '${Config.subpastaHolyrics}/$arquivoQrMensagens',
+      // QR da página de devocionais (o devocional em destaque e a assinatura).
+      'qrDevocionalHolyrics': File(p.join(cartazes.pasta, arquivoQrDevocional)).existsSync()
+          ? '${Config.subpastaHolyrics}/$arquivoQrDevocional'
+          : null,
       // QR do PIX para o momento das ofertas (só quando a chave do PIX está configurada).
       'qrPixHolyrics': File(p.join(cartazes.pasta, arquivoQrPix)).existsSync() ? '${Config.subpastaHolyrics}/$arquivoQrPix' : null,
       // QR do cadastro de visitante para o telão (some com o cadastro pela recepção desligado).
@@ -4943,6 +4949,8 @@ class Servidor {
             },
       ],
       'cultos': lerCultos(c.siteCultos),
+      // Devocional da semana: o mais recente publicado (some se não houver nenhum).
+      if (devocionais.destaque() case final d?) 'devocional': d,
       'endereco': c.siteEndereco,
       if (c.siteEndereco.isNotEmpty) 'mapa': linkMapa(c.siteEndereco),
       if (pix)

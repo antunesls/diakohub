@@ -36,12 +36,22 @@ String _dataExtenso(String iso) {
   return d == null ? iso : '${d.day} de ${_meses[d.month - 1]} de ${d.year}';
 }
 
+/// "Casais", "Casais e Família", "Casais, Família e Jovens".
+String _juntar(List<String> nomes) => nomes.length <= 1
+    ? nomes.join()
+    : '${nomes.sublist(0, nomes.length - 1).join(', ')} e ${nomes.last}';
+
+/// [trilhas]: nomes das trilhas do devocional (sem eles, o tema antigo, se houver).
 EmailDevocional montarEmailDevocional(Map<String, dynamic> devocional,
-    {required String destinatario, required String igreja, required String urlPublica, String? urlCancelar}) {
+    {required String destinatario, required String igreja, required String urlPublica, String? urlCancelar,
+    List<String>? trilhas}) {
   String campo(String k) => '${devocional[k] ?? ''}'.trim();
   final titulo = campo('titulo'), autor = campo('autorNome'), referencia = campo('referencia');
-  final tema = _temas[campo('tema')];
+  final nomes = trilhas ?? [if (_temas[campo('tema')] != null) _temas[campo('tema')]!];
+  final tema = nomes.isEmpty ? null : _juntar(nomes);
   final data = _dataExtenso(campo('data'));
+  final serie = campo('serie'), parte = devocional['serieParte'];
+  final rotuloSerie = serie.isEmpty ? '' : 'Série $serie${parte is int ? ' · parte $parte' : ''}';
   final assinatura = [if (autor.isNotEmpty) 'Por $autor', if (data.isNotEmpty) data].join(' · ');
   final rodape = urlCancelar != null
       ? 'Você recebe este e-mail porque assinou os devocionais${tema == null ? '' : ' de $tema'}.'
@@ -49,6 +59,7 @@ EmailDevocional montarEmailDevocional(Map<String, dynamic> devocional,
 
   final texto = [
     titulo, igreja,
+    if (rotuloSerie.isNotEmpty) rotuloSerie,
     if (assinatura.isNotEmpty) assinatura,
     if (referencia.isNotEmpty) referencia,
     campo('texto'),
@@ -81,6 +92,7 @@ EmailDevocional montarEmailDevocional(Map<String, dynamic> devocional,
     <tr><td style="padding:28px 28px 8px;font-family:$_fonte;color:$_texto">
       <p style="margin:0 0 6px;font-size:12px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:$_primaria">Devocional${tema == null ? '' : ' · ${e(tema)}'}</p>
       <h1 style="margin:0 0 8px;font-family:$_titulo;font-size:30px;line-height:1.2;font-weight:600;color:$_texto">${e(titulo)}</h1>
+      ${rotuloSerie.isEmpty ? '' : '<p style="margin:0 0 6px;font-size:14px;font-weight:600;color:$_primaria">${e(rotuloSerie)}</p>'}
       ${assinatura.isEmpty ? '' : '<p style="margin:0 0 22px;font-size:14px;color:$_suave">${e(assinatura)}</p>'}
       $secoes
     </td></tr>

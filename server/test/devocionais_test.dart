@@ -20,6 +20,7 @@ void main() {
   late List<EmailDevocional> emails;
   late DateTime agora;
   late Future<void> Function(EmailDevocional) transporte;
+  late Devocionais devocionais;
 
   Future<(int, dynamic)> chamar(String metodo, String rota,
       {Object? dados, bool publico = false}) async {
@@ -65,7 +66,7 @@ void main() {
     transporte = (e) async { emails.add(e); };
     final auth = Auth(senha: 'teste', pastaDados: tmp.path);
     sessao = (await auth.login('teste', 'fixture'))!;
-    final modulo = Devocionais(store, urlBase: () => 'https://igreja.test/', igreja: () => 'Igreja',
+    final modulo = devocionais = Devocionais(store, urlBase: () => 'https://igreja.test/', igreja: () => 'Igreja',
         agora: () => agora, ip: (_) => 'fixture', enviar: (e) => transporte(e));
     handler = auth.middleware((r) => r.url.path.startsWith('api/public/'))(modulo.router.call);
   });
@@ -84,7 +85,11 @@ void main() {
     expect(atualizado.$2['urlPublica'], 'https://igreja.test/devocional?id=$id');
     final publico = await chamar('GET', '/api/public/devocionais/$id', publico: true);
     expect(publico.$1, 200);
-    expect((publico.$2 as Map).keys, unorderedEquals([...dados().keys.where((k) => k != 'status'), 'id', 'urlPublica']));
+    // Só conteúdo: sem situação, agendamento nem envios. O "tema" antigo virou a lista de trilhas.
+    expect((publico.$2 as Map).keys, unorderedEquals([
+      ...dados().keys.where((k) => k != 'status' && k != 'tema'), 'trilhas', 'trilhasNomes', 'id', 'urlPublica']));
+    expect(publico.$2['trilhas'], ['casais']);
+    expect(publico.$2['trilhasNomes'], ['Casais']);
     expect(emails, isEmpty);
     expect((await chamar('PUT', '/api/devocionais/$id', dados: {'status': 'rascunho'})).$1, 200);
     expect((await chamar('GET', '/api/public/devocionais/$id', publico: true)).$1, 404);
@@ -347,5 +352,170 @@ void main() {
     expect((await chamar('POST', '/api/devocionais/$segundo/email', dados: selecao(ids: ['ana']))).$2['enviados'], 0);
     await confirmar(pendente);
     expect((await chamar('POST', '/api/devocionais/$segundo/email', dados: selecao(ids: ['ana']))).$2['enviados'], 1);
+  });
+
+  group('trilhas', () {
+    test('Casais e Família vêm prontas; a administração cria, renomeia, ordena e desativa', () async {
+      final (_, publicas) = await chamar('GET', '/api/public/devocionais/trilhas', publico: true);
+      expect([for (final t in publicas) t['id']], ['casais', 'familia']);
+      final (st, jovens) = await chamar('POST', '/api/admin/devocionais/trilhas', dados: {'nome': 'Jovens', 'descricao': 'Para a juventude'});
+      expect(st, 201, reason: '$jovens');
+      expect(jovens['id'], 'jovens');
+      expect((await chamar('POST', '/api/admin/devocionais/trilhas', dados: {'nome': ' JOVENS '})).$1, 400); // nome repetido
+      expect((await chamar('POST', '/api/admin/devocionais/trilhas', dados: {'nome': ''})).$1, 400);
+      final (_, mulheres) = await chamar('POST', '/api/admin/devocionais/trilhas', dados: {'nome': 'Mulheres'});
+      expect((await chamar('PUT', '/api/admin/devocionais/trilhas/jovens', dados: {'nome': 'Juventude', 'ordem': -1})).$1, 200);
+      var (_, lista) = await chamar('GET', '/api/public/devocionais/trilhas', publico: true);
+      expect([for (final t in lista) t['nome']], ['Juventude', 'Casais', 'Família', 'Mulheres']);
+      expect((await chamar('PUT', '/api/admin/devocionais/trilhas/${mulheres['id']}', dados: {'ativa': false})).$1, 200);
+      (_, lista) = await chamar('GET', '/api/public/devocionais/trilhas', publico: true);
+      expect([for (final t in lista) t['id']], isNot(contains('mulheres')));
+      // Desativada: não entra em devocional novo nem em assinatura nova.
+      expect((await chamar('POST', '/api/devocionais', dados: {...dados(), 'trilhas': ['mulheres']})).$1, 400);
+      expect((await chamar('POST', '/api/public/devocionais/assinar', publico: true,
+          dados: {'email': 'm@exemplo.test', 'temas': ['mulheres'], 'autorizo': true})).$1, 400);
+      // A lista completa (com as desativadas) fica para o painel.
+      final (_, painel) = await chamar('GET', '/api/devocionais/trilhas');
+      expect(painel.firstWhere((t) => t['id'] == 'mulheres')['ativa'], false);
+    });
+
+    test('trilha em uso não é excluída (desative); sem uso, sai', () async {
+      await criar();
+      final (st, r) = await chamar('DELETE', '/api/admin/devocionais/trilhas/casais');
+      expect(st, 400);
+      expect(r['erro'], contains('Desative'));
+      expect((await chamar('DELETE', '/api/admin/devocionais/trilhas/familia')).$1, 200);
+      expect((await chamar('GET', '/api/public/devocionais/trilhas', publico: true)).$2, hasLength(1));
+      // Depois de mexer, as padrão não voltam sozinhas.
+      expect((await chamar('GET', '/api/public/devocionais/trilhas', publico: true)).$2, hasLength(1));
+    });
+
+    test('só a administração mexe nas trilhas', () async {
+      final hash = gerarHashSenha('senha-teste');
+      await File('${tmp.path}/usuarios.json').writeAsString(jsonEncode([
+        {'id': 'l', 'nome': 'Líder', 'login': 'lider', 'perfil': Perfil.liderCasais.id,
+          'senhaHash': hash.hash, 'senhaSal': hash.sal, 'ativo': true, 'trocarSenha': false}
+      ]));
+      final usuarios = Usuarios(tmp.path); await usuarios.carregar();
+      final auth = Auth(senha: 'teste', pastaDados: tmp.path, usuarios: usuarios);
+      handler = auth.middleware((r) => r.url.path.startsWith('api/public/'))(devocionais.router.call);
+      sessao = (await auth.login('senha-teste', 'lider', usuario: 'lider'))!;
+      expect((await chamar('GET', '/api/devocionais/trilhas')).$1, 200);
+      expect((await chamar('POST', '/api/admin/devocionais/trilhas', dados: {'nome': 'Jovens'})).$1, 403);
+    });
+
+    test('devocional em várias trilhas chega uma vez a quem assina mais de uma; formato antigo continua', () async {
+      await chamar('POST', '/api/admin/devocionais/trilhas', dados: {'nome': 'Jovens'});
+      await confirmar(await assinar('ambos@exemplo.test', temas: ['casais', 'familia']));
+      await confirmar(await assinar('jovem@exemplo.test', temas: ['jovens']));
+      await confirmar(await assinar('outro@exemplo.test', temas: ['familia']));
+      final (st, d) = await chamar('POST', '/api/devocionais',
+          dados: {...dados('publicado')..remove('tema'), 'trilhas': ['casais', 'familia']});
+      expect(st, 201, reason: '$d');
+      emails.clear();
+      final r = await chamar('POST', '/api/devocionais/${d['id']}/email', dados: selecao());
+      expect(r.$2['enviados'], 2);
+      expect(emails.map((e) => e.destinatario), unorderedEquals(['ambos@exemplo.test', 'outro@exemplo.test']));
+      expect(emails.first.html, contains('Devocional · Casais e Família'));
+
+      // Devocional gravado antes das trilhas ("tema": "familia") é lido e editado normalmente.
+      await store.salvar('devocionais', {...dados('publicado'), 'id': 'antigo', 'tema': 'familia', 'criadoEm': '2026-11-01T10:00:00'});
+      final (_, antigo) = await chamar('GET', '/api/devocionais/antigo');
+      expect(antigo['trilhas'], ['familia']);
+      expect((await chamar('PUT', '/api/devocionais/antigo', dados: {'titulo': 'Novo título'})).$1, 200);
+      expect(store.buscar('devocionais', 'antigo')!['trilhas'], ['familia']);
+      expect(store.buscar('devocionais', 'antigo')!.containsKey('tema'), isFalse);
+    });
+
+    test('resumo de assinantes só tem números, nunca e-mails', () async {
+      await confirmar(await assinar('a@exemplo.test', temas: ['casais', 'familia']));
+      await assinar('b@exemplo.test');
+      final (_, r) = await chamar('GET', '/api/devocionais/assinantes');
+      expect(r['ativos'], 1);
+      expect(r['pendentes'], 1);
+      expect(r['trilhas'].firstWhere((t) => t['id'] == 'familia')['ativos'], 1);
+      expect(jsonEncode(r), isNot(contains('@')));
+    });
+  });
+
+  group('agendamento', () {
+    Map<String, dynamic> agendado(String quando, {bool enviar = true}) =>
+        {...dados('agendado'), 'publicarEm': quando, 'enviarAoPublicar': enviar};
+
+    test('agendado fica fora do ar até a hora; ao chegar, publica e envia aos assinantes', () async {
+      await confirmar(await assinar('ana@exemplo.test'));
+      // agora = 18/11/2026 12:00
+      expect((await chamar('POST', '/api/devocionais', dados: agendado('2026-11-18T11:00'))).$1, 400, reason: 'passado');
+      expect((await chamar('POST', '/api/devocionais', dados: {...dados('agendado')})).$1, 400, reason: 'sem horário');
+      expect((await chamar('POST', '/api/devocionais', dados: agendado('2026-11-18T25:00'))).$1, 400);
+      final (st, d) = await chamar('POST', '/api/devocionais', dados: agendado('2026-11-19T07:00'));
+      expect(st, 201, reason: '$d');
+      final id = d['id'] as String;
+      expect(d['status'], 'agendado');
+      expect((await chamar('GET', '/api/public/devocionais/$id', publico: true)).$1, 404);
+      emails.clear();
+      expect(await devocionais.processarAgendados(), 0);
+      agora = DateTime.utc(2026, 11, 19, 7, 0);
+      expect(await devocionais.processarAgendados(), 1);
+      expect((await chamar('GET', '/api/public/devocionais/$id', publico: true)).$1, 200);
+      expect(emails.single.destinatario, 'ana@exemplo.test');
+      expect(emails.single.texto, contains('#cancelar='));
+      final (_, painel) = await chamar('GET', '/api/devocionais/$id');
+      expect(painel['status'], 'publicado');
+      expect(painel['envioAutomatico']['enviados'], 1);
+      expect((await chamar('GET', '/api/devocionais/$id/envios')).$2['enviados'], 1);
+      // Rodar de novo não publica nem envia outra vez.
+      expect(await devocionais.processarAgendados(), 0);
+      expect(emails, hasLength(1));
+    });
+
+    test('agendado sem envio automático só publica; voltar a rascunho cancela o agendamento', () async {
+      await confirmar(await assinar('ana@exemplo.test'));
+      emails.clear();
+      final (_, a) = await chamar('POST', '/api/devocionais', dados: agendado('2026-11-19T07:00', enviar: false));
+      final (_, b) = await chamar('POST', '/api/devocionais', dados: agendado('2026-11-19T07:00'));
+      await chamar('PUT', '/api/devocionais/${b['id']}', dados: {'status': 'rascunho'});
+      expect(store.buscar('devocionais', b['id'] as String)!.containsKey('publicarEm'), isFalse);
+      agora = DateTime.utc(2026, 11, 20);
+      expect(await devocionais.processarAgendados(), 1);
+      expect(store.buscar('devocionais', a['id'] as String)!['status'], 'publicado');
+      expect(store.buscar('devocionais', b['id'] as String)!['status'], 'rascunho');
+      expect(emails, isEmpty);
+    });
+  });
+
+  group('página pública', () {
+    test('lista os publicados até hoje, filtra por trilha e destaca o mais recente', () async {
+      await chamar('POST', '/api/devocionais', dados: {...dados('publicado'), 'titulo': 'Velho', 'data': '2026-11-01'});
+      await chamar('POST', '/api/devocionais', dados: {...dados('publicado'), 'titulo': 'Novo', 'data': '2026-11-17',
+        'trilhas': ['familia']});
+      await chamar('POST', '/api/devocionais', dados: {...dados('publicado'), 'titulo': 'Futuro', 'data': '2026-12-01'});
+      await chamar('POST', '/api/devocionais', dados: {...dados('rascunho'), 'titulo': 'Rascunho', 'data': '2026-11-18'});
+      final (_, r) = await chamar('GET', '/api/public/devocionais', publico: true);
+      expect([for (final d in r['devocionais']) d['titulo']], ['Novo', 'Velho']);
+      expect(r['destaque']['titulo'], 'Novo');
+      expect(r['destaque']['resumo'], isNot(contains('<script>Reflexão</script>\n')));
+      expect(devocionais.destaque()!['url'], startsWith('/devocional?id='));
+      final (_, casais) = await chamar('GET', '/api/public/devocionais?trilha=casais', publico: true);
+      expect([for (final d in casais['devocionais']) d['titulo']], ['Velho']);
+      expect(jsonEncode(r), isNot(contains('status')));
+    });
+
+    test('série: a página do devocional lista as partes publicadas em ordem', () async {
+      Future<String> parte(int n, {String status = 'publicado'}) async {
+        final (_, d) = await chamar('POST', '/api/devocionais',
+            dados: {...dados(status), 'titulo': 'Dia $n', 'serie': 'Frutos do Espírito', 'serieParte': n});
+        return d['id'] as String;
+      }
+      final dois = await parte(2);
+      await parte(1);
+      await parte(3, status: 'rascunho');
+      expect((await chamar('POST', '/api/devocionais', dados: {...dados(), 'serie': 'X', 'serieParte': 0})).$1, 400);
+      final (_, d) = await chamar('GET', '/api/public/devocionais/$dois', publico: true);
+      expect(d['serie'], 'Frutos do Espírito');
+      expect([for (final p in d['serieItens']) p['titulo']], ['Dia 1', 'Dia 2']);
+      final (_, filtro) = await chamar('GET', '/api/public/devocionais?serie=${Uri.encodeQueryComponent('Frutos do Espírito')}', publico: true);
+      expect(filtro['devocionais'], hasLength(2));
+    });
   });
 }

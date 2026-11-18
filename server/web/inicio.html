@@ -102,6 +102,10 @@
   .evento a { font-size: 14px; font-weight: 600; white-space: nowrap; }
   .caixa { background: var(--superficie); border: 1px solid var(--linha); border-radius: 18px; padding: 18px 20px; display: flex; flex-direction: column; gap: 10px; }
   .caixa h2 { margin: 0; font-size: 21px; }
+  .devocional-semana .sobretitulo { margin: 0 0 -4px; }
+  .devocional-semana p { margin: 0; line-height: 1.55; }
+  .devocional-semana .referencia { font-family: var(--fonte-titulo); font-style: italic; color: var(--primaria-escura); }
+  .devocional-semana .acoes-devocional { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; }
   .par { display: flex; justify-content: space-between; gap: 12px; }
   .endereco { color: var(--suave); padding-top: 10px; border-top: 1px solid var(--linha); white-space: pre-line; }
   .pix { display: flex; gap: 16px; align-items: center; }
@@ -409,6 +413,21 @@
         s.cultos.map((c) => el('div', { class: 'par' }, el('span', {}, c.dia), el('strong', {}, c.hora))),
         s.endereco ? el('div', { class: 'endereco' }, s.endereco) : null,
         s.mapa ? el('a', { class: 'botao secundario', href: s.mapa, target: '_blank', rel: 'noopener' }, 'Como chegar') : null));
+    }
+
+    // Devocional da semana: o mais recente publicado (o servidor só manda quando há um).
+    if (s.devocional) {
+      const d = s.devocional;
+      menu.push(['devocional', 'Devocionais', '/devocional']);
+      lateral.push(el('section', { class: 'caixa devocional-semana', id: 'devocional', 'aria-labelledby': 'devocional-t' },
+        el('p', { class: 'sobretitulo' }, 'Devocional da semana'),
+        el('h2', { id: 'devocional-t' }, d.titulo),
+        d.serie ? el('p', { class: 'dica' }, 'Série ' + d.serie + (d.serieParte ? ' · parte ' + d.serieParte : '')) : null,
+        d.referencia ? el('p', { class: 'referencia' }, d.referencia) : null,
+        d.resumo ? el('p', {}, d.resumo) : null,
+        el('div', { class: 'acoes-devocional' },
+          el('a', { class: 'botao', href: d.url }, 'Ler o devocional'),
+          el('a', { href: '/devocional' }, 'Todos os devocionais'))));
     }
 
     if (s.pix) {

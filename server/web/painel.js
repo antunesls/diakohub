@@ -101,7 +101,7 @@ window.matchMedia('(max-width: 800px)').addEventListener('change', () => fecharM
 fecharMenu();
 
 function mostrarAba(nome) {
-  if (abaAtual === 'casais' && nome !== 'casais' && !confirmarSaidaDevocional()) return;
+  if (abaAtual === 'devocionais' && nome !== 'devocionais' && !confirmarSaidaDevocional()) return;
   const botoes = [...$('menu-lateral').querySelectorAll('button[data-aba]')];
   // Aba fora do perfil (a comissão, por exemplo, não tem Visão geral): abre a primeira que a pessoa pode ver.
   if (!botoes.some((b) => b.dataset.aba === nome)) {
@@ -128,6 +128,7 @@ const carregar = {
   galeria: carregarGaleria,
   membros: carregarMembros,
   casais: carregarCasais,
+  devocionais: carregarDevocionais,
   gestaoCasa: carregarCasa,
   atas: carregarAtas,
   resumo: carregarResumo,
@@ -2497,6 +2498,11 @@ $('projetar-qr').addEventListener('click', async () => {
 $('projetar-qr-mensagens').addEventListener('click', async () => {
   const r = await api('POST', '/api/holyrics/ShowImage', { file: estado.qrMensagensHolyrics });
   mensagem($('resultado-status'), r.status === 'ok' ? 'QR de mensagens no telão.' : r.error, r.status === 'ok');
+});
+$('projetar-qr-devocional').addEventListener('click', async () => {
+  if (!estado.qrDevocionalHolyrics) return mensagem($('resultado-status'), 'O QR dos devocionais ainda não foi gerado. Reinicie o servidor.', false);
+  const r = await api('POST', '/api/holyrics/ShowImage', { file: estado.qrDevocionalHolyrics });
+  mensagem($('resultado-status'), r.status === 'ok' ? 'QR dos devocionais no telão.' : r.error, r.status === 'ok');
 });
 $('projetar-qr-visitante').addEventListener('click', async () => {
   if (!estado.qrVisitanteHolyrics) {

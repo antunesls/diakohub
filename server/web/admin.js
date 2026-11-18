@@ -758,6 +758,7 @@ async function iniciar() {
   try {
     await carregar();
     await carregarTablets();
+    await carregarTrilhas();
   } catch (err) {
     if (token) mensagem($('res-igreja'), 'Não foi possível carregar as configurações: ' + err.message, false);
   }
@@ -782,6 +783,89 @@ async function carregarTablets() {
       }, 'perigo pequeno'))))
     : [el('tr', {}, el('td', { colspan: 4, class: 'dica' }, 'Nenhum tablet pareado.'))]));
 }
+
+// ---------- Trilhas de devocionais ----------
+
+let trilhas = [];
+
+async function carregarTrilhas() {
+  trilhas = await api('GET', '/api/admin/devocionais/trilhas');
+  $('tabela-trilhas').tBodies[0].replaceChildren(...(trilhas.length ? trilhas.map(linhaTrilha)
+    : [el('tr', {}, el('td', { colspan: 6, class: 'dica' }, 'Nenhuma trilha. Adicione a primeira acima.'))]));
+}
+
+async function salvarTrilha(t, mudancas, aviso) {
+  try {
+    await api('PUT', '/api/admin/devocionais/trilhas/' + encodeURIComponent(t.id), mudancas);
+    if (aviso) mensagem($('res-trilhas'), aviso);
+    await carregarTrilhas();
+  } catch (err) { mensagem($('res-trilhas'), err.message, false); }
+}
+
+/** Troca a ordem com a vizinha ([passo] -1 sobe, +1 desce) e grava a ordem de todas, sem buracos. */
+async function moverTrilha(indice, passo) {
+  const nova = [...trilhas];
+  const alvo = indice + passo;
+  if (alvo < 0 || alvo >= nova.length) return;
+  [nova[indice], nova[alvo]] = [nova[alvo], nova[indice]];
+  try {
+    for (const [ordem, t] of nova.entries()) {
+      if (t.ordem !== ordem) await api('PUT', '/api/admin/devocionais/trilhas/' + encodeURIComponent(t.id), { ordem });
+    }
+    await carregarTrilhas();
+  } catch (err) { mensagem($('res-trilhas'), err.message, false); }
+}
+
+function linhaTrilha(t, i) {
+  const nome = el('input', { type: 'text', maxlength: 40, value: t.nome, 'aria-label': 'Nome da trilha ' + t.nome });
+  const descricao = el('input', { type: 'text', maxlength: 200, value: t.descricao || '', 'aria-label': 'Descrição da trilha ' + t.nome });
+  const salvarTexto = () => {
+    if (nome.value.trim() === t.nome && descricao.value.trim() === (t.descricao || '')) return;
+    salvarTrilha(t, { nome: nome.value, descricao: descricao.value }, 'Trilha salva.');
+  };
+  nome.addEventListener('change', salvarTexto);
+  descricao.addEventListener('change', salvarTexto);
+  const subir = botao('↑', () => moverTrilha(i, -1));
+  subir.setAttribute('aria-label', 'Subir ' + t.nome);
+  subir.disabled = i === 0;
+  const descer = botao('↓', () => moverTrilha(i, 1));
+  descer.setAttribute('aria-label', 'Descer ' + t.nome);
+  descer.disabled = i === trilhas.length - 1;
+  const emUso = t.devocionais > 0 || t.assinantes > 0;
+  const excluir = botao('Excluir', async () => {
+    if (!await confirmar('Excluir trilha?', `A trilha ${t.nome} deixa de existir.`, 'Excluir')) return;
+    try {
+      await api('DELETE', '/api/admin/devocionais/trilhas/' + encodeURIComponent(t.id));
+      mensagem($('res-trilhas'), `Trilha ${t.nome} excluída.`);
+      await carregarTrilhas();
+    } catch (err) { mensagem($('res-trilhas'), err.message, false); }
+  }, 'perigo pequeno');
+  if (emUso) {
+    excluir.disabled = true;
+    excluir.title = 'Tem devocionais ou assinantes: desative em vez de excluir.';
+  }
+  return el('tr', { style: t.ativa ? '' : 'opacity:.6' },
+    el('td', { style: 'white-space:nowrap' }, subir, ' ', descer),
+    el('td', {}, nome, t.ativa ? null : el('span', { class: 'dica' }, ' desativada')),
+    el('td', {}, descricao),
+    el('td', { class: 'dica' }, String(t.devocionais)),
+    el('td', { class: 'dica' }, String(t.assinantes)),
+    el('td', { class: 'acoes-tabela' },
+      botao(t.ativa ? 'Desativar' : 'Reativar', () => salvarTrilha(t, { ativa: !t.ativa },
+        t.ativa ? `Trilha ${t.nome} desativada: saiu da página pública e do editor.` : `Trilha ${t.nome} reativada.`)),
+      excluir));
+}
+
+$('form-trilha').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  try {
+    const t = await api('POST', '/api/admin/devocionais/trilhas', { nome: valor('trilha-nome'), descricao: valor('trilha-descricao') });
+    $('trilha-nome').value = '';
+    $('trilha-descricao').value = '';
+    mensagem($('res-trilhas'), `Trilha ${t.nome} criada. Ela já aparece no editor e na assinatura.`);
+    await carregarTrilhas();
+  } catch (err) { mensagem($('res-trilhas'), err.message, false); }
+});
 
 if (token) iniciar();
 else sair();

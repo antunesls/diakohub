@@ -31,11 +31,14 @@
 ## Resultado
 
 - Consulta mensal em `/api/casais` e aba **Casais e Família**; perfil próprio de líder, sem permissão `membros`.
-- Devocionais com rascunho, publicação, retirada do ar, importação de texto/Word e página pública `/devocional`.
-- Envio manual por e-mail com prévia, deduplicação, recibos persistentes, estado incerto sem reenvio automático e aviso quando o SMTP não está configurado.
-- Assinatura pública com duplo opt-in, temas casais/família, cancelamento por link e supressão de envios avulsos após cancelamento.
+- Devocionais em aba própria (**Comunicação › Devocionais**), separados de Casais e Família, com rascunho, publicação, retirada do ar, importação de texto/Word, busca, filtros e calendário.
+- Trilhas configuráveis em **Administração › Trilhas de devocionais**, com ordem, descrição, ativação e uso; exclusão só sem devocionais nem assinantes. Casais e Família nascem como as duas primeiras (mesmos ids dos temas antigos).
+- Série e parte por devocional; a página pública mostra as partes na ordem. Página `/devocional` com destaque da semana, lista por trilha e assinatura; o destaque também aparece na página inicial e há QR no painel.
+- Agendamento opcional: o devocional entra no ar no horário marcado e o envio aos assinantes só ocorre se essa opção for marcada. Publicar agora nunca envia e-mail. Agendados vencidos são processados na subida do servidor e a cada minuto.
+- Envio manual por e-mail com prévia, deduplicação, recibos persistentes, estado incerto sem reenvio automático e aviso quando o SMTP não está configurado. O painel mostra números por trilha, sem expor e-mails.
+- Assinatura pública com duplo opt-in, trilhas à escolha, cancelamento por link e supressão de envios avulsos após cancelamento.
 - Links de cancelamento antigos continuam válidos por até 24 envios; a lista é limitada porque o JSON é regravado a cada envio.
-- Um perfil por conta foi mantido: o suporte a vários perfis que surgiu durante a implementação foi removido por estar fora do pedido.
+- Vários perfis por pessoa (somando permissões) passaram a existir junto da página `/acessos`; um perfil continua funcionando como antes.
 
 ## Segurança e preservação
 

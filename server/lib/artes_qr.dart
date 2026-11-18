@@ -101,4 +101,5 @@ Future<void> gravarQrsProjetados(String pastaCartazes, Configuracoes cfg, ArtesQ
       chave: cfg.sitePixChave, nome: cfg.sitePixNome, cidade: cfg.sitePixCidade, arte: await artes.carregar(cfg, 'pix'));
   await gravarQrVisitante(pastaCartazes, cfg.urlVisitante,
       ativo: cfg.visitanteQrAtivo, arte: await artes.carregar(cfg, 'visitante'));
+  await gravarQrDevocional(pastaCartazes, '${cfg.urlBase}/devocional');
 }

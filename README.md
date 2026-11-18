@@ -33,7 +33,7 @@ Menu organizado por área; cada pessoa vê só o que o seu perfil permite.
 | Início | Visão geral |
 | Acompanhamento | Motivos de oração (aprovação, testemunhos), Mensagens (*Nova*, *Em análise*, *Resolvida*), Membros (cadastro completo, família, visitantes, acompanhamento, LGPD), Casais e Família |
 | Cultos | Escalas pastoral e do louvor, Repertório, Roteiros do Modo Culto, Palavras (sermões) |
-| Comunicação | Agenda (Google), Recados, Cartazes, Galeria do site, Resumo da semana para o WhatsApp |
+| Comunicação | Agenda (Google), Recados, Cartazes, Galeria do site, Resumo da semana para o WhatsApp, Devocionais |
 | Operação | Gestão da Casa, Atas de reunião, Histórico do que foi projetado, Status (Holyrics, agente, QR codes), Acessos às escalas, Administração |
 
 ### Tablet do pastor (app Android)
@@ -53,10 +53,14 @@ Opera o telão durante o culto: recados, cartazes, motivos de oração, boas-vin
 ### Casais e Família
 - **Aniversários do mês:** seleção de mês e ano, casal, data e anos de casamento. Usa exclusivamente os vínculos e nomes já registrados em Membros; não há um segundo cadastro de pessoas. A consulta interna é distinta da autorização para divulgação no mural/telão. Casamentos de 29/02 aparecem em 28/02 nos anos não bissextos.
 - **Perfil Líder de Casais e Família:** consulta os casais e os contatos autorizados, sem acesso a CPF, endereço, observações ou edição da ficha completa. Pode escrever, publicar e enviar devocionais sem aprovação prévia. Administração e pastor também gerenciam os devocionais; secretaria tem consulta dos casais.
-- **Devocionais:** rascunho e publicação, título, autoria, data, tema (Casais ou Família), referência bíblica, reflexão, aplicação e oração. Permite importar texto/Word como na Palavra, mas não tem controles de culto, slides ou apresentação.
-- **Compartilhamento:** copiar o texto formatado para WhatsApp ou compartilhar uma introdução com o link. Qualquer pessoa com o link de um devocional publicado pode ler sem login; rascunhos ficam privados e retirar a publicação interrompe a leitura pública.
-- **E-mail manual:** configure o SMTP na Administração. Depois de publicar, selecione membros com contato e consentimento ou os assinantes confirmados do tema, confira a prévia e confirme o envio. Publicar não dispara mensagens. Cada destinatário recebe sua mensagem individualmente, sem expor a lista; endereços repetidos e destinatários já enviados são ignorados.
-- **Assinaturas:** qualquer leitor pode informar seu e-mail e escolher Casais, Família ou ambos. Exige autorização específica e confirmação por link; não cria ficha de membro e não usa a autorização de casamento como assinatura. O leitor pode cancelar pelo link recebido, sem login. Os links de confirmação e cancelamento exigem uma ação explícita na página, não são acionados por robôs que apenas abrem o endereço.
+- **Base:** o conteúdo usa exclusivamente o cadastro de membros; os assinantes externos guardam só e-mail e consentimento, sem virar ficha. A gestão fica na aba **Devocionais** (Comunicação), separada de Casais e Família.
+- **Devocionais:** rascunho, publicação e retirada do ar, com título, autoria, data, uma ou mais **trilhas** (Casais, Família, Jovens…), série e parte, referência bíblica, reflexão, aplicação e oração. Permite importar texto/Word como na Palavra, mas não tem controles de culto, slides ou apresentação. A lista tem busca e filtros; a aba **Calendário** mostra o mês com publicados, rascunhos e agendados.
+- **Trilhas:** configuradas em **Administração › Trilhas de devocionais**, com ordem, descrição, ativação e contagem de devocionais e assinantes. Trilha em uso é desativada em vez de excluída, para preservar o histórico.
+- **Agendamento (opcional):** o devocional entra no ar sozinho no horário marcado. O envio aos assinantes só acontece nesse horário se a opção de envio estiver marcada; sem ela, ninguém recebe e-mail. Publicar agora nunca envia e-mail.
+- **Compartilhamento:** copiar o texto formatado para WhatsApp ou compartilhar uma introdução com o link. Qualquer pessoa com o link pode ler sem login; rascunhos ficam privados e retirar a publicação interrompe a leitura pública. A página `/devocional` mostra o destaque da semana, a lista por trilha e a assinatura; o devocional mais recente aparece na página inicial e há um QR para a página no painel.
+- **E-mail manual:** configure o SMTP na Administração. Depois de publicar, selecione membros com contato e consentimento ou os assinantes confirmados das trilhas, confira a prévia e confirme o envio. Cada destinatário recebe sua mensagem individualmente, sem expor a lista; endereços repetidos, já enviados e cancelados são ignorados. O painel mostra quantos assinantes há por trilha, sem revelar e-mails.
+- **Assinaturas:** qualquer leitor pode informar seu e-mail e escolher as trilhas que quiser. Exige autorização específica e confirmação por link; não usa a autorização de casamento como assinatura. O leitor pode cancelar pelo link recebido, sem login. Os links de confirmação e cancelamento exigem uma ação explícita na página, não são acionados por robôs que apenas abrem o endereço.
+- **Série:** devocionais de uma mesma série trazem a lista das partes na página pública, para ler em ordem.
 - **Segurança dos envios:** recibos persistentes evitam repetição em pedidos simultâneos e reinícios. Uma interrupção durante o SMTP pode deixar o resultado incerto; esses destinatários não são reenviados automaticamente, para evitar duplicação. As coleções da área participam do backup existente.
 
 ### Gestão da Casa

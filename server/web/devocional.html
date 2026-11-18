@@ -7,7 +7,7 @@
   <title>Devocionais — DiakoHub</title>
   <link rel="icon" href="/logo.png" type="image/png">
   <link rel="stylesheet" href="/estilo.css?v=5">
-  <link rel="stylesheet" href="/casais.css?v=1">
+  <link rel="stylesheet" href="/casais.css?v=2">
 </head>
 <body class="publico devocional-publico">
 <main>
@@ -20,18 +20,17 @@
     <p><a href="/devocional#assinatura">Ler e assinar devocionais</a></p>
   </section>
   <div id="leitura-painel">
-    <div id="devocional-conteudo" aria-live="polite"><h1>Devocionais para a vida em família</h1><p>Uma pausa para ler, refletir e orar.</p></div>
+    <div id="devocional-conteudo" aria-live="polite"><h1>Devocionais</h1><p>Uma pausa para ler, refletir e orar.</p></div>
     <p id="devocional-resultado" role="status"></p>
     <section id="assinatura" class="cartao" aria-labelledby="assinatura-titulo">
       <h2 id="assinatura-titulo">Receba os próximos devocionais</h2>
-      <p>Escolha os temas e confirme seu e-mail pelo link que enviaremos. Você pode cancelar quando quiser.</p>
+      <p>Escolha as trilhas e confirme seu e-mail pelo link que enviaremos. Você pode cancelar quando quiser.</p>
       <form id="assinatura-form">
         <div class="campo"><label for="email">E-mail</label><input id="email" type="email" autocomplete="email" required maxlength="254"></div>
-        <fieldset><legend>Quais temas deseja receber?</legend>
-          <label class="marcar"><input id="tema-casais" type="checkbox" value="casais">Casais</label>
-          <label class="marcar"><input id="tema-familia" type="checkbox" value="familia">Família</label>
+        <fieldset><legend>Quais trilhas deseja receber?</legend>
+          <div id="assinatura-trilhas"><p class="dica">Carregando trilhas…</p></div>
         </fieldset>
-        <label class="marcar"><input id="autorizo" type="checkbox" required>Autorizo o envio de devocionais dos temas selecionados para meu e-mail. Entendo que posso cancelar a assinatura a qualquer momento.</label>
+        <label class="marcar"><input id="autorizo" type="checkbox" required>Autorizo o envio de devocionais das trilhas selecionadas para meu e-mail. Entendo que posso cancelar a assinatura a qualquer momento.</label>
         <div class="escondido" aria-hidden="true"><label for="website">Deixe em branco</label><input id="website" type="text" tabindex="-1" autocomplete="off"></div>
         <button id="assinatura-enviar" class="botao" type="submit">Solicitar assinatura</button>
         <p id="assinatura-resultado" role="status"></p>
@@ -39,6 +38,6 @@
     </section>
   </div>
 </main>
-<script src="/devocional.js?v=1"></script>
+<script src="/devocional.js?v=2"></script>
 </body>
 </html>

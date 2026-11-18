@@ -100,6 +100,7 @@
       <a href="#holyrics">Holyrics</a>
       <a href="#diakoplayer">DiakoPlayer</a>
       <a href="#agenda">Agenda (Google)</a>
+      <a href="#trilhas-devocionais">Trilhas de devocionais</a>
       <a href="#email">Avisos por e-mail</a>
       <a href="#projecao">Projeção</a>
       <a href="#qr-telao">QR codes do telão</a>
@@ -381,6 +382,22 @@
         <div id="lista-artes-qr"></div>
       </section>
 
+      <section class="cartao" id="trilhas-devocionais">
+        <h2>Trilhas de devocionais</h2>
+        <p class="dica">Cada trilha é um público dos devocionais (Casais, Família, Jovens, Mulheres…). Quem escreve escolhe as trilhas de cada devocional, e quem assina pela página pública escolhe quais quer receber. Desativar tira a trilha da página pública e do editor, sem apagar o histórico. Só dá para excluir trilha sem devocionais nem assinantes.</p>
+        <form id="form-trilha" class="grade2" style="align-items:end">
+          <div class="campo"><label for="trilha-nome">Nova trilha</label><input type="text" id="trilha-nome" maxlength="40" required placeholder="ex.: Jovens"></div>
+          <div class="campo"><label for="trilha-descricao">Descrição <span class="dica">(aparece na assinatura)</span></label><input type="text" id="trilha-descricao" maxlength="200" placeholder="ex.: Para a juventude da igreja"></div>
+          <div class="acoes" style="margin-bottom:20px"><button class="botao">Adicionar trilha</button><span id="res-trilhas" role="status"></span></div>
+        </form>
+        <div class="tabela-rolagem">
+          <table id="tabela-trilhas">
+            <thead><tr><th>Ordem</th><th>Trilha</th><th>Descrição</th><th>Devocionais</th><th>Assinantes</th><th><span class="escondido">Ações</span></th></tr></thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </section>
+
       <section class="cartao" id="email">
         <h2>Avisos por e-mail</h2>
         <p class="dica">O aviso não inclui o texto nem os dados de quem escreveu. As mensagens permanecem no painel e no tablet mesmo quando o e-mail falha. Use uma senha de aplicativo do provedor, se necessário.</p>
@@ -505,6 +522,6 @@
 <script src="/primeiro-acesso.js?v=1"></script>
 <script src="/arte-qr.js?v=2"></script>
 <script src="/horarios-escalas.js?v=1"></script>
-<script src="/admin.js?v=18"></script>
+<script src="/admin.js?v=19"></script>
 </body>
 </html>

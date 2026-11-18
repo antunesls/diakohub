@@ -129,6 +129,9 @@ Future<void> main(List<String> args) async {
   );
 
   await servidor.sincronizarParticipacaoCultos();
+  // Devocionais agendados: publica (e envia, se pedido) quando chega a hora.
+  await servidor.devocionais.garantirTrilhas();
+  servidor.devocionais.iniciarAgendador();
   final http = await io.serve(servidor.handler, config.endereco, config.porta);
   final mural = cfg.chaveMural.isEmpty ? '$base/mural' : '$base/mural?chave=${cfg.chaveMural}';
   stdout.writeln('''

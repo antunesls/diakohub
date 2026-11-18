@@ -24,6 +24,7 @@ const MENU_GRUPOS = [
     { id: 'recados', titulo: 'Recados', permissao: 'recados' },
     { id: 'cartazes', titulo: 'Cartazes', permissao: 'cartazes' },
     { id: 'galeria', titulo: 'Galeria', permissao: 'galeria' },
+    { id: 'devocionais', titulo: 'Devocionais', permissao: 'devocionais' },
     { id: 'resumo', titulo: 'Resumo da semana', permissao: 'resumo' },
   ] },
   { nome: 'Operação', itens: [

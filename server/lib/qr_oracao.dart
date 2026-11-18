@@ -121,7 +121,18 @@ const arquivoQrPix = 'qr-pix.png';
 /// QR gerados pelo servidor: não são cartazes (não aparecem na lista nem vão para o backup),
 /// mas o agente os copia para a pasta de imagens do Holyrics.
 bool ehArquivoDeQr(String nome) =>
-    nome == arquivoQr || nome == arquivoQrMensagens || nome == arquivoQrPix || nome == arquivoQrVisitante;
+    nome == arquivoQr || nome == arquivoQrMensagens || nome == arquivoQrPix || nome == arquivoQrVisitante ||
+    nome == arquivoQrDevocional;
+
+/// QR da página de devocionais (abre o devocional em destaque e a assinatura) para o telão.
+const arquivoQrDevocional = 'qr-devocional.png';
+
+Future<File> gravarQrDevocional(String pasta, String url, {ArteDoQr? arte}) async {
+  await Directory(pasta).create(recursive: true);
+  final f = File(p.join(pasta, arquivoQrDevocional));
+  await f.writeAsBytes(gerarPngQr(url, rotulo: 'DEVOCIONAIS', arte: arte));
+  return f;
+}
 
 /// QR do cadastro de visitante como vai ao telão (com a arte, se houver). Para imprimir na
 /// recepção continua o /qr-visitante.png simples, gerado na hora.

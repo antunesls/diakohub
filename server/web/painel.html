@@ -6,7 +6,7 @@
 <title>Painel — DiakoHub</title>
 <link rel="icon" href="/logo.png" type="image/png">
 <link rel="stylesheet" href="/estilo.css?v=5">
-<link rel="stylesheet" href="/casais.css?v=1">
+<link rel="stylesheet" href="/casais.css?v=2">
 <style>
   .topo {
     display: flex; flex-wrap: wrap; align-items: center; gap: 16px;
@@ -897,7 +897,7 @@
 
     <section data-painel="casais" hidden>
       <h1>Casais e Família</h1>
-      <p class="dica">Aniversários de casamento e devocionais para cultivar a vida em família.</p>
+      <p class="dica">Aniversários de casamento para cuidar dos casais da igreja. Os devocionais ficam em <a href="#" data-ir-aba="devocionais">Devocionais</a>.</p>
       <section aria-labelledby="casais-titulo">
         <h2 id="casais-titulo">Aniversários de casamento</h2>
         <form id="casais-filtro" class="barra">
@@ -908,12 +908,41 @@
         <p id="casais-resultado" role="status"></p>
         <div id="casais-lista" class="lista"></div>
       </section>
-      <section id="devocionais-gestao" data-permissao="devocionais" aria-labelledby="devocionais-titulo">
-        <div class="barra"><h2 id="devocionais-titulo">Devocionais</h2><button id="devocional-novo" class="botao" type="button">Criar devocional</button></div>
-        <p id="devocionais-resultado" role="status"></p>
+    </section>
+
+    <section data-painel="devocionais" hidden>
+      <div class="barra"><h1>Devocionais</h1><button id="devocional-novo" class="botao" type="button">Criar devocional</button></div>
+      <p class="dica">Escreva, agende e publique devocionais para cada trilha (Casais, Família, Jovens…). As trilhas são configuradas em Administração. Publicar não envia e-mail: o envio é à parte, ou automático no horário agendado.</p>
+      <div class="abas-devocionais" role="tablist" aria-label="Seções dos devocionais">
+        <button type="button" role="tab" id="dev-tab-lista" data-dev-aba="lista" aria-selected="true">Devocionais</button>
+        <button type="button" role="tab" id="dev-tab-calendario" data-dev-aba="calendario" aria-selected="false">Calendário</button>
+        <button type="button" role="tab" id="dev-tab-assinantes" data-dev-aba="assinantes" aria-selected="false">Assinantes e divulgação</button>
+      </div>
+      <p id="devocionais-resultado" role="status"></p>
+      <section id="dev-aba-lista" role="tabpanel" aria-labelledby="dev-tab-lista">
+        <div class="barra dev-filtros">
+          <label>Situação <select id="dev-filtro-status"><option value="">Todas</option><option value="rascunho">Rascunhos</option><option value="agendado">Agendados</option><option value="publicado">Publicados</option></select></label>
+          <label>Trilha <select id="dev-filtro-trilha"><option value="">Todas</option></select></label>
+          <label class="dev-busca">Buscar <input id="dev-filtro-busca" type="search" placeholder="Título, autor ou série"></label>
+        </div>
         <div id="devocionais-lista" class="lista"></div>
-        <div id="devocional-editor" class="cartao" hidden></div>
       </section>
+      <section id="dev-aba-calendario" role="tabpanel" aria-labelledby="dev-tab-calendario" hidden>
+        <div class="barra"><button type="button" class="botao secundario pequeno" id="dev-mes-anterior" aria-label="Mês anterior">‹</button><h2 id="dev-mes-titulo" style="margin:0"></h2><button type="button" class="botao secundario pequeno" id="dev-mes-proximo" aria-label="Próximo mês">›</button></div>
+        <div id="dev-calendario" class="dev-calendario"></div>
+      </section>
+      <section id="dev-aba-assinantes" role="tabpanel" aria-labelledby="dev-tab-assinantes" hidden>
+        <div id="dev-assinantes"></div>
+        <div class="cartao dev-divulgar">
+          <div><h2 style="font-size:18px">Página pública e QR</h2>
+            <p class="dica">O QR abre a página de devocionais: o devocional em destaque, a lista por trilha e a assinatura por e-mail. O devocional mais recente também aparece na página inicial do site.</p>
+            <p><a href="/devocional" target="_blank" rel="noopener">Abrir a página de devocionais</a></p>
+            <button class="botao secundario" type="button" id="dev-projetar-qr" data-permissao="projetar">Projetar QR no telão</button>
+            <p id="dev-qr-resultado" role="status"></p></div>
+          <a href="/qr-devocional.png" download="qr-devocionais.png"><img class="qr" src="/qr-devocional.png" alt="QR code da página de devocionais" loading="lazy"></a>
+        </div>
+      </section>
+      <div id="devocional-editor" class="cartao" hidden></div>
     </section>
 
     <section data-painel="ministerios" hidden>
@@ -1044,6 +1073,7 @@
             <button class="botao secundario" id="projetar-qr" data-permissao="projetar">Projetar QR no telão</button>
             <button class="botao secundario" id="projetar-qr-mensagens" data-permissao="projetar">Projetar QR de mensagens</button>
             <button class="botao secundario" id="projetar-qr-visitante" data-permissao="projetar">Projetar QR de visitante</button>
+            <button class="botao secundario" id="projetar-qr-devocional" data-permissao="projetar">Projetar QR dos devocionais</button>
           </div>
           <p id="resultado-status" role="status"></p>
         </div>
@@ -1556,11 +1586,12 @@
 <script src="/comum.js?v=6"></script>
 <script src="/primeiro-acesso.js?v=1"></script>
 <script src="/form-visitante.js?v=2"></script>
-<script src="/menu-lateral.js?v=9"></script>
+<script src="/menu-lateral.js?v=10"></script>
 <script src="/gestao-casa.js?v=1"></script>
 <script src="/atas.js?v=2"></script>
-<script src="/casais.js?v=1"></script>
-<script src="/painel.js?v=28"></script>
+<script src="/casais.js?v=2"></script>
+<script src="/devocionais.js?v=1"></script>
+<script src="/painel.js?v=29"></script>
 <script src="/certificado.js?v=1"></script>
 <script src="/acessos-escala.js?v=4"></script>
 <script src="/ministerios.js?v=1"></script>
