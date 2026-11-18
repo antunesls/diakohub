@@ -17,7 +17,7 @@ test('a aba Ministérios existe no painel e carrega o script com versão nova', 
   assert.match(html, /<section data-painel="ministerios" hidden>/);
   assert.match(html, /<script src="\/ministerios\.js\?v=\d+"><\/script>/);
   assert.match(html, /<script src="\/atas\.js\?v=2"><\/script>/);
-  assert.match(html, /<script src="\/menu-lateral\.js\?v=10"><\/script>/);
+  assert.match(html, /<script src="\/menu-lateral\.js\?v=11"><\/script>/);
   const js = web('ministerios.js');
   assert.match(js, /carregar\.ministerios = carregarMinisterios;/);
   assert.match(js, /\/api\/ministerios\/membros/, 'escolhe pessoas sem precisar do cadastro de membros completo');

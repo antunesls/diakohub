@@ -897,14 +897,15 @@
 
     <section data-painel="casais" hidden>
       <h1>Casais e Família</h1>
-      <p class="dica">Contatos, encontros e atividades para cuidar dos casais e das famílias. Os devocionais continuam na área própria.</p>
+      <p class="dica">Contatos e materiais para cuidar dos casais e das famílias. Encontros e inscrições ficam na área própria, para qualquer público. Os devocionais continuam na área própria.</p>
       <p class="dica">Não registre detalhes de aconselhamento, conflitos íntimos ou informações de saúde. O histórico guarda somente contatos operacionais.</p>
       <nav class="barra" aria-label="Seções de Casais e Família">
-        <a href="#casais-titulo">Aniversários</a><a href="#casais-encontros-titulo">Encontros e presença</a>
+        <a href="#casais-titulo">Aniversários</a>
         <a href="#casais-materiais-titulo">Roteiros e atividades</a>
+        <a href="#" data-ir="encontros" data-permissao="encontros">Encontros e inscrições</a>
         <a href="/devocional?trilha=casais">Ler devocionais de Casais</a>
         <a href="/devocional?trilha=familia">Ler devocionais de Família</a>
-        <a href="#" data-ir-aba="devocionais" data-permissao="devocionais">Gerenciar devocionais</a>
+        <a href="#" data-ir="devocionais" data-permissao="devocionais">Gerenciar devocionais</a>
       </nav>
       <section aria-labelledby="casais-titulo">
         <h2 id="casais-titulo">Aniversários de casamento</h2>
@@ -916,14 +917,17 @@
         <p id="casais-resultado" role="status"></p>
         <div id="casais-lista" class="lista"></div>
       </section>
-      <section aria-labelledby="casais-encontros-titulo">
-        <h2 id="casais-encontros-titulo">Encontros, inscrições e presença</h2>
-        <div id="casais-encontros-conteudo" class="lista"></div>
-      </section>
       <section aria-labelledby="casais-materiais-titulo">
         <h2 id="casais-materiais-titulo">Roteiros e atividades</h2>
         <div id="casais-materiais-conteudo" class="lista"></div>
       </section>
+    </section>
+
+    <section data-painel="encontros" hidden>
+      <h1>Encontros e inscrições</h1>
+      <p class="dica">Organize encontros para qualquer público: culto, conferência, retiro, acampamento, treinamento, jantar ou encontro de famílias. As inscrições são internas e cada pessoa é confirmada individualmente.</p>
+      <p class="dica">Não registre saúde, documentos, data de nascimento ou observações íntimas. Acompanhantes sem ficha existem apenas dentro da inscrição e não criam cadastros de membros.</p>
+      <div id="encontros-conteudo" class="lista"></div>
     </section>
 
     <section data-painel="devocionais" hidden>
@@ -1602,14 +1606,14 @@
 <script src="/comum.js?v=6"></script>
 <script src="/primeiro-acesso.js?v=1"></script>
 <script src="/form-visitante.js?v=2"></script>
-<script src="/menu-lateral.js?v=10"></script>
+<script src="/menu-lateral.js?v=11"></script>
 <script src="/gestao-casa.js?v=1"></script>
 <script src="/atas.js?v=2"></script>
-<script src="/casais-encontros.js?v=1"></script>
-<script src="/casais-materiais.js?v=1"></script>
-<script src="/casais.js?v=3"></script>
-<script src="/devocionais.js?v=1"></script>
-<script src="/painel.js?v=30"></script>
+<script src="/encontros.js?v=1"></script>
+<script src="/casais-materiais.js?v=2"></script>
+<script src="/casais.js?v=4"></script>
+<script src="/devocionais.js?v=2"></script>
+<script src="/painel.js?v=31"></script>
 <script src="/certificado.js?v=1"></script>
 <script src="/acessos-escala.js?v=4"></script>
 <script src="/ministerios.js?v=1"></script>

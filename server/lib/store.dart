@@ -35,7 +35,7 @@ class Store {
   static const colecoes = ['recados', 'motivos', 'membros', 'solicitacoesMembros', 'mensagens', 'galeria', 'visitas', 'escalas',
     'indisponibilidades', 'linksEscala', 'repertorio', 'palavras', 'roteiros', 'escolhasPalavra', 'gestaoCasa', 'atas',
     'ministerios', 'devocionais', 'assinaturasDevocionais', 'enviosDevocionais', 'trilhasDevocionais', 'configDevocionais',
-    'casaisContatos', 'casaisEnvios', 'casaisEncontros', 'casaisInscricoes', 'casaisTarefas', 'casaisMateriais'];
+    'casaisContatos', 'casaisEnvios', 'encontros', 'inscricoes', 'tarefasEncontros', 'casaisMateriais'];
 
   Stream<String> get mudancas => _mudancas.stream;
   Map<String, int> get versoes => Map.unmodifiable(_versoes);

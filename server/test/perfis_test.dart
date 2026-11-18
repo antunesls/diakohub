@@ -85,7 +85,8 @@ void main() {
 
     test('migra gestão de casais só nos padrões, preservando remoção posterior', () async {
       await File(p.join(pasta.path, 'perfis.json')).writeAsString(jsonEncode({
-        'permissoesConhecidas': [for (final q in Permissao.values) if (q.name != 'casaisGerenciar') q.name],
+        'permissoesConhecidas': [for (final q in Permissao.values)
+          if (q.name != 'casaisGerenciar' && q.name != 'encontros') q.name],
         'perfis': [
           for (final id in ['liderCasais', 'pastor', 'secretaria', 'consulta-customizada'])
             {'id': id, 'nome': id, 'permissoes': ['sessao', 'casais']},
@@ -93,18 +94,23 @@ void main() {
       }));
       final perfis = Perfis(pasta.path);
       await perfis.carregar();
-      final gestao = Permissao.porNome('casaisGerenciar');
-      expect(gestao, isNotNull);
+      final gestao = Permissao.porNome('casaisGerenciar')!;
       for (final id in ['liderCasais', 'pastor', 'administrador']) {
-        expect(perfis.buscar(id)!.pode(gestao!), isTrue);
+        expect(perfis.buscar(id)!.pode(gestao), isTrue);
       }
       for (final id in ['secretaria', 'consulta-customizada']) {
-        expect(perfis.buscar(id)!.pode(gestao!), isFalse);
+        expect(perfis.buscar(id)!.pode(gestao), isFalse);
       }
+      final encontros = Permissao.porNome('encontros')!;
+      for (final id in ['liderCasais', 'secretaria', 'pastor', 'administrador']) {
+        expect(perfis.buscar(id)!.pode(encontros), isTrue, reason: id);
+      }
+      expect(perfis.buscar('consulta-customizada')!.pode(encontros), isFalse);
       await perfis.atualizar('liderCasais', permissoes: {Permissao.casais});
       final recarregado = Perfis(pasta.path);
       await recarregado.carregar();
-      expect(recarregado.buscar('liderCasais')!.pode(gestao!), isFalse);
+      expect(recarregado.buscar('liderCasais')!.pode(gestao), isFalse);
+      expect(recarregado.buscar('liderCasais')!.pode(encontros), isFalse);
     });
 
     test('dependências entre permissões e página de entrada do perfil', () {

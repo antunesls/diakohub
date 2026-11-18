@@ -85,7 +85,7 @@ void main() {
   test('versão e snapshot preservados após edição e arquivamento', () async {
     final doc = await dominio.criarMaterial(corpo(), conta: lider);
     final id = doc['id'] as String;
-    await store.salvar('casaisEncontros', {
+    await store.salvar('encontros', {
       'id': 'e',
       'titulo': 'Encontro',
       'tarefas': ['preservar']
@@ -96,15 +96,15 @@ void main() {
           'materiaisIds': [id]
         },
         conta: lider);
-    final antes = jsonEncode(store.buscar('casaisEncontros', 'e')!['roteiro']);
+    final antes = jsonEncode(store.buscar('encontros', 'e')!['roteiro']);
     final editado =
         await dominio.editarMaterial(id, {'titulo': 'Revisado'}, conta: lider);
     expect(editado['versao'], 2);
     await dominio.arquivarMaterial(id, conta: lider);
     expect(dominio.listarMateriais(), isEmpty);
     expect(dominio.listarMateriais(arquivados: true), hasLength(1));
-    expect(jsonEncode(store.buscar('casaisEncontros', 'e')!['roteiro']), antes);
-    expect(store.buscar('casaisEncontros', 'e')!['tarefas'], ['preservar']);
+    expect(jsonEncode(store.buscar('encontros', 'e')!['roteiro']), antes);
+    expect(store.buscar('encontros', 'e')!['tarefas'], ['preservar']);
     await expectLater(
         dominio.associarAoEncontro(
             'e',
@@ -119,7 +119,7 @@ void main() {
     final a = await dominio.criarMaterial(corpo(), conta: lider);
     final b = await dominio
         .criarMaterial({...corpo(), 'titulo': 'Outro'}, conta: lider);
-    await store.salvar('casaisEncontros', {'id': 'e'});
+    await store.salvar('encontros', {'id': 'e'});
     final doc = await dominio.associarAoEncontro(
         'e',
         {
@@ -143,7 +143,7 @@ void main() {
           throwsFormatException);
     }
     await dominio.associarAoEncontro('e', {'materiaisIds': []}, conta: lider);
-    expect(store.buscar('casaisEncontros', 'e')!['roteiro'], isEmpty);
+    expect(store.buscar('encontros', 'e')!['roteiro'], isEmpty);
   });
   test('edições de instâncias diferentes não perdem versão', () async {
     final doc = await dominio.criarMaterial(corpo(), conta: lider);
@@ -160,12 +160,12 @@ void main() {
   test('fila compartilhada preserva campos de edição concorrente de encontro',
       () async {
     final doc = await dominio.criarMaterial(corpo(), conta: lider);
-    await store.salvar('casaisEncontros', {'id': 'e', 'titulo': 'Antes'});
+    await store.salvar('encontros', {'id': 'e', 'titulo': 'Antes'});
     await Future.wait([
       store.serializarCasais(() async {
-        final anterior = store.buscar('casaisEncontros', 'e')!;
+        final anterior = store.buscar('encontros', 'e')!;
         await Future<void>.delayed(const Duration(milliseconds: 10));
-        await store.salvar('casaisEncontros', {
+        await store.salvar('encontros', {
           ...anterior,
           'titulo': 'Depois',
           'tarefas': ['nova']
@@ -178,7 +178,7 @@ void main() {
           },
           conta: lider),
     ]);
-    final atual = store.buscar('casaisEncontros', 'e')!;
+    final atual = store.buscar('encontros', 'e')!;
     expect(atual['titulo'], 'Depois');
     expect(atual['tarefas'], ['nova']);
     expect(atual['roteiro'], hasLength(1));

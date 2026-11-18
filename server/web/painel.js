@@ -129,6 +129,7 @@ const carregar = {
   galeria: carregarGaleria,
   membros: carregarMembros,
   casais: carregarCasais,
+  encontros: carregarEncontros,
   devocionais: carregarDevocionais,
   gestaoCasa: carregarCasa,
   atas: carregarAtas,
@@ -140,7 +141,10 @@ const carregar = {
 
 // ---------- Início (resumo de tudo) ----------
 
-document.querySelectorAll('[data-ir]').forEach((b) => b.addEventListener('click', () => mostrarAba(b.dataset.ir)));
+document.querySelectorAll('[data-ir]').forEach((b) => b.addEventListener('click', (e) => {
+  if (b.tagName === 'A') e.preventDefault();
+  mostrarAba(b.dataset.ir);
+}));
 
 /** Dia local no formato AAAA-MM-DD. */
 const diaIso = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
@@ -2528,7 +2532,9 @@ function conectarTempoReal() {
       (abaAtual === 'escalas' && (tipo === 'indisponibilidades' || tipo === 'membros')) ||
       // Mudanças do ministério atualizam a área, mas nunca descartam uma edição
       // aberta nem fecham um diálogo em uso por outra pessoa.
-      (abaAtual === 'casais' && tipo.startsWith('casais') && !casaisEdicao && !document.querySelector('dialog[open]'))) {
+      (abaAtual === 'casais' && tipo.startsWith('casais') && !casaisEdicao && !document.querySelector('dialog[open]')) ||
+      (abaAtual === 'encontros' && ['encontros', 'inscricoes', 'tarefasEncontros'].includes(tipo) &&
+        !document.querySelector('dialog[open]'))) {
       carregar[abaAtual]();
     }
     if (abaAtual === 'inicio') carregarInicio();

@@ -3,13 +3,17 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const html = () => fs.readFileSync(path.join(__dirname, '../web/painel.html'), 'utf8');
+const web = (nome) => fs.readFileSync(path.join(__dirname, '../web', nome), 'utf8');
 
-test('área de casais tem seções operacionais e scripts carregados antes do painel', () => {
+test('encontros têm aba própria e não ficam dentro de Casais', () => {
   const pagina = html();
-  for (const id of ['casais-encontros-conteudo', 'casais-materiais-conteudo']) {
-    assert.match(pagina, new RegExp(`id="${id}"`));
-  }
-  for (const script of ['casais-encontros.js', 'casais-materiais.js', 'casais.js']) {
+  assert.match(pagina, /<section data-painel="encontros" hidden>/);
+  assert.match(pagina, /id="encontros-conteudo"/);
+  const inicioCasais = pagina.indexOf('<section data-painel="casais"');
+  const fimCasais = pagina.indexOf('<section data-painel="encontros"');
+  assert.ok(inicioCasais !== -1 && fimCasais > inicioCasais);
+  assert.doesNotMatch(pagina.slice(inicioCasais, fimCasais), /id="encontros-conteudo"/);
+  for (const script of ['encontros.js', 'casais-materiais.js', 'casais.js']) {
     const pos = pagina.indexOf(`/${script}?`);
     assert.ok(pos !== -1 && pos < pagina.indexOf('/painel.js?'), script);
   }
@@ -17,7 +21,17 @@ test('área de casais tem seções operacionais e scripts carregados antes do pa
   assert.match(pagina, /Não registre detalhes de aconselhamento/);
 });
 
-test('mudanças do ministério atualizam a área sem interromper edição ou diálogo', () => {
-  const js = fs.readFileSync(path.join(__dirname, '../web/painel.js'), 'utf8');
+test('menu e painel registram a aba independente de encontros', () => {
+  const menu = require('../web/menu-lateral.js');
+  const itens = menu.gruposPermitidos(['encontros']).flatMap((g) => g.itens);
+  assert.ok(itens.some((i) => i.id === 'encontros' && i.titulo === 'Encontros e inscrições'));
+  assert.match(web('painel.js'), /encontros: carregarEncontros/);
+  assert.match(web('encontros.js'), /pode\('encontros'\)/);
+  assert.doesNotMatch(web('encontros.js'), /casaisGerenciar|\/api\/casais/);
+});
+
+test('mudanças de encontros atualizam a aba sem fechar diálogo em uso', () => {
+  const js = web('painel.js');
   assert.match(js, /abaAtual === 'casais' && tipo\.startsWith\('casais'\) && !casaisEdicao && !document\.querySelector\('dialog\[open\]'\)/);
+  assert.match(js, /abaAtual === 'encontros' && \['encontros', 'inscricoes', 'tarefasEncontros'\]\.includes\(tipo\)/);
 });

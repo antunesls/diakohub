@@ -20,7 +20,7 @@ function ambiente({ gestao = true, devocionais = false, materiais = [], encontro
     console, el: (tag, props, ...children) => new No(tag, props, children),
     botao: (texto, onclick) => new No('button', { onclick, type: 'button' }, [texto]),
     $: id => id === 'casais-materiais-conteudo' ? container : null,
-    pode: p => { assert.ok(pronto, 'não consultar permissões durante carga'); return p === 'casaisGerenciar' ? gestao : p === 'devocionais' && devocionais; },
+    pode: p => { assert.ok(pronto, 'não consultar permissões durante carga'); return p === 'casaisGerenciar' || p === 'encontros' ? gestao : p === 'devocionais' && devocionais; },
     mensagem: (no, texto) => no.replaceChildren(texto), confirm: () => true,
     navigator: { clipboard: { writeText: async texto => copias.push(texto) } },
     api: async (metodo, url, corpo) => { chamadas.push({ metodo, url, corpo }); return metodo === 'GET' ? (url.includes('encontros') ? encontros : materiais) : {}; },
@@ -89,6 +89,6 @@ test('associação guarda IDs em ordem explícita e nunca envia snapshot', async
   seletor.value = 'm'; a.bot('Adicionar material').props.onclick();
   await a.bot('Salvar roteiro').props.onclick();
   const envio = a.chamadas.find(c => c.metodo === 'PUT');
-  assert.equal(envio.url, '/api/casais/encontros/e/roteiro');
+  assert.equal(envio.url, '/api/encontros/e/roteiro');
   assert.equal(JSON.stringify(envio.corpo), JSON.stringify({ materiaisIds: ['b', 'm'] }));
 });

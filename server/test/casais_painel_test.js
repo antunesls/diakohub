@@ -38,7 +38,7 @@ test('menu e painel integram Casais e Família, que não carrega mais devocionai
   assert.ok(html.indexOf('/casais.js?') < html.indexOf('/painel.js?'));
   assert.match(web('painel.js'), /casais: carregarCasais/);
   assert.doesNotMatch(web('casais.js'), /api\/devocionais|abrirEditorDevocional|devocionais-gestao/);
-  assert.match(html, /data-ir-aba="devocionais"/); // atalho para a página própria
+  assert.match(html, /data-ir="devocionais"/); // atalho para a página própria
 });
 
 test('consulta mensal restrita não busca membros nem devocionais e usa DOM seguro', async () => {

@@ -28,7 +28,8 @@ enum Permissao {
   mensagens('Caixa de mensagens', AreaPermissao.oracao, 'Mensagens enviadas pelo site (dúvidas, sugestões, críticas).'),
   membros('Cadastro de membros', AreaPermissao.pessoas, 'Aba Membros, fichas, certificado de batismo e contato com visitantes.'),
   casais('Consultar Casais e Família', AreaPermissao.pessoas, 'Aniversários de casamento por mês e contatos limitados. Não permite consultar ou editar fichas completas.'),
-  casaisGerenciar('Gerenciar Casais e Família', AreaPermissao.pessoas, 'Registrar contatos e organizar encontros e materiais do ministério. Não permite consultar ou editar fichas completas.'),
+  casaisGerenciar('Gerenciar Casais e Família', AreaPermissao.pessoas, 'Registrar contatos e organizar os materiais do ministério. Não permite consultar ou editar fichas completas.'),
+  encontros('Encontros e inscrições', AreaPermissao.pessoas, 'Organizar encontros, inscrições, presença e tarefas para qualquer público. Não exige vínculo de casal nem permite editar fichas completas.'),
   devocionais('Escrever, publicar e enviar devocionais', AreaPermissao.comunicacao, 'Página Devocionais: escrever, agendar e publicar em qualquer trilha e enviar por e-mail aos assinantes (envio só após confirmação). Não dá acesso a Casais e Família.'),
   ministerios('Cadastro de ministérios', AreaPermissao.pessoas, 'Criar ministérios e dizer quem participa de cada um (decide quem vê as atas de cada ministério).'),
   visitantes('Ver os visitantes do dia e dar as boas-vindas', AreaPermissao.pessoas, ''),
@@ -110,7 +111,8 @@ enum PerfilPadrao {
     Permissao.visitantes, Permissao.visitantesHistorico, Permissao.visitantesCadastrar, Permissao.escalasVer,
     Permissao.escalaPastoral, Permissao.escalaLouvor, Permissao.minhaEscala, Permissao.indisponibilidade,
     Permissao.acessosEscala, Permissao.palavras, Permissao.palavrasTodas, Permissao.atas, Permissao.atasSigilosas,
-    Permissao.ministerios, Permissao.atasTodosMinisterios, Permissao.casais, Permissao.casaisGerenciar, Permissao.devocionais,
+    Permissao.ministerios, Permissao.atasTodosMinisterios, Permissao.casais, Permissao.casaisGerenciar, Permissao.encontros,
+    Permissao.devocionais,
   }),
   pastor('Pastor', 'Todo o conteúdo, inclusive pedidos particulares. Sem configurações técnicas.', {
     ..._base, Permissao.motivosParticulares, Permissao.motivosEditar, Permissao.mensagens, Permissao.agendaEditar,
@@ -118,12 +120,14 @@ enum PerfilPadrao {
     Permissao.visitantes, Permissao.visitantesHistorico, Permissao.visitantesCadastrar, Permissao.escalasVer,
     Permissao.escalaPastoral, Permissao.escalaLouvor, Permissao.minhaEscala, Permissao.indisponibilidade,
     Permissao.palavras, Permissao.palavrasTodas, Permissao.atas, Permissao.atasSigilosas,
-    Permissao.ministerios, Permissao.atasTodosMinisterios, Permissao.casais, Permissao.casaisGerenciar, Permissao.devocionais,
+    Permissao.ministerios, Permissao.atasTodosMinisterios, Permissao.casais, Permissao.casaisGerenciar, Permissao.encontros,
+    Permissao.devocionais,
   }),
   secretaria('Secretaria', 'Recados, agenda, mensagens, aniversariantes e pedidos públicos.', {
     ..._base, Permissao.motivosEditar, Permissao.mensagens, Permissao.agendaEditar, Permissao.membros, Permissao.gestaoCasa, Permissao.resumo,
     Permissao.visitantes, Permissao.visitantesHistorico, Permissao.visitantesCadastrar, Permissao.escalasVer,
     Permissao.minhaEscala, Permissao.indisponibilidade, Permissao.acessosEscala, Permissao.atas, Permissao.ministerios, Permissao.casais,
+    Permissao.encontros,
   }),
   midia('Mídia', 'Cartazes, galeria do site, recados e projeção no telão.', {
     ..._base, Permissao.galeria, Permissao.projetar, Permissao.escalasVer,
@@ -137,8 +141,8 @@ enum PerfilPadrao {
   gestaoCasa('Gestão da Casa', 'Cuida das pendências, compras planejadas e manutenções preventivas.', {
     Permissao.sessao, Permissao.gestaoCasa,
   }),
-  liderCasais('Líder de Casais e Família', 'Gerencia contatos, encontros e materiais de Casais e Família; escreve, publica e envia devocionais. Sem acesso às fichas completas.', {
-    Permissao.sessao, Permissao.casais, Permissao.casaisGerenciar, Permissao.devocionais,
+  liderCasais('Líder de Casais e Família', 'Gerencia contatos e materiais de Casais e Família; organiza encontros e inscrições; escreve, publica e envia devocionais. Sem acesso às fichas completas.', {
+    Permissao.sessao, Permissao.casais, Permissao.casaisGerenciar, Permissao.encontros, Permissao.devocionais,
   }),
   comissaoLouvor('Comissão do Louvor', 'Membros da comissão: montam a escala e as músicas do louvor e veem a escala pastoral e a agenda.', {
     Permissao.sessao, Permissao.agendaVer, Permissao.escalasVer, Permissao.escalaLouvor, Permissao.minhaEscala,
@@ -270,6 +274,8 @@ Permissao permissaoDaRota(String metodo, String caminho) {
   if (comeca('api/galeria')) return Permissao.galeria;
   if (comeca('api/membros')) return Permissao.membros;
   if (comeca('api/casais')) return leitura ? Permissao.casais : Permissao.casaisGerenciar;
+  // Encontros e inscrições são uma área própria: não exigem vínculo de casal.
+  if (comeca('api/encontros') || comeca('api/inscricoes')) return Permissao.encontros;
   if (comeca('api/devocionais')) return Permissao.devocionais;
   if (comeca('api/solicitacoes-membros')) return Permissao.membros;
   // Certificado de batismo (geração do PDF e as imagens de assinatura/carimbo salvas).

@@ -152,6 +152,8 @@ class CasaisMateriais {
           {required Conta conta}) =>
       _serializar(() async {
         _exigir(conta);
+        if (!conta.pode(Permissao.encontros))
+          throw StateError('Sem permissão para alterar o roteiro de encontros.');
         final ids = corpo['materiaisIds'];
         if (corpo.length != 1 ||
             ids is! List ||
@@ -173,7 +175,7 @@ class CasaisMateriais {
           });
         }
         // Leitura e gravação protegidas pela mesma fila usada pelo domínio de encontros.
-        final atual = store.buscar('casaisEncontros', id);
+        final atual = store.buscar('encontros', id);
         if (atual == null) throw StateError('Encontro não encontrado.');
         final atualizado = <String, dynamic>{
           ...atual,
@@ -181,7 +183,7 @@ class CasaisMateriais {
           'atualizadoEm': _agora().toIso8601String(),
           'atualizadoPor': conta.id,
         };
-        await store.salvar('casaisEncontros', atualizado);
+        await store.salvar('encontros', atualizado);
         return _copia(atualizado);
       });
 }

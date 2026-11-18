@@ -20,15 +20,15 @@ import 'package:test/test.dart';
 
 void main() {
   test('Store registra todas as coleções do ministério sem duplicar pessoas', () {
-    expect(Store.colecoes, containsAll(['casaisContatos', 'casaisEnvios', 'casaisEncontros',
-      'casaisInscricoes', 'casaisTarefas', 'casaisMateriais']));
+    expect(Store.colecoes, containsAll(['casaisContatos', 'casaisEnvios', 'encontros',
+      'inscricoes', 'tarefasEncontros', 'casaisMateriais']));
     expect(Store.colecoes, isNot(contains('casaisPessoas')));
   });
 
   late Directory pasta;
   late Store store;
   late Handler handler;
-  late String lider, consulta, admin;
+  late String lider, consulta, midia, admin;
   late List<EmailCasais> enviados;
   Future<(int, dynamic)> chamar(String metodo, String rota, {String? token, Object? corpo}) async {
     final r = await handler(Request(metodo, Uri.parse('http://teste$rota'), headers: {
@@ -47,6 +47,7 @@ void main() {
     final usuarios = Usuarios(store.pasta);
     await usuarios.criar(nome: 'Líder', login: 'lider', perfil: Perfil.liderCasais, senha: 'lider-teste-123');
     await usuarios.criar(nome: 'Consulta', login: 'consulta', perfil: Perfil.secretaria, senha: 'consulta-teste-123');
+    await usuarios.criar(nome: 'Sem encontros', login: 'midia', perfil: Perfil.midia, senha: 'midia-teste-123');
     final auth = Auth(conferirSenha: cfg.conferirSenha, pastaDados: store.pasta, usuarios: usuarios);
     handler = Servidor(store: store, auth: auth,
       holyrics: HolyricsDireto(host: 'h', porta: 1, token: 't', cliente: MockClient((_) async => http.Response('{}', 200))),
@@ -57,6 +58,7 @@ void main() {
     admin = (await chamar('POST', '/api/login', corpo: {'senha': 'admin-teste-123'})).$2['token'] as String;
     lider = (await chamar('POST', '/api/login', corpo: {'usuario': 'lider', 'senha': 'lider-teste-123'})).$2['token'] as String;
     consulta = (await chamar('POST', '/api/login', corpo: {'usuario': 'consulta', 'senha': 'consulta-teste-123'})).$2['token'] as String;
+    midia = (await chamar('POST', '/api/login', corpo: {'usuario': 'midia', 'senha': 'midia-teste-123'})).$2['token'] as String;
     await store.salvarVarios('membros', [
       {'id': 'a', 'nome': 'Ana', 'status': 'membro', 'conjugeId': 'b', 'dataCasamento': '2016-11-18',
         'cpf': 'segredo', 'rua': 'restrita', 'email': 'ana@example.test', 'consentimentoEm': '2026-01-01'},
@@ -81,19 +83,20 @@ void main() {
   });
 
   test('seletores limitados não vazam ficha nem login', () async {
-    final lista = await chamar('GET', '/api/casais/pessoas?busca=ana', token: lider);
+    final lista = await chamar('GET', '/api/encontros/pessoas?busca=ana', token: lider);
     expect(lista.$1, 200);
     expect((lista.$2 as List).single['nome'], 'Ana');
     for (final campo in ['cpf', 'rua', 'email', 'consentimentoEm', 'segredo']) {
       expect(jsonEncode(lista.$2), isNot(contains(campo)));
     }
-    expect((await chamar('GET', '/api/casais/pessoas?busca=a', token: lider)).$1, 400);
+    expect((await chamar('GET', '/api/encontros/pessoas?busca=a', token: lider)).$1, 400);
     expect((await chamar('GET', '/api/membros', token: lider)).$1, 403);
-    final responsaveis = await chamar('GET', '/api/casais/responsaveis', token: lider);
+    final responsaveis = await chamar('GET', '/api/encontros/responsaveis', token: lider);
     expect(responsaveis.$1, 200);
     expect(jsonEncode(responsaveis.$2), isNot(contains('login')));
     expect(jsonEncode(responsaveis.$2), isNot(contains('senha')));
-    expect((await chamar('GET', '/api/casais/responsaveis', token: consulta)).$1, 403);
+    expect((await chamar('GET', '/api/encontros/responsaveis', token: consulta)).$1, 200);
+    expect((await chamar('GET', '/api/encontros/responsaveis', token: midia)).$1, 403);
   });
 
   test('excluir membro remove histórico identificável de contatos', () async {
@@ -104,14 +107,19 @@ void main() {
     expect(store.listar('casaisContatos'), isEmpty);
   });
 
-  test('rotas de encontros e materiais preservam consulta e negam escrita à secretaria', () async {
-    for (final recurso in ['encontros', 'materiais']) {
-      final leitura = await chamar('GET', '/api/casais/$recurso', token: consulta);
-      expect(leitura.$1, 200, reason: recurso);
-      expect(leitura.$2, isList);
-      expect((await chamar('POST', '/api/casais/$recurso', token: consulta, corpo: {})).$1, 403);
-      expect((await chamar('GET', '/api/public/casais/$recurso')).$1, 404);
-    }
+  test('encontros independem de casais e materiais continuam restritos', () async {
+    expect((await chamar('GET', '/api/encontros', token: consulta)).$1, 200);
+    expect((await chamar('GET', '/api/encontros', token: midia)).$1, 403);
+    expect((await chamar('POST', '/api/encontros', token: midia, corpo: {})).$1, 403);
+    final evento = await chamar('POST', '/api/encontros', token: consulta, corpo: {
+      'titulo': 'Culto de missões', 'tipo': 'culto', 'inicio': '2026-12-05T19:00',
+      'fim': '2026-12-05T21:00', 'estado': 'aberto',
+    });
+    expect(evento.$1, 201, reason: '${evento.$2}');
+    expect((await chamar('GET', '/api/casais/materiais', token: consulta)).$1, 200);
+    expect((await chamar('POST', '/api/casais/materiais', token: consulta, corpo: {})).$1, 403);
+    expect((await chamar('GET', '/api/public/encontros')).$1, 404);
+    expect((await chamar('GET', '/api/public/casais/materiais')).$1, 404);
   });
 
   test('prévia e SMTP falso não marcam contato, revalidam e não duplicam entrega', () async {
@@ -139,44 +147,44 @@ void main() {
   });
 
   test('fluxo integrado encontro, inscrição, presença, tarefa e roteiro versionado', () async {
-    final e = await chamar('POST', '/api/casais/encontros', token: lider, corpo: {
+    final e = await chamar('POST', '/api/encontros', token: lider, corpo: {
       'titulo': 'Encontro de teste', 'tipo': 'jantar', 'inicio': '2026-11-20T19:00',
       'fim': '2026-11-20T21:00', 'estado': 'aberto', 'capacidade': 2,
     });
     expect(e.$1, 201, reason: '${e.$2}');
     final id = e.$2['id'];
-    final i = await chamar('POST', '/api/casais/encontros/$id/inscricoes', token: lider, corpo: {
+    final i = await chamar('POST', '/api/encontros/$id/inscricoes', token: lider, corpo: {
       'responsavelMembroId': 'a', 'participantes': [
         {'membroId': 'a', 'confirmado': true}, {'membroId': 'b', 'confirmado': false},
       ],
     });
     expect(i.$1, 201, reason: '${i.$2}');
-    expect((await chamar('GET', '/api/casais/encontros/$id', token: consulta)).$2['vagasDisponiveis'], 0);
-    final caminho = '/api/casais/inscricoes/${i.$2['id']}/participantes/${i.$2['participantes'][0]['id']}/presenca';
+    expect((await chamar('GET', '/api/encontros/$id', token: consulta)).$2['vagasDisponiveis'], 0);
+    final caminho = '/api/inscricoes/${i.$2['id']}/participantes/${i.$2['participantes'][0]['id']}/presenca';
     expect((await chamar('PUT', caminho, token: lider, corpo: {'presente': true})).$1, 200);
-    final lista = await chamar('GET', '/api/casais/encontros/$id/inscricoes', token: consulta);
+    final lista = await chamar('GET', '/api/encontros/$id/inscricoes', token: consulta);
     expect(lista.$2.first['participantes'][0]['presencaPorNome'], 'Líder');
     expect(lista.$2.first['participantes'][1]['presenteEm'], isNull);
-    final tarefa = await chamar('POST', '/api/casais/encontros/$id/tarefas', token: lider,
+    final tarefa = await chamar('POST', '/api/encontros/$id/tarefas', token: lider,
       corpo: {'descricao': 'Recepção', 'responsavelUsuarioId': 'admin', 'prazo': '2026-11-17'});
     expect(tarefa.$1, 201, reason: '${tarefa.$2}');
-    expect((await chamar('GET', '/api/casais/encontros/$id/tarefas', token: consulta)).$2.single['responsavelNome'], 'Administrador');
+    expect((await chamar('GET', '/api/encontros/$id/tarefas', token: consulta)).$2.single['responsavelNome'], 'Administrador');
     final material = await chamar('POST', '/api/casais/materiais', token: lider, corpo: {
       'titulo': 'Escuta', 'publico': 'ambos', 'duracaoMinutos': 20, 'passos': 'Conversar com gratidão.',
     });
     expect(material.$1, 201, reason: '${material.$2}');
-    expect((await chamar('PUT', '/api/casais/encontros/$id/roteiro', token: lider,
+    expect((await chamar('PUT', '/api/encontros/$id/roteiro', token: lider,
       corpo: {'materiaisIds': [material.$2['id']]})).$1, 200);
     expect((await chamar('PUT', '/api/casais/materiais/${material.$2['id']}', token: lider,
       corpo: {'titulo': 'Escuta revisada'})).$1, 200);
-    final detalhe = await chamar('GET', '/api/casais/encontros/$id', token: consulta);
+    final detalhe = await chamar('GET', '/api/encontros/$id', token: consulta);
     expect(detalhe.$2['roteiro'].single['conteudoSnapshot']['titulo'], 'Escuta');
-    expect((await chamar('POST', '/api/casais/encontros/$id/cancelar', token: lider)).$1, 200);
+    expect((await chamar('POST', '/api/encontros/$id/cancelar', token: lider)).$1, 200);
     expect((await chamar('PUT', caminho, token: lider, corpo: {'presente': false})).$1, 400);
   });
 
   test('exclusão mantém outros membros inscritos e remove acompanhantes do responsável excluído', () async {
-    await store.salvarVarios('casaisInscricoes', [
+    await store.salvarVarios('inscricoes', [
       {'id': 'i', 'encontroId': 'e', 'responsavelMembroId': 'a', 'estado': 'confirmada', 'participantes': [
         {'id': 'pa', 'membroId': 'a'}, {'id': 'pb', 'membroId': 'b'},
         {'id': 'pc', 'nomeAcompanhante': 'Convidado contextual'},
@@ -189,19 +197,19 @@ void main() {
     await store.salvar('casaisEnvios', {'id': 'envio', 'membrosIds': ['a', 'b'], 'destinatarioMembroId': 'a'});
     expect((await chamar('DELETE', '/api/membros/a', token: admin)).$1, 200);
     expect(store.listar('casaisEnvios'), isEmpty);
-    final i = store.buscar('casaisInscricoes', 'i')!;
+    final i = store.buscar('inscricoes', 'i')!;
     expect(i['responsavelMembroId'], 'b');
     expect((i['participantes'] as List).single['membroId'], 'b');
-    final j = store.buscar('casaisInscricoes', 'j')!;
+    final j = store.buscar('inscricoes', 'j')!;
     expect(j['participantes'], hasLength(2));
     expect(jsonEncode(j), contains('Convidado de Bruno'));
   });
 
   test('excluir último participante remove inscrição vazia cujo responsável não participava', () async {
-    await store.salvar('casaisInscricoes', {'id': 'i', 'encontroId': 'e',
+    await store.salvar('inscricoes', {'id': 'i', 'encontroId': 'e',
       'responsavelMembroId': 'b', 'estado': 'confirmada',
       'participantes': [{'id': 'p', 'membroId': 'a', 'crianca': false, 'confirmado': true}]});
     expect((await chamar('DELETE', '/api/membros/a', token: admin)).$1, 200);
-    expect(store.listar('casaisInscricoes'), isEmpty);
+    expect(store.listar('inscricoes'), isEmpty);
   });
 }

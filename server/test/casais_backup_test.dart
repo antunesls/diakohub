@@ -4,15 +4,15 @@ import 'dart:io';
 import 'package:archive/archive.dart';
 import 'package:diako_server/auth.dart';
 import 'package:diako_server/backup.dart';
-import 'package:diako_server/casais_encontros.dart';
+import 'package:diako_server/encontros.dart';
 import 'package:diako_server/casais_materiais.dart';
 import 'package:diako_server/permissoes.dart';
 import 'package:diako_server/store.dart';
 import 'package:path/path.dart' as p;
 import 'package:test/test.dart';
 
-const colecoesCasais = ['casaisContatos', 'casaisEnvios', 'casaisEncontros',
-  'casaisInscricoes', 'casaisTarefas', 'casaisMateriais'];
+const colecoesCasais = ['casaisContatos', 'casaisEnvios', 'encontros',
+  'inscricoes', 'tarefasEncontros', 'casaisMateriais'];
 const data = '2026-11-18T10:00:00.000';
 final autoria = {'criadoEm': data, 'atualizadoEm': data, 'usuarioId': 'lider', 'usuarioNome': 'Líder'};
 Map<String, dynamic> conteudo() => {'titulo': 'Atividade fictícia', 'publico': 'ambos',
@@ -26,19 +26,19 @@ Map<String, List<Map<String, dynamic>>> base() => {
     'registradoEm': data, 'usuarioId': 'lider', 'usuarioNome': 'Líder',
   }],
   'casaisMateriais': [{'id': 'mat1', ...conteudo(), 'versao': 2, 'arquivado': true, ...autoria}],
-  'casaisEncontros': [{'id': 'e1', 'titulo': 'Encontro fictício', 'tipo': 'jantar',
+  'encontros': [{'id': 'e1', 'titulo': 'Encontro fictício', 'tipo': 'jantar',
     'inicio': data, 'fim': '2026-11-18T12:00:00.000', 'local': '', 'descricao': '',
     'estado': 'aberto', 'capacidade': 10, ...autoria,
     'roteiro': [{'materialId': 'mat1', 'versao': 1, 'conteudoSnapshot': conteudo()}],
   }],
-  'casaisInscricoes': [{'id': 'i1', 'encontroId': 'e1', 'responsavelMembroId': 'm1',
+  'inscricoes': [{'id': 'i1', 'encontroId': 'e1', 'responsavelMembroId': 'm1',
     'participantes': [
       {'id': 'p1', 'membroId': 'm1', 'crianca': false, 'confirmado': true,
         'presenteEm': data, 'presencaPor': 'lider'},
       {'id': 'p2', 'nomeAcompanhante': 'Convidado fictício', 'crianca': true, 'confirmado': false},
     ], 'estado': 'confirmada', ...autoria,
   }],
-  'casaisTarefas': [{'id': 't1', 'encontroId': 'e1', 'descricao': 'Preparar sala',
+  'tarefasEncontros': [{'id': 't1', 'encontroId': 'e1', 'descricao': 'Preparar sala',
     'responsavelUsuarioId': 'conta-fora-do-backup', 'prazo': '2026-11-18', 'estado': 'pendente', ...autoria}],
   'casaisEnvios': [{'id': 'env1', 'finalidade': 'parabens', 'membrosIds': ['m1'],
     'casalChave': 'a' * 64, 'ocorrencia': '2026-11-18', 'destinatarioHash': 'b' * 64,
@@ -119,7 +119,7 @@ void main() {
 
   test('aceita contratos gerados pelos domínios, inclusive reversão de presença', () async {
     final lider = Conta(id: 'lider', nome: 'Líder', login: 'lider', perfil: Perfil.liderCasais);
-    final encontros = CasaisEncontros(store, agora: () => DateTime.parse(data), responsavelValido: (_) => true);
+    final encontros = Encontros(store, agora: () => DateTime.parse(data), responsavelValido: (_) => true);
     final materiais = CasaisMateriais(store, agora: () => DateTime.parse(data));
     await store.substituir('membros', base()['membros']!);
     final encontro = await encontros.criarEncontro({'titulo': 'Encontro', 'tipo': 'jantar',
@@ -147,27 +147,27 @@ void main() {
   });
 
   for (final caso in <String, void Function(Map<String, List<Map<String, dynamic>>>)>{
-    'lotação excedida no conjunto de inscrições': (b) => b['casaisEncontros']!.single['capacidade'] = 1,
-    'membro repetido entre inscrições ativas': (b) => b['casaisInscricoes']!.add({
-      ...b['casaisInscricoes']!.single, 'id': 'i2', 'participantes': [
+    'lotação excedida no conjunto de inscrições': (b) => b['encontros']!.single['capacidade'] = 1,
+    'membro repetido entre inscrições ativas': (b) => b['inscricoes']!.add({
+      ...b['inscricoes']!.single, 'id': 'i2', 'participantes': [
         {'id': 'p3', 'membroId': 'm1', 'confirmado': true, 'crianca': false}]}),
-    'encontro com estado inválido': (b) => b['casaisEncontros']!.single['estado'] = 'publicado',
-    'encontro com intervalo invertido': (b) => b['casaisEncontros']!.single['fim'] = '2026-11-17T10:00:00',
-    'capacidade não inteira': (b) => b['casaisEncontros']!.single['capacidade'] = '10',
-    'inscrição órfã': (b) => b['casaisInscricoes']!.single['encontroId'] = 'ausente',
-    'responsável inexistente': (b) => b['casaisInscricoes']!.single['responsavelMembroId'] = 'ausente',
-    'participante inexistente': (b) => (b['casaisInscricoes']!.single['participantes'] as List).first['membroId'] = 'ausente',
-    'presença sem autoria': (b) => (b['casaisInscricoes']!.single['participantes'] as List).first.remove('presencaPor'),
-    'inscrição com estado inválido': (b) => b['casaisInscricoes']!.single['estado'] = 'pendente',
-    'participante com tipo inválido': (b) => (b['casaisInscricoes']!.single['participantes'] as List).first['crianca'] = 'sim',
-    'tarefa órfã': (b) => b['casaisTarefas']!.single['encontroId'] = 'ausente',
-    'tarefa com estado inválido': (b) => b['casaisTarefas']!.single['estado'] = 'aberta',
+    'encontro com estado inválido': (b) => b['encontros']!.single['estado'] = 'publicado',
+    'encontro com intervalo invertido': (b) => b['encontros']!.single['fim'] = '2026-11-17T10:00:00',
+    'capacidade não inteira': (b) => b['encontros']!.single['capacidade'] = '10',
+    'inscrição órfã': (b) => b['inscricoes']!.single['encontroId'] = 'ausente',
+    'responsável inexistente': (b) => b['inscricoes']!.single['responsavelMembroId'] = 'ausente',
+    'participante inexistente': (b) => (b['inscricoes']!.single['participantes'] as List).first['membroId'] = 'ausente',
+    'presença sem autoria': (b) => (b['inscricoes']!.single['participantes'] as List).first.remove('presencaPor'),
+    'inscrição com estado inválido': (b) => b['inscricoes']!.single['estado'] = 'pendente',
+    'participante com tipo inválido': (b) => (b['inscricoes']!.single['participantes'] as List).first['crianca'] = 'sim',
+    'tarefa órfã': (b) => b['tarefasEncontros']!.single['encontroId'] = 'ausente',
+    'tarefa com estado inválido': (b) => b['tarefasEncontros']!.single['estado'] = 'aberta',
     'material com duração inválida': (b) => b['casaisMateriais']!.single['duracaoMinutos'] = 481,
     'material com tipo inválido': (b) => b['casaisMateriais']!.single['arquivado'] = 'sim',
     'material com versão inválida': (b) => b['casaisMateriais']!.single['versao'] = 0,
-    'snapshot inválido': (b) => b['casaisEncontros']!.single['roteiro'][0]['conteudoSnapshot']['publico'] = 'todos',
-    'material do roteiro inexistente': (b) => b['casaisEncontros']!.single['roteiro'][0]['materialId'] = 'ausente',
-    'snapshot com versão futura': (b) => b['casaisEncontros']!.single['roteiro'][0]['versao'] = 3,
+    'snapshot inválido': (b) => b['encontros']!.single['roteiro'][0]['conteudoSnapshot']['publico'] = 'todos',
+    'material do roteiro inexistente': (b) => b['encontros']!.single['roteiro'][0]['materialId'] = 'ausente',
+    'snapshot com versão futura': (b) => b['encontros']!.single['roteiro'][0]['versao'] = 3,
     'IDs duplicados': (b) => b['casaisMateriais']!.add({...b['casaisMateriais']!.single}),
     'envio com estado inválido': (b) => b['casaisEnvios']!.single['estado'] = 'enviado',
     'envio com hash inválido': (b) => b['casaisEnvios']!.single['destinatarioHash'] = 'email@exemplo.com',

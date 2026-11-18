@@ -2,7 +2,7 @@ const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const vm = require('node:vm');
-const fonte = () => fs.readFileSync(require('node:path').join(__dirname, '../web/casais-encontros.js'), 'utf8');
+const fonte = () => fs.readFileSync(require('node:path').join(__dirname, '../web/encontros.js'), 'utf8');
 function ambiente(gestao = true, responder = () => []) {
   class No {
     constructor(tag, props = {}, filhos = []) { this.tag = tag; this.props = props; this.children = filhos.flat().filter(v => v != null); this.value = props.value || ''; this.checked = false; this.events = {}; }
@@ -30,36 +30,36 @@ function ambiente(gestao = true, responder = () => []) {
 }
 test('carga do script é inerte e abertura usa apenas API restrita', async () => {
   const a = ambiente(false); assert.equal(a.chamadas.length, 0);
-  await a.run('carregarCasaisEncontros()');
-  assert.deepEqual(a.chamadas.map(c => c.url), ['/api/casais/encontros']);
+  await a.run('carregarEncontros()');
+  assert.deepEqual(a.chamadas.map(c => c.url), ['/api/encontros']);
   assert.ok(a.raiz.children.length);
 });
 test('formulário acessível usa dialog sem HTML inseguro nem dados privados', () => {
-  const a = ambiente(); a.run('formularioEncontroCasais()');
+  const a = ambiente(); a.run('formularioEncontro()');
   assert.equal(a.body.children[0].tag, 'dialog');
   assert.equal(a.body.children[0].aberto, true);
   assert.doesNotMatch(fonte(), /innerHTML|prompt\(|\/api\/membros|\/api\/usuarios/);
-  assert.match(fonte(), /\/api\/casais\/pessoas\?busca=/);
-  assert.match(fonte(), /\/api\/casais\/responsaveis/);
+  assert.match(fonte(), /\/api\/encontros\/pessoas\?busca=/);
+  assert.match(fonte(), /\/api\/encontros\/responsaveis/);
 });
 test('busca exige mínimo de dois caracteres e seleciona sem inscrição automática', async () => {
-  const a = ambiente(); await a.run('formularioInscricaoCasais({id:"e"})');
+  const a = ambiente(); await a.run('formularioInscricao({id:"e"})');
   const dialogo = a.body.children[0];
   const todos = no => [no, ...(no.children || []).filter(v => typeof v === 'object').flatMap(todos)];
   const busca = todos(dialogo).find(n => n.props?.['aria-label'] === 'Buscar pessoas');
   const pesquisar = todos(dialogo).find(n => n.tag === 'button' && n.children.includes('Buscar'));
   busca.value = 'A'; await pesquisar.props.onclick(); assert.equal(a.chamadas.length, 0);
   busca.value = 'Ana'; await pesquisar.props.onclick();
-  assert.equal(a.chamadas[0].url, '/api/casais/pessoas?busca=Ana');
+  assert.equal(a.chamadas[0].url, '/api/encontros/pessoas?busca=Ana');
 });
 
 const todos = no => [no, ...(no.children || []).filter(v => v && typeof v === 'object').flatMap(todos)];
 test('consulta, resumo e busca nunca passam null a replaceChildren', async () => {
   const consulta = ambiente(false);
-  await consulta.run('carregarCasaisEncontros()');
+  await consulta.run('carregarEncontros()');
   assert.ok(todos(consulta.raiz).every(n => !n.children.includes(null)), 'consulta não pode escrever null');
   const busca = ambiente(true, () => [{ id: 'a', nome: 'Ana' }]);
-  await busca.run('formularioInscricaoCasais({id:"e"})');
+  await busca.run('formularioInscricao({id:"e"})');
   const dlg = busca.body.children[0];
   todos(dlg).find(n => n.props?.['aria-label'] === 'Buscar pessoas').value = 'Ana';
   await todos(dlg).find(n => n.tag === 'button' && n.children.includes('Buscar')).props.onclick();
@@ -67,12 +67,12 @@ test('consulta, resumo e busca nunca passam null a replaceChildren', async () =>
   const detalhes = ambiente(true, (_, url) => url.endsWith('/inscricoes')
     ? [{ id: 'i', estado: 'confirmada', participantes: [{ id: 'p', nome: 'Ana', confirmado: false }] }]
     : url.endsWith('/tarefas') ? [] : { id: 'e', estado: 'aberto', titulo: 'Jantar' });
-  await detalhes.run('detalheEncontroCasais("e")');
+  await detalhes.run('detalheEncontro("e")');
   assert.ok(todos(detalhes.body).every(n => !n.children.includes(null)), 'participante sem confirmação não pode escrever null');
 });
 test('inscrição envia confirmação individual explícita e responsável selecionado', async () => {
   const a = ambiente(true, (metodo, url) => url.includes('pessoas?') ? [{id: 'a', nome: '<Ana>'}] : []);
-  await a.run('formularioInscricaoCasais({id:"e"})');
+  await a.run('formularioInscricao({id:"e"})');
   const dlg = a.body.children[0];
   const buscarBotao = texto => todos(dlg).find(n => n.tag === 'button' && n.children.includes(texto));
   todos(dlg).find(n => n.props?.['aria-label'] === 'Buscar pessoas').value = 'Ana';
@@ -84,7 +84,7 @@ test('inscrição envia confirmação individual explícita e responsável selec
   checks[0].checked = true;
   await todos(dlg).find(n => n.tag === 'form').events.submit({preventDefault() {}});
   const envio = a.chamadas.find(c => c.metodo === 'POST');
-  assert.equal(envio.url, '/api/casais/encontros/e/inscricoes');
+  assert.equal(envio.url, '/api/encontros/e/inscricoes');
   assert.equal(envio.corpo.responsavelMembroId, 'a');
   assert.equal(envio.corpo.participantes[0].confirmado, true);
   assert.equal(envio.corpo.participantes[0].crianca, false);
@@ -95,25 +95,25 @@ test('detalhes carregam inscrições/tarefas e presença chama caminho por IDs',
     if (url.endsWith('/tarefas')) return [];
     return {id:'e', titulo:'Jantar', estado:'aberto'};
   });
-  await a.run('detalheEncontroCasais("e")');
+  await a.run('detalheEncontro("e")');
   const dlg = a.body.children[0];
   todos(dlg).find(n => n.tag === 'button' && n.children.includes('Registrar presença')).props.onclick();
   const confirmacao = a.body.children[1];
   await todos(confirmacao).find(n => n.tag === 'form').events.submit({preventDefault() {}});
   const envio = a.chamadas.find(c => c.metodo === 'PUT');
-  assert.equal(envio.url, '/api/casais/inscricoes/i/participantes/p/presenca');
+  assert.equal(envio.url, '/api/inscricoes/i/participantes/p/presenca');
   assert.equal(envio.corpo.presente, true);
 });
 test('tarefa busca somente responsáveis limitados e envia campos operacionais', async () => {
   const a = ambiente(true, (_, url) => url.endsWith('/responsaveis') ? [{id:'l', nome:'Líder'}] : []);
-  await a.run('formularioTarefaEncontroCasais({id:"e"}, null)');
+  await a.run('formularioTarefaEncontro({id:"e"}, null)');
   const dlg = a.body.children[0];
   const campos = todos(dlg).filter(n => ['input','select','textarea'].includes(n.tag));
   campos[0].value = 'Preparar salão'; campos[1].value = '2026-12-01'; campos[2].value = 'pendente'; campos[3].value = 'l';
   await todos(dlg).find(n => n.tag === 'form').events.submit({preventDefault() {}});
-  assert.equal(a.chamadas[0].url, '/api/casais/responsaveis');
+  assert.equal(a.chamadas[0].url, '/api/encontros/responsaveis');
   const envio = a.chamadas.find(c => c.metodo === 'POST');
-  assert.equal(envio.url, '/api/casais/encontros/e/tarefas');
+  assert.equal(envio.url, '/api/encontros/e/tarefas');
   assert.equal(envio.corpo.responsavelUsuarioId, 'l');
   assert.deepEqual(Object.keys(envio.corpo).sort(), ['descricao', 'estado', 'prazo', 'responsavelUsuarioId']);
 });
@@ -121,7 +121,7 @@ test('salvar encontro impede clique duplo enquanto requisição aguarda', async 
   let liberar;
   const espera = new Promise(resolve => { liberar = resolve; });
   const a = ambiente(true, metodo => metodo === 'POST' ? espera : []);
-  a.run('formularioEncontroCasais()');
+  a.run('formularioEncontro()');
   const form = todos(a.body.children[0]).find(n => n.tag === 'form');
   const primeira = form.events.submit({preventDefault() {}});
   await form.events.submit({preventDefault() {}});
@@ -130,7 +130,7 @@ test('salvar encontro impede clique duplo enquanto requisição aguarda', async 
 });
 test('resumo mostra próximos encontros e tarefas vencidas de encontros antigos sem filtro mensal', async () => {
   const a = ambiente(false, (_, url) => {
-    if (url === '/api/casais/encontros') return [
+    if (url === '/api/encontros') return [
       {id:'antigo', titulo:'Encontro antigo', estado:'encerrado', inicio:'2000-01-01T18:00'},
       {id:'futuro', titulo:'Próximo jantar', estado:'aberto', inicio:'2099-01-01T18:00'},
     ];
@@ -140,13 +140,13 @@ test('resumo mostra próximos encontros e tarefas vencidas de encontros antigos 
     ];
     return [];
   });
-  await a.run('carregarCasaisEncontros()');
+  await a.run('carregarEncontros()');
   const textos = todos(a.raiz).flatMap(n => n.children.filter(f => typeof f === 'string')).join(' ');
   assert.match(textos, /Próximos encontros/);
   assert.match(textos, /Pendência antiga/);
   assert.match(textos, /Vencida/);
   assert.doesNotMatch(textos, /Não exibir concluída/);
-  assert.ok(a.chamadas.some(c => c.url === '/api/casais/encontros/antigo/tarefas'));
+  assert.ok(a.chamadas.some(c => c.url === '/api/encontros/antigo/tarefas'));
 });
 test('roteiro exibe e copia snapshots em ordem sem expor inscritos', async () => {
   const a = ambiente(false, (_, url) => {
@@ -159,7 +159,7 @@ test('roteiro exibe e copia snapshots em ordem sem expor inscritos', async () =>
   });
   // Helper aparece depois do script de encontros, como no painel real.
   a.run('function textoMaterialCasais(m) { return m.titulo + "\\n" + m.objetivo; }');
-  await a.run('detalheEncontroCasais("e")');
+  await a.run('detalheEncontro("e")');
   const dlg = a.body.children[0];
   const copiar = todos(dlg).find(n => n.tag === 'button' && n.children.includes('Copiar roteiro utilizado'));
   assert.ok(copiar);
@@ -172,7 +172,7 @@ test('roteiro exibe e copia snapshots em ordem sem expor inscritos', async () =>
 
 test('convite contém somente informações do encontro e não expõe participantes', () => {
   const a = ambiente();
-  const texto = a.run('textoConviteEncontroCasais({titulo:"Jantar",inicio:"2026-11-20T19:00",local:"Salão",descricao:"Venham celebrar",participantes:[{nome:"Privado"}],usuarioId:"segredo"})');
+  const texto = a.run('textoConviteEncontro({titulo:"Jantar",inicio:"2026-11-20T19:00",local:"Salão",descricao:"Venham celebrar",participantes:[{nome:"Privado"}],usuarioId:"segredo"})');
   assert.match(texto, /Jantar/);
   assert.match(texto, /Salão/);
   assert.match(texto, /Venham celebrar/);
@@ -183,7 +183,7 @@ test('tarefa exibe o nome autorizado do responsável em vez de seu ID', async ()
   const a = ambiente(false, (_, url) => url.endsWith('/tarefas')
     ? [{id:'t', descricao:'Recepção', estado:'pendente', responsavelUsuarioId:'id-interno', responsavelNome:'Liderança Teste'}]
     : url.endsWith('/inscricoes') ? [] : {id:'e', titulo:'Encontro', estado:'aberto'});
-  await a.run('detalheEncontroCasais("e")');
+  await a.run('detalheEncontro("e")');
   const texto = todos(a.body).flatMap(n => n.children.filter(f => typeof f === 'string')).join(' ');
   assert.match(texto, /Liderança Teste/);
   assert.doesNotMatch(texto, /id-interno/);

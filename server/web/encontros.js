@@ -1,12 +1,12 @@
 'use strict';
 
 // Inerte na carga: identidade/permissões só existem após o painel autenticar.
-const tiposEncontroCasais = { jantar: 'Jantar', retiro: 'Retiro', palestra: 'Palestra', encontro_familias: 'Encontro de famílias', outro: 'Outro' };
-const estadosEncontroCasais = { rascunho: 'Rascunho', aberto: 'Aberto', encerrado: 'Encerrado', cancelado: 'Cancelado' };
-const caminhoEncontroCasais = id => '/api/casais/encontros/' + encodeURIComponent(id);
-const listaEncontroCasais = (resposta, chave) => Array.isArray(resposta) ? resposta : resposta[chave] || [];
+const tiposEncontro = { culto: 'Culto', conferencia: 'Conferência', retiro: 'Retiro', acampamento: 'Acampamento', jantar: 'Jantar', palestra: 'Palestra', treinamento: 'Treinamento', encontro_familias: 'Encontro de famílias', outro: 'Outro' };
+const estadosEncontro = { rascunho: 'Rascunho', aberto: 'Aberto', encerrado: 'Encerrado', cancelado: 'Cancelado' };
+const caminhoEncontro = id => '/api/encontros/' + encodeURIComponent(id);
+const listaEncontros = (resposta, chave) => Array.isArray(resposta) ? resposta : resposta[chave] || [];
 
-function janelaEncontroCasais(titulo, salvar) {
+function janelaEncontro(titulo, salvar) {
   const erro = el('p', { role: 'alert' });
   const conteudo = el('div', { class: 'dialogo-coluna' });
   const form = el('form', {}, el('h2', {}, titulo), conteudo);
@@ -30,7 +30,7 @@ function janelaEncontroCasais(titulo, salvar) {
   return { dlg, conteudo, erro };
 }
 
-function campoEncontroCasais(alvo, rotulo, valor = '', { tipo = 'text', opcoes, obrigatorio = false, limite = 300 } = {}) {
+function campoEncontro(alvo, rotulo, valor = '', { tipo = 'text', opcoes, obrigatorio = false, limite = 300 } = {}) {
   const input = el(opcoes ? 'select' : tipo === 'textarea' ? 'textarea' : 'input', {
     type: opcoes || tipo === 'textarea' ? null : tipo,
     required: obrigatorio, maxlength: limite,
@@ -41,33 +41,33 @@ function campoEncontroCasais(alvo, rotulo, valor = '', { tipo = 'text', opcoes, 
   return input;
 }
 
-async function carregarCasaisEncontros() {
-  const alvo = $('casais-encontros-conteudo');
+async function carregarEncontros() {
+  const alvo = $('encontros-conteudo');
   if (!alvo) return;
   try {
-    const encontros = listaEncontroCasais(await api('GET', '/api/casais/encontros'), 'encontros');
+    const encontros = listaEncontros(await api('GET', '/api/encontros'), 'encontros');
     const resumo = el('section', { 'aria-label': 'Resumo de encontros e tarefas' });
-    alvo.replaceChildren(...[el('h3', {}, 'Encontros e famílias'),
+    alvo.replaceChildren(...[el('h3', {}, 'Encontros e inscrições'),
       el('p', { class: 'dica' }, 'Inscrições internas. Cada pessoa é confirmada individualmente. Não registre saúde, documentos ou informações íntimas.'),
       resumo,
-      pode('casaisGerenciar') ? botao('Criar encontro', () => formularioEncontroCasais()) : null,
+      pode('encontros') ? botao('Criar encontro', () => formularioEncontro()) : null,
       ...encontros.map(e => el('article', { class: 'item' }, el('div', {}, el('h4', {}, e.titulo),
-        el('p', {}, `${estadosEncontroCasais[e.estado] || e.estado} · ${new Date(e.inicio).toLocaleString('pt-BR')} · ${e.local || 'Local a definir'}`),
+        el('p', {}, `${estadosEncontro[e.estado] || e.estado} · ${new Date(e.inicio).toLocaleString('pt-BR')} · ${e.local || 'Local a definir'}`),
         el('p', {}, `${e.vagasOcupadas || 0} participantes · ${e.vagasDisponiveis == null ? 'Sem limite de vagas' : e.vagasDisponiveis + ' vagas disponíveis'}`)),
-      botao('Ver encontro', () => detalheEncontroCasais(e.id)))),
+      botao('Ver encontro', () => detalheEncontro(e.id)))),
       encontros.length ? null : el('p', {}, 'Nenhum encontro cadastrado.')].filter(Boolean));
-    await resumoEncontrosCasais(resumo, encontros);
+    await resumoEncontros(resumo, encontros);
   } catch (e) { mensagem(alvo, e.message, false); }
 }
 
-async function resumoEncontrosCasais(alvo, encontros) {
+async function resumoEncontros(alvo, encontros) {
   // Não depende dos filtros de aniversário: pendências antigas continuam visíveis.
   const agora = new Date();
   const hoje = `${agora.getFullYear()}-${String(agora.getMonth() + 1).padStart(2, '0')}-${String(agora.getDate()).padStart(2, '0')}`;
   const proximos = encontros.filter(e => ['rascunho', 'aberto'].includes(e.estado) && new Date(e.inicio) >= agora)
     .sort((a, b) => new Date(a.inicio) - new Date(b.inicio));
   alvo.replaceChildren(...[el('h4', {}, 'Próximos encontros'),
-    ...proximos.map(e => el('div', { class: 'item' }, `${e.titulo} · ${new Date(e.inicio).toLocaleString('pt-BR')}`, botao('Abrir encontro', () => detalheEncontroCasais(e.id)))),
+    ...proximos.map(e => el('div', { class: 'item' }, `${e.titulo} · ${new Date(e.inicio).toLocaleString('pt-BR')}`, botao('Abrir encontro', () => detalheEncontro(e.id)))),
     proximos.length ? null : el('p', {}, 'Nenhum próximo encontro.'),
     el('h4', {}, 'Tarefas abertas e vencidas')].filter(Boolean));
   const tarefas = [];
@@ -76,7 +76,7 @@ async function resumoEncontrosCasais(alvo, encontros) {
   for (let inicio = 0; inicio < encontros.length; inicio += 5) {
     await Promise.all(encontros.slice(inicio, inicio + 5).map(async encontro => {
       try {
-        const lista = listaEncontroCasais(await api('GET', caminhoEncontroCasais(encontro.id) + '/tarefas'), 'tarefas');
+        const lista = listaEncontros(await api('GET', caminhoEncontro(encontro.id) + '/tarefas'), 'tarefas');
         tarefas.push(...lista.filter(t => t.estado === 'pendente').map(t => ({ ...t, encontro })));
       } catch (_) { falhas.push(encontro.titulo); }
     }));
@@ -84,12 +84,12 @@ async function resumoEncontrosCasais(alvo, encontros) {
   tarefas.sort((a, b) => (a.prazo || '9999').localeCompare(b.prazo || '9999'));
   alvo.append(...[...tarefas.map(t => el('div', { class: 'item' },
     el('p', {}, `${t.prazo && t.prazo < hoje ? 'Vencida · ' : ''}${t.descricao} · ${t.prazo || 'Sem prazo'} · ${t.encontro.titulo}`),
-    botao('Ver tarefa no encontro', () => detalheEncontroCasais(t.encontro.id)))),
+    botao('Ver tarefa no encontro', () => detalheEncontro(t.encontro.id)))),
     tarefas.length ? null : el('p', {}, falhas.length ? 'Não foi possível consultar todas as tarefas.' : 'Nenhuma tarefa aberta.'),
     falhas.length ? el('p', { role: 'alert' }, 'Falha ao carregar tarefas de: ' + falhas.join(', ') + '. Reabra a área para tentar novamente.') : null].filter(Boolean));
 }
 
-function roteiroUtilizadoEncontroCasais(alvo, encontro) {
+function roteiroUtilizadoEncontro(alvo, encontro) {
   const roteiro = Array.isArray(encontro.roteiro) ? encontro.roteiro : [];
   alvo.append(el('h3', {}, 'Roteiro utilizado'));
   if (!roteiro.length) { alvo.append(el('p', {}, 'Nenhum material associado.')); return; }
@@ -110,39 +110,39 @@ function roteiroUtilizadoEncontroCasais(alvo, encontro) {
   }), status);
 }
 
-function formularioEncontroCasais(atual, atualizar = carregarCasaisEncontros) {
+function formularioEncontro(atual, atualizar = carregarEncontros) {
   const campos = {};
-  const { conteudo } = janelaEncontroCasais(atual ? 'Editar encontro' : 'Criar encontro', async () => {
+  const { conteudo } = janelaEncontro(atual ? 'Editar encontro' : 'Criar encontro', async () => {
     const corpo = Object.fromEntries(Object.entries(campos).map(([chave, input]) => [chave, input.value]));
     corpo.capacidade = corpo.capacidade === '' ? null : Number(corpo.capacidade);
-    await api(atual ? 'PUT' : 'POST', atual ? caminhoEncontroCasais(atual.id) : '/api/casais/encontros', corpo);
+    await api(atual ? 'PUT' : 'POST', atual ? caminhoEncontro(atual.id) : '/api/encontros', corpo);
     await atualizar();
   });
-  const adicionar = (chave, rotulo, opcoes = {}) => { campos[chave] = campoEncontroCasais(conteudo, rotulo, atual?.[chave] ?? '', opcoes); };
+  const adicionar = (chave, rotulo, opcoes = {}) => { campos[chave] = campoEncontro(conteudo, rotulo, atual?.[chave] ?? '', opcoes); };
   adicionar('titulo', 'Título', { obrigatorio: true, limite: 160 });
-  adicionar('tipo', 'Tipo', { opcoes: tiposEncontroCasais }); if (!atual) campos.tipo.value = 'jantar';
+  adicionar('tipo', 'Tipo', { opcoes: tiposEncontro }); if (!atual) campos.tipo.value = 'jantar';
   adicionar('inicio', 'Início', { tipo: 'datetime-local', obrigatorio: true });
   adicionar('fim', 'Fim', { tipo: 'datetime-local', obrigatorio: true });
   adicionar('local', 'Local'); adicionar('descricao', 'Descrição', { tipo: 'textarea', limite: 3000 });
   adicionar('capacidade', 'Capacidade (todas as pessoas, inclusive crianças)', { tipo: 'number' }); campos.capacidade.min = '1'; campos.capacidade.max = '100000';
-  adicionar('estado', 'Estado', { opcoes: estadosEncontroCasais }); if (!atual) campos.estado.value = 'rascunho';
+  adicionar('estado', 'Estado', { opcoes: estadosEncontro }); if (!atual) campos.estado.value = 'rascunho';
 }
 
-function confirmarEncontroCasais(titulo, texto, executar) {
-  const { conteudo } = janelaEncontroCasais(titulo, executar);
+function confirmarEncontro(titulo, texto, executar) {
+  const { conteudo } = janelaEncontro(titulo, executar);
   conteudo.append(el('p', {}, texto));
 }
 
-function textoConviteEncontroCasais(encontro) {
-  return [`Convite: ${encontro.titulo || 'Encontro de Casais e Família'}`,
+function textoConviteEncontro(encontro) {
+  return [`Convite: ${encontro.titulo || 'Encontro'}`,
     new Date(encontro.inicio).toLocaleString('pt-BR'), encontro.local || 'Local a confirmar',
     encontro.descricao || '', 'Confirme sua participação com a liderança do ministério.'].filter(Boolean).join('\n\n');
 }
 
-function prepararConviteEncontroCasais(encontro) {
-  const janela = janelaEncontroCasais('Prévia do convite');
+function prepararConviteEncontro(encontro) {
+  const janela = janelaEncontro('Prévia do convite');
   const texto = el('textarea', { rows: 9, maxlength: 10000, 'aria-label': 'Texto do convite', style: 'width:100%;box-sizing:border-box' });
-  texto.value = textoConviteEncontroCasais(encontro);
+  texto.value = textoConviteEncontro(encontro);
   const compartilhar = el('a', { class: 'botao secundario', target: '_blank', rel: 'noopener noreferrer' }, 'Abrir no WhatsApp');
   const atualizar = () => { compartilhar.href = 'https://wa.me/?text=' + encodeURIComponent(texto.value); };
   texto.addEventListener('input', atualizar); atualizar();
@@ -153,25 +153,25 @@ function prepararConviteEncontroCasais(encontro) {
     }), compartilhar);
 }
 
-async function detalheEncontroCasais(id) {
-  const janela = janelaEncontroCasais('Detalhes do encontro');
+async function detalheEncontro(id) {
+  const janela = janelaEncontro('Detalhes do encontro');
   try {
     const [e, respostaI, respostaT] = await Promise.all([
-      api('GET', caminhoEncontroCasais(id)), api('GET', caminhoEncontroCasais(id) + '/inscricoes'), api('GET', caminhoEncontroCasais(id) + '/tarefas'),
+      api('GET', caminhoEncontro(id)), api('GET', caminhoEncontro(id) + '/inscricoes'), api('GET', caminhoEncontro(id) + '/tarefas'),
     ]);
-    const gestao = pode('casaisGerenciar'), ativo = e.estado !== 'cancelado';
-    const atualizar = async () => { janela.dlg.close(); await carregarCasaisEncontros(); await detalheEncontroCasais(id); };
-    janela.conteudo.append(el('h3', {}, e.titulo), el('p', {}, e.descricao || ''), el('p', {}, `${e.local || 'Local a definir'} · ${estadosEncontroCasais[e.estado]}`),
+    const gestao = pode('encontros'), ativo = e.estado !== 'cancelado';
+    const atualizar = async () => { janela.dlg.close(); await carregarEncontros(); await detalheEncontro(id); };
+    janela.conteudo.append(el('h3', {}, e.titulo), el('p', {}, e.descricao || ''), el('p', {}, `${e.local || 'Local a definir'} · ${estadosEncontro[e.estado]}`),
       el('p', {}, `${e.vagasOcupadas || 0} participantes · ${e.vagasDisponiveis == null ? 'Sem limite' : e.vagasDisponiveis + ' vagas disponíveis'}`));
-    roteiroUtilizadoEncontroCasais(janela.conteudo, e);
-    if (gestao && ativo) janela.conteudo.append(botao('Preparar convite', () => prepararConviteEncontroCasais(e)));
-    if (gestao && ativo) janela.conteudo.append(botao('Editar encontro', () => formularioEncontroCasais(e, atualizar)),
-      botao('Cancelar encontro', () => confirmarEncontroCasais('Cancelar encontro', 'Novas inscrições e presenças serão bloqueadas. O histórico será preservado.', async () => {
-        await api('POST', caminhoEncontroCasais(id) + '/cancelar', {}); await atualizar();
+    roteiroUtilizadoEncontro(janela.conteudo, e);
+    if (gestao && ativo) janela.conteudo.append(botao('Preparar convite', () => prepararConviteEncontro(e)));
+    if (gestao && ativo) janela.conteudo.append(botao('Editar encontro', () => formularioEncontro(e, atualizar)),
+      botao('Cancelar encontro', () => confirmarEncontro('Cancelar encontro', 'Novas inscrições e presenças serão bloqueadas. O histórico será preservado.', async () => {
+        await api('POST', caminhoEncontro(id) + '/cancelar', {}); await atualizar();
       })));
-    if (gestao && e.estado === 'aberto') janela.conteudo.append(botao('Inscrever pessoas', () => formularioInscricaoCasais(e, atualizar)));
+    if (gestao && e.estado === 'aberto') janela.conteudo.append(botao('Inscrever pessoas', () => formularioInscricao(e, atualizar)));
     janela.conteudo.append(el('h3', {}, 'Inscrições e presença'));
-    const inscricoes = listaEncontroCasais(respostaI, 'inscricoes');
+    const inscricoes = listaEncontros(respostaI, 'inscricoes');
     if (!inscricoes.length) janela.conteudo.append(el('p', {}, 'Nenhuma inscrição.'));
     for (const i of inscricoes) {
       const bloco = el('section', { class: 'item' }, el('h4', {}, i.estado === 'cancelada' ? 'Inscrição cancelada' : 'Inscrição familiar / individual'));
@@ -181,36 +181,36 @@ async function detalheEncontroCasais(id) {
           el('p', {}, `${p.confirmado ? 'Confirmado' : 'Aguardando confirmação'} · ${p.presenteEm ? 'Presente' : 'Sem presença'}`),
           p.presenteEm ? el('small', {}, `Registrado em ${new Date(p.presenteEm).toLocaleString('pt-BR')} por ${p.presencaPorNome || p.presencaPor || 'responsável'}`) : null);
         if (gestao && ativo && i.estado === 'confirmada') {
-          const alterar = corpo => confirmarEncontroCasais('Atualizar participante', `Confirmar alteração para ${nome}?`, async () => {
-            await api('PUT', '/api/casais/inscricoes/' + encodeURIComponent(i.id) + '/participantes/' + encodeURIComponent(p.id) + '/presenca', corpo); await atualizar();
+          const alterar = corpo => confirmarEncontro('Atualizar participante', `Confirmar alteração para ${nome}?`, async () => {
+            await api('PUT', '/api/inscricoes/' + encodeURIComponent(i.id) + '/participantes/' + encodeURIComponent(p.id) + '/presenca', corpo); await atualizar();
           });
           linha.append(...[botao(p.confirmado ? 'Desfazer confirmação' : 'Confirmar pessoa', () => alterar({ confirmado: !p.confirmado })),
             p.confirmado ? botao(p.presenteEm ? 'Desfazer check-in' : 'Registrar presença', () => alterar({ presente: !p.presenteEm })) : null].filter(Boolean));
         }
         bloco.append(linha);
       }
-      if (gestao && i.estado === 'confirmada') bloco.append(botao('Cancelar inscrição', () => confirmarEncontroCasais('Cancelar inscrição', 'As vagas desta inscrição serão liberadas. O histórico será preservado.', async () => {
-        await api('POST', '/api/casais/inscricoes/' + encodeURIComponent(i.id) + '/cancelar', {}); await atualizar();
+      if (gestao && i.estado === 'confirmada') bloco.append(botao('Cancelar inscrição', () => confirmarEncontro('Cancelar inscrição', 'As vagas desta inscrição serão liberadas. O histórico será preservado.', async () => {
+        await api('POST', '/api/inscricoes/' + encodeURIComponent(i.id) + '/cancelar', {}); await atualizar();
       })));
       janela.conteudo.append(bloco);
     }
     janela.conteudo.append(el('h3', {}, 'Tarefas da equipe'));
-    if (gestao && ativo) janela.conteudo.append(botao('Criar tarefa', () => formularioTarefaEncontroCasais(e, null, atualizar)));
-    const tarefas = listaEncontroCasais(respostaT, 'tarefas');
+    if (gestao && ativo) janela.conteudo.append(botao('Criar tarefa', () => formularioTarefaEncontro(e, null, atualizar)));
+    const tarefas = listaEncontros(respostaT, 'tarefas');
     if (!tarefas.length) janela.conteudo.append(el('p', {}, 'Nenhuma tarefa.'));
     for (const t of tarefas) janela.conteudo.append(el('article', { class: 'item' }, el('p', {}, t.descricao),
       el('p', {}, `${t.estado} · ${t.prazo || 'Sem prazo'} · ${t.responsavelNome || (t.responsavelUsuarioId ? 'Responsável indisponível' : 'Sem responsável')}`),
-      gestao ? botao('Editar tarefa', () => formularioTarefaEncontroCasais(e, t, atualizar)) : null));
+      gestao ? botao('Editar tarefa', () => formularioTarefaEncontro(e, t, atualizar)) : null));
   } catch (e) { mensagem(janela.erro, e.message, false); }
 }
 
-async function formularioInscricaoCasais(encontro, atualizar = carregarCasaisEncontros) {
+async function formularioInscricao(encontro, atualizar = carregarEncontros) {
   const selecionados = [];
   let responsavel = '';
-  const { conteudo, erro } = janelaEncontroCasais('Inscrever pessoas', async () => {
+  const { conteudo, erro } = janelaEncontro('Inscrever pessoas', async () => {
     if (!responsavel) throw new Error('Selecione um membro responsável pela inscrição.');
     if (!selecionados.length) throw new Error('Inclua ao menos uma pessoa.');
-    await api('POST', caminhoEncontroCasais(encontro.id) + '/inscricoes', {
+    await api('POST', caminhoEncontro(encontro.id) + '/inscricoes', {
       responsavelMembroId: responsavel,
       participantes: selecionados.map(p => ({ ...(p.membroId ? { membroId: p.membroId } : { nomeAcompanhante: p.nomeAcompanhante }), crianca: p.crianca.checked, confirmado: p.confirmado.checked })),
     }); await atualizar();
@@ -234,32 +234,32 @@ async function formularioInscricaoCasais(encontro, atualizar = carregarCasaisEnc
     const termo = busca.value.trim();
     if (termo.length < 2) { mensagem(erro, 'Digite ao menos duas letras.', false); return; }
     try {
-      const lista = listaEncontroCasais(await api('GET', '/api/casais/pessoas?busca=' + encodeURIComponent(termo)), 'pessoas').slice(0, 30);
+      const lista = listaEncontros(await api('GET', '/api/encontros/pessoas?busca=' + encodeURIComponent(termo)), 'pessoas').slice(0, 30);
       resultados.replaceChildren(...lista.map(p => el('div', {}, p.nome, botao('Selecionar pessoa', () => incluir({ membroId: p.id, nome: p.nome })))), ...(!lista.length ? [el('p', {}, 'Nenhuma pessoa encontrada.')] : []));
     } catch (e) { mensagem(erro, e.message, false); }
   }), resultados, responsavelTexto, pessoas);
-  const convidado = campoEncontroCasais(conteudo, 'Nome de acompanhante sem ficha', '', { limite: 160 });
+  const convidado = campoEncontro(conteudo, 'Nome de acompanhante sem ficha', '', { limite: 160 });
   conteudo.append(botao('Incluir acompanhante', () => {
     if (!convidado.value.trim()) { mensagem(erro, 'Informe o nome do acompanhante.', false); return; }
     incluir({ nomeAcompanhante: convidado.value.trim() }); convidado.value = '';
   }));
 }
 
-async function formularioTarefaEncontroCasais(encontro, atual, atualizar = carregarCasaisEncontros) {
+async function formularioTarefaEncontro(encontro, atual, atualizar = carregarEncontros) {
   const campos = {};
-  const { conteudo, erro } = janelaEncontroCasais(atual ? 'Editar tarefa' : 'Criar tarefa', async () => {
-    await api(atual ? 'PUT' : 'POST', atual ? '/api/casais/tarefas/' + encodeURIComponent(atual.id) : caminhoEncontroCasais(encontro.id) + '/tarefas', {
+  const { conteudo, erro } = janelaEncontro(atual ? 'Editar tarefa' : 'Criar tarefa', async () => {
+    await api(atual ? 'PUT' : 'POST', atual ? '/api/encontros/tarefas/' + encodeURIComponent(atual.id) : caminhoEncontro(encontro.id) + '/tarefas', {
       descricao: campos.descricao.value, responsavelUsuarioId: campos.responsavel.value || null,
       prazo: campos.prazo.value || null, estado: campos.estado.value,
     }); await atualizar();
   });
-  campos.descricao = campoEncontroCasais(conteudo, 'Descrição operacional', atual?.descricao, { tipo: 'textarea', limite: 1000, obrigatorio: true });
-  campos.prazo = campoEncontroCasais(conteudo, 'Prazo', atual?.prazo, { tipo: 'date' });
-  campos.estado = campoEncontroCasais(conteudo, 'Estado', atual?.estado || 'pendente', { opcoes: { pendente: 'Pendente', concluida: 'Concluída', cancelada: 'Cancelada' } });
-  campos.responsavel = campoEncontroCasais(conteudo, 'Responsável autorizado', '', { opcoes: { '': 'Sem responsável' } });
+  campos.descricao = campoEncontro(conteudo, 'Descrição operacional', atual?.descricao, { tipo: 'textarea', limite: 1000, obrigatorio: true });
+  campos.prazo = campoEncontro(conteudo, 'Prazo', atual?.prazo, { tipo: 'date' });
+  campos.estado = campoEncontro(conteudo, 'Estado', atual?.estado || 'pendente', { opcoes: { pendente: 'Pendente', concluida: 'Concluída', cancelada: 'Cancelada' } });
+  campos.responsavel = campoEncontro(conteudo, 'Responsável autorizado', '', { opcoes: { '': 'Sem responsável' } });
   campos.responsavel.disabled = true;
   try {
-    const usuarios = listaEncontroCasais(await api('GET', '/api/casais/responsaveis'), 'responsaveis');
+    const usuarios = listaEncontros(await api('GET', '/api/encontros/responsaveis'), 'responsaveis');
     for (const u of usuarios) campos.responsavel.append(el('option', { value: u.id }, u.nome));
     campos.responsavel.value = atual?.responsavelUsuarioId || '';
     campos.responsavel.disabled = false;

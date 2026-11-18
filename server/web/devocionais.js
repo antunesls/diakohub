@@ -60,16 +60,6 @@ async function carregarDevocionais() {
   await listarDevocionais();
 }
 
-// Link "Devocionais" na página Casais e Família.
-if (typeof document !== 'undefined') {
-  document.addEventListener('click', (e) => {
-    const alvo = e.target && e.target.closest ? e.target.closest('[data-ir-aba]') : null;
-    if (!alvo) return;
-    e.preventDefault();
-    mostrarAba(alvo.dataset.irAba);
-  });
-}
-
 function mostrarAbaDevocionais(nome) {
   devAbaAtual = nome;
   document.querySelectorAll('[data-dev-aba]').forEach((b) => b.setAttribute('aria-selected', String(b.dataset.devAba === nome)));

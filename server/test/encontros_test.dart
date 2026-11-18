@@ -2,17 +2,17 @@ import 'dart:io';
 import 'package:diako_server/auth.dart';
 import 'package:diako_server/permissoes.dart';
 import 'package:diako_server/store.dart';
-import 'package:diako_server/casais_encontros.dart';
+import 'package:diako_server/encontros.dart';
 import 'package:test/test.dart';
 
 void main() {
   late Store store;
   late Directory pasta;
-  late CasaisEncontros dominio;
+  late Encontros dominio;
   final lider =
       Conta(id: 'l', nome: 'Líder', login: 'lider', perfil: Perfil.liderCasais);
-  final consulta =
-      Conta(id: 's', nome: 'Secretaria', login: 's', perfil: Perfil.secretaria);
+  final semEncontros =
+      Conta(id: 's', nome: 'Sem encontros', login: 's', perfil: Perfil.midia);
   Map<String, dynamic> dados() => {
         'titulo': 'Jantar',
         'tipo': 'jantar',
@@ -38,7 +38,7 @@ void main() {
       {'id': 'b', 'nome': 'Bia'},
       {'id': 'c', 'nome': 'Caio'}
     ]);
-    dominio = CasaisEncontros(store,
+    dominio = Encontros(store,
         agora: () => DateTime(2026, 11, 18),
         responsavelValido: (id) => id == 'l');
   });
@@ -48,7 +48,7 @@ void main() {
   });
   test('valida gestão, intervalo, estados e campos estritos', () async {
     await expectLater(
-        dominio.criarEncontro(dados(), conta: consulta), throwsStateError);
+        dominio.criarEncontro(dados(), conta: semEncontros), throwsStateError);
     for (final alteracao in [
       {'fim': '2026-11-01T10:00'},
       {'estado': 'inventado'},
@@ -60,8 +60,10 @@ void main() {
           dominio.criarEncontro({...dados(), ...alteracao}, conta: lider),
           throwsFormatException);
     }
-    final e = await dominio.criarEncontro(dados(), conta: lider);
-    expect(e['usuarioId'], 'l');
+    final equipe = Conta(id: 'e', nome: 'Equipe de eventos', login: 'equipe',
+        perfil: Perfil(id: 'equipe-eventos', nome: 'Equipe de eventos', permissoes: {Permissao.encontros}));
+    final e = await dominio.criarEncontro(dados(), conta: equipe);
+    expect(e['usuarioId'], 'e');
     expect(dominio.listarEncontros(), hasLength(1));
     e['titulo'] = 'não persistir';
     expect(dominio.encontro(e['id'])['titulo'], 'Jantar');
@@ -154,7 +156,7 @@ void main() {
       () async {
     final e = await dominio
         .criarEncontro({...dados(), 'capacidade': 1}, conta: lider);
-    final outro = CasaisEncontros(store);
+    final outro = Encontros(store);
     final resultados = await Future.wait([
       dominio
           .inscrever(e['id'], inscricao('a'), conta: lider)
@@ -245,7 +247,7 @@ void main() {
     final t = await dominio.criarTarefa(
         e['id'], {'descricao': 'Preparar', 'responsavelUsuarioId': 'l'},
         conta: lider);
-    final revogado = CasaisEncontros(store, responsavelValido: (_) => false);
+    final revogado = Encontros(store, responsavelValido: (_) => false);
     await expectLater(
         revogado.editarTarefa(t['id'], {'estado': 'concluida'}, conta: lider),
         throwsFormatException);
@@ -264,7 +266,7 @@ void main() {
     await isolado.carregar();
     try {
       await isolado.salvar('membros', {'id': 'a', 'nome': 'Ana'});
-      final d = CasaisEncontros(isolado);
+      final d = Encontros(isolado);
       final e =
           await d.criarEncontro({...dados(), 'capacidade': 1}, conta: lider);
       falhar = true;
@@ -283,7 +285,7 @@ void main() {
       () async {
     final e = await dominio.criarEncontro(dados(), conta: lider);
     final roteiro = store.serializarCasais(() async {
-      final atual = {...store.buscar('casaisEncontros', e['id'])!};
+      final atual = {...store.buscar('encontros', e['id'])!};
       await Future<void>.delayed(const Duration(milliseconds: 5));
       atual['roteiro'] = [
         {
@@ -292,7 +294,7 @@ void main() {
           'conteudoSnapshot': {'titulo': 'Atividade'}
         }
       ];
-      await store.salvar('casaisEncontros', atual);
+      await store.salvar('encontros', atual);
     });
     final edicao = dominio.editarEncontro(e['id'], {'titulo': 'Novo título'},
         conta: lider);

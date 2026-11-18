@@ -11,6 +11,7 @@ const MENU_GRUPOS = [
     { id: 'mensagens', titulo: 'Mensagens', permissao: 'mensagens', badge: 'badge-mensagens' },
     { id: 'membros', titulo: 'Membros', permissao: 'membros', badge: 'badge-cadastros' },
     { id: 'casais', titulo: 'Casais e Família', permissao: 'casais' },
+    { id: 'encontros', titulo: 'Encontros e inscrições', permissao: 'encontros' },
     { id: 'ministerios', titulo: 'Ministérios', permissao: 'ministerios' },
   ] },
   { nome: 'Cultos', itens: [

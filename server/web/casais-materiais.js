@@ -38,9 +38,8 @@ async function carregarCasaisMateriais() {
         el('a', { href: '/devocional?trilha=familia' }, 'Devocionais para família')];
     const acoes = el('div', { class: 'acoes', style: 'display:flex;flex-wrap:wrap;gap:8px' }, ...links);
     const gerir = pode('casaisGerenciar');
-    if (gerir) {
-      acoes.append(botao('Novo material', () => editor()), botao('Associar ao encontro', associar));
-    }
+    if (gerir) acoes.append(botao('Novo material', () => editor()));
+    if (gerir && pode('encontros')) acoes.append(botao('Associar ao encontro', associar));
     raiz.replaceChildren(el('h3', {}, 'Materiais e atividades'), acoes, filtros, status, lista, trabalho);
 
     function previa(material) {
@@ -131,7 +130,7 @@ async function carregarCasaisMateriais() {
 
     async function associar() {
       try {
-        const resposta = await api('GET', '/api/casais/encontros');
+        const resposta = await api('GET', '/api/encontros');
         const encontros = Array.isArray(resposta) ? resposta : resposta.encontros || [];
         const ativos = materiais.filter(m => !m.arquivado);
         if (!encontros.length || !ativos.length) {
@@ -159,7 +158,7 @@ async function carregarCasaisMateriais() {
           if (salvar.disabled || !confirm('Substituir o roteiro deste encontro pelas versões atuais dos materiais selecionados?')) return;
           salvar.disabled = true;
           try {
-            await api('PUT', '/api/casais/encontros/' + encodeURIComponent(encontro.value) + '/roteiro', { materiaisIds: [...selecionados] });
+            await api('PUT', '/api/encontros/' + encodeURIComponent(encontro.value) + '/roteiro', { materiaisIds: [...selecionados] });
             mensagem(aviso, 'Roteiro salvo com cópia das versões utilizadas.');
           } catch (err) { mensagem(aviso, err.message, false); }
           finally { salvar.disabled = false; }

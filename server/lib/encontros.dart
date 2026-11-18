@@ -4,10 +4,11 @@ import 'auth.dart';
 import 'permissoes.dart';
 import 'store.dart';
 
-/// Operações internas; leituras devem ser protegidas por `casais` nas rotas.
+/// Encontros, inscrições, presença e tarefas de qualquer público. Não depende de
+/// vínculo de casal; as leituras são protegidas por `encontros` nas rotas.
 /// A fila é compartilhada por Store, inclusive entre instâncias deste serviço.
-class CasaisEncontros {
-  CasaisEncontros(this.store,
+class Encontros {
+  Encontros(this.store,
       {DateTime Function()? agora, this.responsavelValido})
       : _agora = agora ?? DateTime.now;
   final Store store;
@@ -15,7 +16,7 @@ class CasaisEncontros {
   final bool Function(String id)? responsavelValido;
   Future<T> _alterar<T>(Conta conta, Future<T> Function() operacao) {
     return store.serializarCasais(() {
-      if (!conta.pode(Permissao.casaisGerenciar))
+      if (!conta.pode(Permissao.encontros))
         throw StateError('Sem permissão para gerenciar encontros.');
       return operacao();
     });
@@ -78,12 +79,12 @@ class CasaisEncontros {
         'alteradoPor': conta.id,
       };
   int _ocupadas(String id) => store
-      .listar('casaisInscricoes')
+      .listar('inscricoes')
       .where((i) => i['encontroId'] == id && i['estado'] == 'confirmada')
       .fold(0, (n, i) => n + (i['participantes'] as List).length);
   List<Map<String, dynamic>> listarEncontros() {
     final lista = store
-        .listar('casaisEncontros')
+        .listar('encontros')
         .map((e) => encontro(e['id'] as String))
         .toList();
     lista.sort((a, b) =>
@@ -92,7 +93,7 @@ class CasaisEncontros {
   }
 
   Map<String, dynamic> encontro(String id) {
-    final doc = _buscar('casaisEncontros', id);
+    final doc = _buscar('encontros', id);
     final ocupadas = _ocupadas(id);
     return {
       ...doc,
@@ -105,7 +106,8 @@ class CasaisEncontros {
 
   Map<String, dynamic> _validarEncontro(Map corpo) {
     final titulo = _texto(corpo['titulo'], 'Título', 160, obrigatorio: true);
-    if (!{'jantar', 'retiro', 'palestra', 'encontro_familias', 'outro'}
+    if (!{'culto', 'conferencia', 'retiro', 'acampamento', 'jantar', 'palestra', 'treinamento',
+          'encontro_familias', 'outro'}
             .contains(corpo['tipo']) ||
         !{'rascunho', 'aberto', 'encerrado', 'cancelado'}
             .contains(corpo['estado']))
@@ -149,14 +151,14 @@ class CasaisEncontros {
           ..._validarEncontro({'estado': 'rascunho', ...corpo}),
           ..._autoria(conta, novo: true)
         };
-        await store.salvar('casaisEncontros', doc);
+        await store.salvar('encontros', doc);
         return encontro(doc['id'] as String);
       });
   Future<Map<String, dynamic>> editarEncontro(String id, Map corpo,
           {required Conta conta}) =>
       _alterar(conta, () async {
         _campos(corpo, _camposEncontro);
-        final antigo = _buscar('casaisEncontros', id);
+        final antigo = _buscar('encontros', id);
         if (antigo['estado'] == 'cancelado')
           throw const FormatException(
               'Encontro cancelado não pode ser editado.');
@@ -169,16 +171,16 @@ class CasaisEncontros {
             'canceladoEm': _agora().toIso8601String(),
             'canceladoPor': conta.id
           });
-        await store.salvar('casaisEncontros', doc);
+        await store.salvar('encontros', doc);
         return encontro(id);
       });
   Future<Map<String, dynamic>> cancelarEncontro(String id,
           {required Conta conta}) =>
       editarEncontro(id, {'estado': 'cancelado'}, conta: conta);
   List<Map<String, dynamic>> listarInscricoes(String encontroId) {
-    _buscar('casaisEncontros', encontroId);
+    _buscar('encontros', encontroId);
     return store
-        .listar('casaisInscricoes')
+        .listar('inscricoes')
         .where((i) => i['encontroId'] == encontroId)
         .map(_copia)
         .map((i) {
@@ -198,7 +200,7 @@ class CasaisEncontros {
           {required Conta conta}) =>
       _alterar(conta, () async {
         _campos(corpo, {'responsavelMembroId', 'participantes'});
-        final e = _buscar('casaisEncontros', encontroId);
+        final e = _buscar('encontros', encontroId);
         if (e['estado'] != 'aberto')
           throw const FormatException(
               'Encontro não está aberto para inscrições.');
@@ -258,13 +260,13 @@ class CasaisEncontros {
           'estado': 'confirmada',
           ..._autoria(conta, novo: true)
         };
-        await store.salvar('casaisInscricoes', doc);
+        await store.salvar('inscricoes', doc);
         return _copia(doc);
       });
   Future<Map<String, dynamic>> cancelarInscricao(String id,
           {required Conta conta}) =>
       _alterar(conta, () async {
-        final doc = _buscar('casaisInscricoes', id);
+        final doc = _buscar('inscricoes', id);
         if (doc['estado'] == 'cancelada') return doc;
         doc.addAll({
           'estado': 'cancelada',
@@ -272,7 +274,7 @@ class CasaisEncontros {
           'canceladoPor': conta.id,
           ..._autoria(conta)
         });
-        await store.salvar('casaisInscricoes', doc);
+        await store.salvar('inscricoes', doc);
         return _copia(doc);
       });
   Future<Map<String, dynamic>> registrarPresenca(
@@ -283,9 +285,9 @@ class CasaisEncontros {
         if (corpo.isEmpty || corpo.values.any((v) => v is! bool))
           throw const FormatException(
               'Informe presença ou confirmação booleana.');
-        final i = _buscar('casaisInscricoes', inscricaoId),
-            e = _buscar('casaisEncontros',
-                _buscar('casaisInscricoes', inscricaoId)['encontroId']);
+        final i = _buscar('inscricoes', inscricaoId),
+            e = _buscar('encontros',
+                _buscar('inscricoes', inscricaoId)['encontroId']);
         if (i['estado'] != 'confirmada' ||
             !{'aberto', 'encerrado'}.contains(e['estado']))
           throw const FormatException(
@@ -309,13 +311,13 @@ class CasaisEncontros {
           p['presencaAlteradaPor'] = conta.id;
         }
         i.addAll(_autoria(conta));
-        await store.salvar('casaisInscricoes', i);
+        await store.salvar('inscricoes', i);
         return _copia(i);
       });
   List<Map<String, dynamic>> listarTarefas(String encontroId) {
-    _buscar('casaisEncontros', encontroId);
+    _buscar('encontros', encontroId);
     return store
-        .listar('casaisTarefas')
+        .listar('tarefasEncontros')
         .where((t) => t['encontroId'] == encontroId)
         .map(_copia)
         .toList();
@@ -350,7 +352,7 @@ class CasaisEncontros {
           {required Conta conta}) =>
       _alterar(conta, () async {
         _campos(corpo, _camposTarefa);
-        final e = _buscar('casaisEncontros', encontroId);
+        final e = _buscar('encontros', encontroId);
         if (e['estado'] == 'cancelado')
           throw const FormatException('Encontro cancelado.');
         final doc = {
@@ -359,20 +361,20 @@ class CasaisEncontros {
           ..._validarTarefa(corpo),
           ..._autoria(conta, novo: true)
         };
-        await store.salvar('casaisTarefas', doc);
+        await store.salvar('tarefasEncontros', doc);
         return _copia(doc);
       });
   Future<Map<String, dynamic>> editarTarefa(String id, Map corpo,
           {required Conta conta}) =>
       _alterar(conta, () async {
         _campos(corpo, _camposTarefa);
-        final antigo = _buscar('casaisTarefas', id);
+        final antigo = _buscar('tarefasEncontros', id);
         final doc = {
           ...antigo,
           ..._validarTarefa({...antigo, ...corpo}),
           ..._autoria(conta)
         };
-        await store.salvar('casaisTarefas', doc);
+        await store.salvar('tarefasEncontros', doc);
         return _copia(doc);
       });
 }

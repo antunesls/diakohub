@@ -22,7 +22,7 @@ void main() {
   test('perfil líder consulta casais e publica, sem acesso ao cadastro completo', () {
     final lider = Perfil.porNome('liderCasais');
     expect(lider, isNotNull);
-    expect(lider!.permissoes.map((p) => p.name), containsAll(['casais', 'devocionais']));
+    expect(lider!.permissoes.map((p) => p.name), containsAll(['casais', 'encontros', 'devocionais']));
     expect(lider.pode(Permissao.membros), isFalse);
     expect(lider.pode(Permissao.projetar), isFalse);
     expect(lider.pode(Permissao.admin), isFalse);

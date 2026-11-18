@@ -21,6 +21,11 @@ import 'store.dart';
 /// Formato dos arquivos de backup (manifest.json).
 const versaoBackup = 2;
 
+/// Coleções com pessoas e vínculos que precisam ser validadas juntas na restauração.
+const _colecoesMinisterio = [
+  'casaisContatos', 'casaisEnvios', 'casaisMateriais', 'encontros', 'inscricoes', 'tarefasEncontros',
+];
+
 /// Backups em .zip: dados, histórico, cartazes, fotos da galeria do site, fundos das TVs, artes dos QR e configurações públicas
 /// (sem senha nem chaves).
 /// Diário no horário configurado, sob demanda pelo painel e antes de cada restauração.
@@ -453,15 +458,15 @@ class Restauracao {
       }
     }
     if (colecoes.isEmpty) throw const FormatException('O arquivo não contém dados do DiakoHub.');
-    // Uma cópia anterior à criação do ministério não possui esses arquivos.
+    // Uma cópia anterior à criação destes módulos não possui esses arquivos.
     // Ao restaurar o cadastro inteiro, não deixar dados posteriores apontando
     // para membros que já não existem no snapshot restaurado.
     if (colecoes.containsKey('membros')) {
-      for (final nome in Store.colecoes.where((nome) => nome.startsWith('casais'))) {
+      for (final nome in _colecoesMinisterio) {
         colecoes.putIfAbsent(nome, () => <Map<String, dynamic>>[]);
       }
     }
-    _validarCasais(colecoes);
+    _validarMinisterio(colecoes);
 
     final cartazes = <String, List<int>>{};
     var temPastaCartazes = false;
@@ -662,11 +667,11 @@ class Restauracao {
   // A restauração confere o contrato persistido, não as permissões atuais de
   // contas (que não fazem parte do ZIP), nem o vínculo conjugal atual: histórico
   // pode legitimamente anteceder uma alteração no cadastro.
-  void _validarCasais(Map<String, List<Map<String, dynamic>>> colecoes) {
+  void _validarMinisterio(Map<String, List<Map<String, dynamic>>> colecoes) {
     List<Map<String, dynamic>> documentos(String nome) => colecoes[nome] ?? store.listar(nome);
     bool texto(Object? v) => v is String && v.trim().isNotEmpty;
     void exigir(bool valido) {
-      if (!valido) throw const FormatException('Backup com dados inválidos de Casais e Família.');
+      if (!valido) throw const FormatException('Backup com dados inválidos de Casais, Encontros ou Materiais.');
     }
     void data(Object? v, {bool dia = false}) {
       exigir(v is String);
@@ -713,15 +718,15 @@ class Restauracao {
       }
       exigir(total <= 20000);
     }
-    for (final e in colecoes.entries.where((e) => e.key.startsWith('casais'))) {
+    for (final nome in _colecoesMinisterio) {
       final ids = <String>{};
-      for (final d in e.value) {
+      for (final d in colecoes[nome] ?? <Map<String, dynamic>>[]) {
         exigir(texto(d['id']));
         exigir(ids.add(d['id'] as String));
       }
     }
     final membros = documentos('membros').map((d) => d['id']).whereType<String>().toSet();
-    final encontros = documentos('casaisEncontros').map((d) => d['id']).whereType<String>().toSet();
+    final encontros = documentos('encontros').map((d) => d['id']).whereType<String>().toSet();
     final materiais = {for (final d in documentos('casaisMateriais')) d['id']: d};
     for (final d in colecoes['casaisContatos'] ?? <Map<String, dynamic>>[]) {
       exigir(d.keys.every({'id', 'membrosIds', 'casalChave', 'tipo', 'ocorrencia',
@@ -750,11 +755,12 @@ class Restauracao {
       inteiro(d['versao'], 1, 0x7fffffff);
       exigir(d['arquivado'] is bool);
     }
-    for (final d in colecoes['casaisEncontros'] ?? <Map<String, dynamic>>[]) {
+    for (final d in colecoes['encontros'] ?? <Map<String, dynamic>>[]) {
       campos(d, {...camposAutoria, 'titulo', 'tipo', 'inicio', 'fim', 'local', 'descricao', 'capacidade', 'estado', 'roteiro'});
       autoria(d);
       limite(d['titulo'], 160, obrigatorio: true);
-      exigir({'jantar', 'retiro', 'palestra', 'encontro_familias', 'outro'}.contains(d['tipo']));
+      exigir({'culto', 'conferencia', 'retiro', 'acampamento', 'jantar', 'palestra', 'treinamento',
+        'encontro_familias', 'outro'}.contains(d['tipo']));
       exigir({'rascunho', 'aberto', 'encerrado', 'cancelado'}.contains(d['estado']));
       data(d['inicio']);
       data(d['fim']);
@@ -785,7 +791,7 @@ class Restauracao {
     }
     final ocupacaoPorEncontro = <String, int>{};
     final membrosPorEncontro = <String, Set<String>>{};
-    for (final d in colecoes['casaisInscricoes'] ?? <Map<String, dynamic>>[]) {
+    for (final d in colecoes['inscricoes'] ?? <Map<String, dynamic>>[]) {
       campos(d, {...camposAutoria, 'encontroId', 'responsavelMembroId', 'participantes', 'estado'});
       autoria(d);
       exigir(encontros.contains(d['encontroId']) && membros.contains(d['responsavelMembroId']));
@@ -828,12 +834,12 @@ class Restauracao {
         ocupacaoPorEncontro[id] = (ocupacaoPorEncontro[id] ?? 0) + participantes.length;
       }
     }
-    for (final encontro in documentos('casaisEncontros')) {
+    for (final encontro in documentos('encontros')) {
       if (encontro['capacidade'] is int) {
         exigir((ocupacaoPorEncontro[encontro['id']] ?? 0) <= encontro['capacidade']);
       }
     }
-    for (final d in colecoes['casaisTarefas'] ?? <Map<String, dynamic>>[]) {
+    for (final d in colecoes['tarefasEncontros'] ?? <Map<String, dynamic>>[]) {
       campos(d, {...camposAutoria, 'encontroId', 'descricao', 'responsavelUsuarioId', 'prazo', 'estado'});
       autoria(d);
       exigir(encontros.contains(d['encontroId']));
