@@ -30,7 +30,7 @@ void main() {
     expect(e.html, contains('#confirmar=TOKEN'));
   });
   test('SMTP ausente produz falha clara sem abrir conexão', () async {
-    final tmp = await Directory(r'C:\Users\antunesls\AppData\Local\Temp\opencode').createTemp('email_devocionais_');
+    final tmp = await Directory.systemTemp.createTemp('email_devocionais_');
     try {
       final config = Config.lerJson('{"senhaAdmin":"senha-teste"}', pastaBase: tmp.path);
       final cfg = await Configuracoes.carregar(config, urlDetectada: 'https://igreja.test');

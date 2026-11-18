@@ -57,7 +57,7 @@ void main() {
       {'membrosIds': ids, 'incluirAssinantes': assinantes, 'confirmar': confirmar};
 
   setUp(() async {
-    tmp = await Directory(r'C:\Users\antunesls\AppData\Local\Temp\opencode').createTemp('devocionais_');
+    tmp = await Directory.systemTemp.createTemp('devocionais_');
     store = Store(tmp.path);
     await store.carregar();
     agora = DateTime.utc(2026, 11, 18, 12);
