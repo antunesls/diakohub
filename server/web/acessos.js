@@ -285,7 +285,8 @@ function desenharFicha() {
     }, 'perigo pequeno'),
   ];
 
-  ficha.replaceChildren(
+  // replaceChildren não ignora null (vira o texto "null"): filtrar antes de trocar os filhos.
+  ficha.replaceChildren(...[
     el('div', { class: 'ficha-topo' }, el('h3', {}, u.nome), el('code', {}, u.login),
       el('span', { class: 'dica' }, u.ativo ? 'ativa' : 'desativada', ' · último acesso: ', u.ultimoAcesso ? dataCurta(u.ultimoAcesso) : 'nunca',
         u.membroId ? ' · ligada ao cadastro de membro' : '')),
@@ -295,7 +296,8 @@ function desenharFicha() {
       descricoes.length ? el('ul', { class: 'dica', style: 'margin:4px 0 0;padding-left:18px' }, descricoes) : null),
     pendente,
     el('div', { class: 'bloco' }, el('span', { class: 'rotulo' }, rascunho ? 'O que vai poder fazer' : 'O que pode fazer'), blocoPermissoes(ids)),
-    el('div', { class: 'acoes' }, acoes, saida));
+    el('div', { class: 'acoes' }, acoes, saida),
+  ].filter(Boolean));
 }
 
 /** Senha temporária com a prévia do texto para o WhatsApp (cartaoEntregaAcesso, em comum.js). */

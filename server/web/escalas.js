@@ -410,10 +410,12 @@ function opcoesPessoas(select) {
   // Quem tem o ministério desta escala primeiro.
   const daEscala = pessoas.filter((p) => p[escala.tipo]);
   const outros = pessoas.filter((p) => !p[escala.tipo]);
-  select.replaceChildren(
+  // replaceChildren não ignora null (vira o texto "null"): filtrar os grupos vazios.
+  select.replaceChildren(...[
     el('option', { value: '' }, 'Escolha…'),
     daEscala.length ? el('optgroup', { label: NOMES_ESCALA[escala.tipo] }, ...daEscala.map((p) => el('option', { value: p.id }, p.nome))) : null,
-    outros.length ? el('optgroup', { label: 'Outros membros' }, ...outros.map((p) => el('option', { value: p.id }, p.nome))) : null);
+    outros.length ? el('optgroup', { label: 'Outros membros' }, ...outros.map((p) => el('option', { value: p.id }, p.nome))) : null,
+  ].filter(Boolean));
 }
 
 $('escala-indisponivel').addEventListener('click', () => {
