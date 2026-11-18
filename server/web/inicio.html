@@ -102,10 +102,18 @@
   .evento a { font-size: 14px; font-weight: 600; white-space: nowrap; }
   .caixa { background: var(--superficie); border: 1px solid var(--linha); border-radius: 18px; padding: 18px 20px; display: flex; flex-direction: column; gap: 10px; }
   .caixa h2 { margin: 0; font-size: 21px; }
-  .devocional-semana .sobretitulo { margin: 0 0 -4px; }
-  .devocional-semana p { margin: 0; line-height: 1.55; }
+  /* Devocional da semana: faixa de largura total, logo abaixo dos atalhos. */
+  .devocional-semana { display: grid; gap: 12px 24px; align-items: end; }
+  .devocional-semana .devocional-conteudo { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+  .devocional-semana .sobretitulo { margin: 0; }
+  .devocional-semana h2 { margin: 0; font-size: 24px; }
+  .devocional-semana p { margin: 0; line-height: 1.55; max-width: 78ch; }
   .devocional-semana .referencia { font-family: var(--fonte-titulo); font-style: italic; color: var(--primaria-escura); }
   .devocional-semana .acoes-devocional { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; }
+  @media (min-width: 760px) {
+    .devocional-semana { grid-template-columns: minmax(0, 1fr) auto; }
+    .devocional-semana .acoes-devocional { justify-content: flex-end; }
+  }
   .par { display: flex; justify-content: space-between; gap: 12px; }
   .endereco { color: var(--suave); padding-top: 10px; border-top: 1px solid var(--linha); white-space: pre-line; }
   .pix { display: flex; gap: 16px; align-items: center; }
@@ -199,6 +207,7 @@
   <section class="largura-toda" id="avisos" aria-labelledby="avisos-t" hidden></section>
   <section class="destaque largura-toda" id="hoje" aria-labelledby="hoje-t" hidden></section>
   <nav class="acoes-site largura-toda" id="atalhos" aria-label="Fale com a igreja" hidden></nav>
+  <section class="largura-toda caixa devocional-semana" id="devocional" aria-labelledby="devocional-t" hidden></section>
   <div class="coluna" id="principal" hidden></div>
   <aside class="coluna" id="lateral" hidden></aside>
 </main>
@@ -384,7 +393,8 @@
     }
 
     // Atalhos em faixa, logo abaixo do destaque, em vez de empilhados na coluna da direita.
-    $('atalhos').replaceChildren(
+    // Sem Pix o terceiro atalho não existe: filtrar evita o texto "null" na faixa.
+    const faixaAtalhos = [
         el('a', { class: 'acao principal', href: '/oracao' },
           // Mão segurando um coração: o mesmo símbolo dos motivos de oração no app do tablet.
           el('span', { class: 'icone-acao' }, svg(
@@ -403,7 +413,9 @@
           el('span', { class: 'icone-acao' }, svg(
             '<path d="M12 21s-7-4.5-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 11c0 5.5-7 10-7 10z"></path>',
             'var(--primaria)')),
-          el('strong', {}, 'Dízimos e ofertas'), el('span', {}, 'Contribua pelo Pix')) : null);
+          el('strong', {}, 'Dízimos e ofertas'), el('span', {}, 'Contribua pelo Pix')) : null,
+    ].filter(Boolean);
+    $('atalhos').replaceChildren(...faixaAtalhos);
     $('atalhos').hidden = false;
 
     const lateral = [];
@@ -416,18 +428,21 @@
     }
 
     // Devocional da semana: o mais recente publicado (o servidor só manda quando há um).
+    // Fica em faixa própria, de largura total, logo abaixo dos atalhos.
     if (s.devocional) {
       const d = s.devocional;
       menu.push(['devocional', 'Devocionais', '/devocional']);
-      lateral.push(el('section', { class: 'caixa devocional-semana', id: 'devocional', 'aria-labelledby': 'devocional-t' },
-        el('p', { class: 'sobretitulo' }, 'Devocional da semana'),
-        el('h2', { id: 'devocional-t' }, d.titulo),
-        d.serie ? el('p', { class: 'dica' }, 'Série ' + d.serie + (d.serieParte ? ' · parte ' + d.serieParte : '')) : null,
-        d.referencia ? el('p', { class: 'referencia' }, d.referencia) : null,
-        d.resumo ? el('p', {}, d.resumo) : null,
+      $('devocional').replaceChildren(
+        el('div', { class: 'devocional-conteudo' },
+          el('p', { class: 'sobretitulo' }, 'Devocional da semana'),
+          el('h2', { id: 'devocional-t' }, d.titulo),
+          d.serie ? el('p', { class: 'dica' }, 'Série ' + d.serie + (d.serieParte ? ' · parte ' + d.serieParte : '')) : null,
+          d.referencia ? el('p', { class: 'referencia' }, d.referencia) : null,
+          d.resumo ? el('p', {}, d.resumo) : null),
         el('div', { class: 'acoes-devocional' },
           el('a', { class: 'botao', href: d.url }, 'Ler o devocional'),
-          el('a', { href: '/devocional' }, 'Todos os devocionais'))));
+          el('a', { href: '/devocional' }, 'Todos os devocionais')));
+      $('devocional').hidden = false;
     }
 
     if (s.pix) {
