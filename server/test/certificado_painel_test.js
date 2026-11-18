@@ -11,7 +11,8 @@ test('ficha do membro tem o botão do certificado e o painel carrega o script', 
   const painel = web('painel.js');
   assert.match(html, /id="certificado-da-ficha"[^>]*hidden/);
   assert.match(html, /<dialog id="dlg-certificado">/);
-  assert.ok(html.indexOf('/painel.js?v=29') < html.indexOf('/certificado.js?v=1'));
+  assert.ok(html.indexOf('/painel.js?v=30') !== -1);
+  assert.ok(html.indexOf('/painel.js?v=30') < html.indexOf('/certificado.js?v=1'));
   // Só aparece para quem tem data de batismo (o servidor recusa sem ela).
   assert.match(painel, /\$\('certificado-da-ficha'\)\.hidden = !m\.dataBatismo/);
   assert.match(painel, /Certificado\.abrir\(fichaAberta\)/);

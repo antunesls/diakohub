@@ -453,6 +453,15 @@ class Restauracao {
       }
     }
     if (colecoes.isEmpty) throw const FormatException('O arquivo não contém dados do DiakoHub.');
+    // Uma cópia anterior à criação do ministério não possui esses arquivos.
+    // Ao restaurar o cadastro inteiro, não deixar dados posteriores apontando
+    // para membros que já não existem no snapshot restaurado.
+    if (colecoes.containsKey('membros')) {
+      for (final nome in Store.colecoes.where((nome) => nome.startsWith('casais'))) {
+        colecoes.putIfAbsent(nome, () => <Map<String, dynamic>>[]);
+      }
+    }
+    _validarCasais(colecoes);
 
     final cartazes = <String, List<int>>{};
     var temPastaCartazes = false;
@@ -648,5 +657,205 @@ class Restauracao {
       resumo.configuracoes = true;
     }
     return resumo;
+  }
+
+  // A restauração confere o contrato persistido, não as permissões atuais de
+  // contas (que não fazem parte do ZIP), nem o vínculo conjugal atual: histórico
+  // pode legitimamente anteceder uma alteração no cadastro.
+  void _validarCasais(Map<String, List<Map<String, dynamic>>> colecoes) {
+    List<Map<String, dynamic>> documentos(String nome) => colecoes[nome] ?? store.listar(nome);
+    bool texto(Object? v) => v is String && v.trim().isNotEmpty;
+    void exigir(bool valido) {
+      if (!valido) throw const FormatException('Backup com dados inválidos de Casais e Família.');
+    }
+    void data(Object? v, {bool dia = false}) {
+      exigir(v is String);
+      final s = v as String;
+      exigir(RegExp(dia ? r'^\d{4}-\d{2}-\d{2}$' :
+          r'^\d{4}-\d{2}-\d{2}(T\d{2}:\d{2}(:\d{2}(\.\d{1,6})?)?(Z|[+-]\d{2}:\d{2})?)?$').hasMatch(s));
+      final d = DateTime.tryParse(s.substring(0, 10));
+      exigir(d != null && d.year >= 1900 && d.year <= 2200 &&
+          d.toIso8601String().substring(0, 10) == s.substring(0, 10) && DateTime.tryParse(s) != null);
+      if (s.length > 10) {
+        exigir(int.parse(s.substring(11, 13)) <= 23 && int.parse(s.substring(14, 16)) <= 59);
+        if (s.length > 16 && s[16] == ':') exigir(int.parse(s.substring(17, 19)) <= 59);
+      }
+    }
+    void campos(Map d, Set<String> permitidos) => exigir(d.keys.every(permitidos.contains));
+    void limite(Object? v, int tamanho, {bool obrigatorio = false}) =>
+        exigir(v is String && v.length <= tamanho && (!obrigatorio || texto(v)));
+    void inteiro(Object? v, int min, int max) => exigir(v is int && v >= min && v <= max);
+    const camposAutoria = {'id', 'criadoEm', 'usuarioId', 'usuarioNome', 'alteradoEm', 'alteradoPor',
+      'atualizadoEm', 'atualizadoPor', 'canceladoEm', 'canceladoPor', 'arquivadoEm', 'arquivadoPor'};
+    void autoria(Map d) {
+      exigir(texto(d['usuarioId']) && texto(d['usuarioNome']));
+      data(d['criadoEm']);
+      for (final campo in ['alteradoEm', 'atualizadoEm', 'canceladoEm', 'arquivadoEm']) {
+        if (d[campo] != null) data(d[campo]);
+      }
+      for (final campo in ['alteradoPor', 'atualizadoPor', 'canceladoPor', 'arquivadoPor']) {
+        if (d[campo] != null) exigir(texto(d[campo]));
+      }
+      for (final prefixo in ['cancelado', 'arquivado']) {
+        exigir((d['${prefixo}Em'] == null) == (d['${prefixo}Por'] == null));
+      }
+    }
+    const camposConteudo = {'titulo', 'publico', 'objetivo', 'duracaoMinutos', 'referenciasBiblicas', 'preparacao', 'passos', 'perguntas'};
+    void conteudo(Map d) {
+      limite(d['titulo'], 20000, obrigatorio: true);
+      exigir({'casais', 'familia', 'ambos'}.contains(d['publico']));
+      inteiro(d['duracaoMinutos'], 1, 480);
+      var total = (d['titulo'] as String).length;
+      for (final campo in ['objetivo', 'referenciasBiblicas', 'preparacao', 'passos', 'perguntas']) {
+        if (d[campo] == null && !d.containsKey(campo)) continue;
+        limite(d[campo], 20000);
+        total += (d[campo] as String).length;
+      }
+      exigir(total <= 20000);
+    }
+    for (final e in colecoes.entries.where((e) => e.key.startsWith('casais'))) {
+      final ids = <String>{};
+      for (final d in e.value) {
+        exigir(texto(d['id']));
+        exigir(ids.add(d['id'] as String));
+      }
+    }
+    final membros = documentos('membros').map((d) => d['id']).whereType<String>().toSet();
+    final encontros = documentos('casaisEncontros').map((d) => d['id']).whereType<String>().toSet();
+    final materiais = {for (final d in documentos('casaisMateriais')) d['id']: d};
+    for (final d in colecoes['casaisContatos'] ?? <Map<String, dynamic>>[]) {
+      exigir(d.keys.every({'id', 'membrosIds', 'casalChave', 'tipo', 'ocorrencia',
+        'realizadoEm', 'registradoEm', 'usuarioId', 'usuarioNome', 'anuladoEm', 'anuladoPor'}.contains));
+      exigir(texto(d['id']) && texto(d['casalChave']) && texto(d['usuarioId']) && texto(d['usuarioNome']));
+      exigir({'parabenizado', 'convite_enviado', 'contato_realizado'}.contains(d['tipo']));
+      final ids = d['membrosIds'];
+      exigir(ids is List && ids.isNotEmpty && ids.length <= 2 && ids.toSet().length == ids.length &&
+          ids.every((id) => texto(id) && membros.contains(id)));
+      data(d['realizadoEm'], dia: true);
+      data(d['registradoEm']);
+      if (d['tipo'] == 'parabenizado') {
+        data(d['ocorrencia'], dia: true);
+      } else {
+        exigir(!d.containsKey('ocorrencia'));
+      }
+      if (d['anuladoEm'] != null || d['anuladoPor'] != null) {
+        data(d['anuladoEm']);
+        exigir(texto(d['anuladoPor']));
+      }
+    }
+    for (final d in colecoes['casaisMateriais'] ?? <Map<String, dynamic>>[]) {
+      campos(d, {...camposConteudo, ...camposAutoria, 'versao', 'arquivado'});
+      autoria(d);
+      conteudo(d);
+      inteiro(d['versao'], 1, 0x7fffffff);
+      exigir(d['arquivado'] is bool);
+    }
+    for (final d in colecoes['casaisEncontros'] ?? <Map<String, dynamic>>[]) {
+      campos(d, {...camposAutoria, 'titulo', 'tipo', 'inicio', 'fim', 'local', 'descricao', 'capacidade', 'estado', 'roteiro'});
+      autoria(d);
+      limite(d['titulo'], 160, obrigatorio: true);
+      exigir({'jantar', 'retiro', 'palestra', 'encontro_familias', 'outro'}.contains(d['tipo']));
+      exigir({'rascunho', 'aberto', 'encerrado', 'cancelado'}.contains(d['estado']));
+      data(d['inicio']);
+      data(d['fim']);
+      exigir(DateTime.parse(d['fim']).isAfter(DateTime.parse(d['inicio'])));
+      if (d['capacidade'] != null) inteiro(d['capacidade'], 1, 100000);
+      for (final campo in ['local', 'descricao']) {
+        if (d[campo] != null) limite(d[campo], campo == 'local' ? 300 : 3000);
+      }
+      if (d.containsKey('roteiro')) {
+        final roteiro = d['roteiro'];
+        exigir(roteiro is List && roteiro.length <= 20);
+        final usados = <String>{};
+        for (final item in roteiro as List) {
+          exigir(item is Map);
+          final r = item as Map;
+          campos(r, {'materialId', 'versao', 'conteudoSnapshot'});
+          exigir(texto(r['materialId']) && materiais.containsKey(r['materialId']));
+          exigir(usados.add(r['materialId'] as String));
+          inteiro(r['versao'], 1, 0x7fffffff);
+          final versaoAtual = materiais[r['materialId']]!['versao'];
+          exigir(versaoAtual is int && r['versao'] <= versaoAtual);
+          exigir(r['conteudoSnapshot'] is Map);
+          final snapshot = r['conteudoSnapshot'] as Map;
+          campos(snapshot, camposConteudo);
+          conteudo(snapshot);
+        }
+      }
+    }
+    final ocupacaoPorEncontro = <String, int>{};
+    final membrosPorEncontro = <String, Set<String>>{};
+    for (final d in colecoes['casaisInscricoes'] ?? <Map<String, dynamic>>[]) {
+      campos(d, {...camposAutoria, 'encontroId', 'responsavelMembroId', 'participantes', 'estado'});
+      autoria(d);
+      exigir(encontros.contains(d['encontroId']) && membros.contains(d['responsavelMembroId']));
+      exigir({'confirmada', 'cancelada'}.contains(d['estado']));
+      final participantes = d['participantes'];
+      exigir(participantes is List && participantes.isNotEmpty && participantes.length <= 100);
+      final ids = <String>{};
+      final membrosInscritos = <String>{};
+      for (final item in participantes as List) {
+        exigir(item is Map);
+        final pessoa = item as Map;
+        campos(pessoa, {'id', 'membroId', 'nomeAcompanhante', 'crianca', 'confirmado',
+          'presenteEm', 'presencaPor', 'presencaPorNome', 'presencaAlteradaEm', 'presencaAlteradaPor'});
+        exigir(texto(pessoa['id']));
+        exigir(ids.add(pessoa['id'] as String));
+        exigir((pessoa['membroId'] != null) != (pessoa['nomeAcompanhante'] != null));
+        if (pessoa['membroId'] != null) {
+          exigir(texto(pessoa['membroId']) && membros.contains(pessoa['membroId']));
+          exigir(membrosInscritos.add(pessoa['membroId'] as String));
+          if (d['estado'] == 'confirmada') {
+            exigir(membrosPorEncontro.putIfAbsent(d['encontroId'] as String, () => <String>{})
+                .add(pessoa['membroId'] as String));
+          }
+        } else {
+          limite(pessoa['nomeAcompanhante'], 160, obrigatorio: true);
+        }
+        exigir(pessoa['crianca'] is bool && pessoa['confirmado'] is bool);
+        if (pessoa['presenteEm'] != null || pessoa['presencaPor'] != null) {
+          data(pessoa['presenteEm']);
+          exigir(texto(pessoa['presencaPor']) && pessoa['confirmado'] == true);
+        }
+        if (pessoa['presencaPorNome'] != null) exigir(texto(pessoa['presencaPorNome']));
+        if (pessoa['presencaAlteradaEm'] != null || pessoa['presencaAlteradaPor'] != null) {
+          data(pessoa['presencaAlteradaEm']);
+          exigir(texto(pessoa['presencaAlteradaPor']));
+        }
+      }
+      if (d['estado'] == 'confirmada') {
+        final id = d['encontroId'] as String;
+        ocupacaoPorEncontro[id] = (ocupacaoPorEncontro[id] ?? 0) + participantes.length;
+      }
+    }
+    for (final encontro in documentos('casaisEncontros')) {
+      if (encontro['capacidade'] is int) {
+        exigir((ocupacaoPorEncontro[encontro['id']] ?? 0) <= encontro['capacidade']);
+      }
+    }
+    for (final d in colecoes['casaisTarefas'] ?? <Map<String, dynamic>>[]) {
+      campos(d, {...camposAutoria, 'encontroId', 'descricao', 'responsavelUsuarioId', 'prazo', 'estado'});
+      autoria(d);
+      exigir(encontros.contains(d['encontroId']));
+      limite(d['descricao'], 1000, obrigatorio: true);
+      exigir({'pendente', 'concluida', 'cancelada'}.contains(d['estado']));
+      if (d['responsavelUsuarioId'] != null) exigir(texto(d['responsavelUsuarioId']));
+      if (d['prazo'] != null) data(d['prazo'], dia: true);
+    }
+    for (final d in colecoes['casaisEnvios'] ?? <Map<String, dynamic>>[]) {
+      campos(d, {'id', 'finalidade', 'membrosIds', 'casalChave', 'ocorrencia', 'destinatarioHash',
+        'destinatarioMembroId', 'estado', 'registradoEm', 'finalizadoEm', 'usuarioId', 'usuarioNome'});
+      exigir(d['finalidade'] == 'parabens' && {'reservado', 'aceito_smtp', 'incerto', 'nao_enviado'}.contains(d['estado']));
+      exigir(texto(d['usuarioId']) && texto(d['usuarioNome']) && texto(d['casalChave']));
+      exigir(d['destinatarioHash'] is String && RegExp(r'^[a-f0-9]{64}$').hasMatch(d['destinatarioHash']));
+      final ids = d['membrosIds'];
+      exigir(ids is List && ids.isNotEmpty && ids.length <= 2 && ids.toSet().length == ids.length &&
+          ids.every((id) => texto(id) && membros.contains(id)));
+      exigir(texto(d['destinatarioMembroId']) && membros.contains(d['destinatarioMembroId']) &&
+          (ids as List).contains(d['destinatarioMembroId']));
+      data(d['ocorrencia'], dia: true);
+      data(d['registradoEm']);
+      if (d['finalizadoEm'] != null) data(d['finalizadoEm']);
+    }
   }
 }

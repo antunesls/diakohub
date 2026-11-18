@@ -64,7 +64,7 @@ $('form-login').addEventListener('submit', async (e) => {
 });
 
 $('sair').addEventListener('click', () => {
-  if (confirmarSaidaDevocional()) sair();
+  if (confirmarSaidaDevocional() && confirmarSaidaCasais()) sair();
 });
 
 // ---------- Menu lateral ----------
@@ -102,6 +102,7 @@ fecharMenu();
 
 function mostrarAba(nome) {
   if (abaAtual === 'devocionais' && nome !== 'devocionais' && !confirmarSaidaDevocional()) return;
+  if (abaAtual === 'casais' && nome !== 'casais' && !confirmarSaidaCasais()) return;
   const botoes = [...$('menu-lateral').querySelectorAll('button[data-aba]')];
   // Aba fora do perfil (a comissão, por exemplo, não tem Visão geral): abre a primeira que a pessoa pode ver.
   if (!botoes.some((b) => b.dataset.aba === nome)) {
@@ -2524,7 +2525,10 @@ function conectarTempoReal() {
     if (tipo === 'motivos') { if (pode('motivosVer')) carregarMotivos(); }
     else if (tipo === 'mensagens') { if (pode('mensagens')) carregarMensagens(); }
     else if (tipo === abaAtual || (tipo === 'membros' && abaAtual === 'recados') || (tipo === 'visitas' && abaAtual === 'membros') ||
-      (abaAtual === 'escalas' && (tipo === 'indisponibilidades' || tipo === 'membros'))) {
+      (abaAtual === 'escalas' && (tipo === 'indisponibilidades' || tipo === 'membros')) ||
+      // Mudanças do ministério atualizam a área, mas nunca descartam uma edição
+      // aberta nem fecham um diálogo em uso por outra pessoa.
+      (abaAtual === 'casais' && tipo.startsWith('casais') && !casaisEdicao && !document.querySelector('dialog[open]'))) {
       carregar[abaAtual]();
     }
     if (abaAtual === 'inicio') carregarInicio();

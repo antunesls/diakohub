@@ -22,10 +22,20 @@ class Store {
 
   // Serializa as operações inteiras (ler o estado, gravar, publicar), na ordem pedida.
   Future<void> _fila = Future.value();
+  Future<void> _filaCasais = Future.value();
+
+  /// Compartilha o bloqueio entre encontros, roteiros e limpeza de membros.
+  /// Não é uma transação entre coleções; cada gravação continua atômica por arquivo.
+  Future<T> serializarCasais<T>(Future<T> Function() operacao) {
+    final resultado = _filaCasais.then((_) => operacao());
+    _filaCasais = resultado.then<void>((_) {}, onError: (Object _, StackTrace __) {});
+    return resultado;
+  }
 
   static const colecoes = ['recados', 'motivos', 'membros', 'solicitacoesMembros', 'mensagens', 'galeria', 'visitas', 'escalas',
     'indisponibilidades', 'linksEscala', 'repertorio', 'palavras', 'roteiros', 'escolhasPalavra', 'gestaoCasa', 'atas',
-    'ministerios', 'devocionais', 'assinaturasDevocionais', 'enviosDevocionais', 'trilhasDevocionais', 'configDevocionais'];
+    'ministerios', 'devocionais', 'assinaturasDevocionais', 'enviosDevocionais', 'trilhasDevocionais', 'configDevocionais',
+    'casaisContatos', 'casaisEnvios', 'casaisEncontros', 'casaisInscricoes', 'casaisTarefas', 'casaisMateriais'];
 
   Stream<String> get mudancas => _mudancas.stream;
   Map<String, int> get versoes => Map.unmodifiable(_versoes);

@@ -6,7 +6,7 @@
 <title>Painel — DiakoHub</title>
 <link rel="icon" href="/logo.png" type="image/png">
 <link rel="stylesheet" href="/estilo.css?v=5">
-<link rel="stylesheet" href="/casais.css?v=2">
+<link rel="stylesheet" href="/casais.css?v=3">
 <style>
   .topo {
     display: flex; flex-wrap: wrap; align-items: center; gap: 16px;
@@ -897,16 +897,32 @@
 
     <section data-painel="casais" hidden>
       <h1>Casais e Família</h1>
-      <p class="dica">Aniversários de casamento para cuidar dos casais da igreja. Os devocionais ficam em <a href="#" data-ir-aba="devocionais">Devocionais</a>.</p>
+      <p class="dica">Contatos, encontros e atividades para cuidar dos casais e das famílias. Os devocionais continuam na área própria.</p>
+      <p class="dica">Não registre detalhes de aconselhamento, conflitos íntimos ou informações de saúde. O histórico guarda somente contatos operacionais.</p>
+      <nav class="barra" aria-label="Seções de Casais e Família">
+        <a href="#casais-titulo">Aniversários</a><a href="#casais-encontros-titulo">Encontros e presença</a>
+        <a href="#casais-materiais-titulo">Roteiros e atividades</a>
+        <a href="/devocional?trilha=casais">Ler devocionais de Casais</a>
+        <a href="/devocional?trilha=familia">Ler devocionais de Família</a>
+        <a href="#" data-ir-aba="devocionais" data-permissao="devocionais">Gerenciar devocionais</a>
+      </nav>
       <section aria-labelledby="casais-titulo">
         <h2 id="casais-titulo">Aniversários de casamento</h2>
         <form id="casais-filtro" class="barra">
           <label>Mês <select id="casais-mes" aria-label="Mês dos aniversários"></select></label>
-          <label>Ano <input id="casais-ano" type="number" min="1900" max="9999" required></label>
+          <label>Ano <input id="casais-ano" type="number" min="1900" max="2200" required></label>
           <button class="botao secundario" type="submit">Consultar</button>
         </form>
         <p id="casais-resultado" role="status"></p>
         <div id="casais-lista" class="lista"></div>
+      </section>
+      <section aria-labelledby="casais-encontros-titulo">
+        <h2 id="casais-encontros-titulo">Encontros, inscrições e presença</h2>
+        <div id="casais-encontros-conteudo" class="lista"></div>
+      </section>
+      <section aria-labelledby="casais-materiais-titulo">
+        <h2 id="casais-materiais-titulo">Roteiros e atividades</h2>
+        <div id="casais-materiais-conteudo" class="lista"></div>
       </section>
     </section>
 
@@ -1589,9 +1605,11 @@
 <script src="/menu-lateral.js?v=10"></script>
 <script src="/gestao-casa.js?v=1"></script>
 <script src="/atas.js?v=2"></script>
-<script src="/casais.js?v=2"></script>
+<script src="/casais-encontros.js?v=1"></script>
+<script src="/casais-materiais.js?v=1"></script>
+<script src="/casais.js?v=3"></script>
 <script src="/devocionais.js?v=1"></script>
-<script src="/painel.js?v=29"></script>
+<script src="/painel.js?v=30"></script>
 <script src="/certificado.js?v=1"></script>
 <script src="/acessos-escala.js?v=4"></script>
 <script src="/ministerios.js?v=1"></script>

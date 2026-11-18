@@ -94,7 +94,7 @@ test('edição não salva pede confirmação antes de fechar e rascunho não com
 });
 
 test('sair da sessão por gesto humano pede confirmação da edição pendente', () => {
-  assert.match(web('painel.js'), /\$\('sair'\)\.addEventListener\('click', \(\) => \{\s*if \(confirmarSaidaDevocional\(\)\) sair\(\);/);
+  assert.match(web('painel.js'), /\$\('sair'\)\.addEventListener\('click', \(\) => \{\s*if \(confirmarSaidaDevocional\(\) && confirmarSaidaCasais\(\)\) sair\(\);/);
 });
 
 test('prévia email usa somente endpoint limitado, invalida seleção e bloqueia envio duplicado', async () => {

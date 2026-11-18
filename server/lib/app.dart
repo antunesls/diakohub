@@ -44,7 +44,10 @@ import 'ministerios.dart';
 import 'pagina_inicial.dart';
 import 'perfis.dart';
 import 'palavras.dart';
-import 'casais.dart';
+import 'casais_ministerio.dart';
+import 'casais_encontros.dart';
+import 'casais_materiais.dart';
+import 'email_casais.dart';
 import 'devocionais.dart';
 import 'email_devocionais.dart';
 import 'permissoes.dart';
@@ -80,6 +83,7 @@ class Servidor {
     this.enviarAvisoCadastro,
     this.enviarAta,
     this.enviarDevocional,
+    this.enviarEmailCasal,
     this.senhaMinima = 6,
     DateTime Function()? relogio,
     LimiteTaxa? limitePedidos,
@@ -123,6 +127,18 @@ class Servidor {
   final Auditoria auditoria;
   final String versao;
   final Store store;
+  late final MinisterioCasais ministerioCasais = MinisterioCasais(store, agora: _agora,
+      igreja: () => nomeIgreja, enviar: (email) async {
+        if (enviarEmailCasal != null) return enviarEmailCasal!(email);
+        final configuracao = cfg;
+        if (configuracao == null || !configuracao.smtpConfigurado) {
+          throw StateError('Configure o SMTP antes de enviar parabéns.');
+        }
+        await enviarEmailCasais(configuracao, email);
+      });
+  late final CasaisEncontros encontrosCasais = CasaisEncontros(store, agora: _agora,
+      responsavelValido: (id) => _responsaveisCasais().any((u) => u['id'] == id));
+  late final CasaisMateriais materiaisCasais = CasaisMateriais(store, agora: _agora);
   late final GestaoCasa casa = GestaoCasa(store, agora: _agora);
   late final AnexosCasa anexosCasa = AnexosCasa(store.pasta);
   late final Atas atas = Atas(store, agora: _agora);
@@ -186,6 +202,7 @@ class Servidor {
   /// Envia uma ata por e-mail (substituível nos testes; sem ele, usa o SMTP do /admin).
   final Future<void> Function(EmailAta email)? enviarAta;
   final Future<void> Function(EmailDevocional email)? enviarDevocional;
+  final Future<void> Function(EmailCasais email)? enviarEmailCasal;
 
   /// Tamanho mínimo da senha ao trocar pelo painel (10 quando o servidor está na internet).
   final int senhaMinima;
@@ -296,6 +313,57 @@ class Servidor {
       ..post('/api/mensagens/<id>/avisar', _reenviarAviso)
       // Recados
       ..get('/api/casais', _consultarCasais)
+      ..post('/api/casais/parabens/previa', (Request req) => _operacaoCasais(() async =>
+          ministerioCasais.previaParabens(await _corpo(req), conta: Auth.contaDa(req)!)))
+      ..post('/api/casais/parabens/email', _enviarParabensCasais)
+      ..get('/api/casais/contatos', (Request req) => _operacaoCasais(() =>
+          ministerioCasais.listarContatos(mes: _numeroCasais(req, 'mes', _agora().month),
+              ano: _numeroCasais(req, 'ano', _agora().year), conta: Auth.contaDa(req)!)))
+      ..post('/api/casais/contatos', (Request req) => _operacaoCasais(() async =>
+          ministerioCasais.registrarContato(await _corpo(req), conta: Auth.contaDa(req)!), status: 201))
+      ..post('/api/casais/contatos/<id>/anular', (Request req, String id) => _operacaoCasais(() =>
+          ministerioCasais.anularContato(id, conta: Auth.contaDa(req)!)))
+      ..get('/api/casais/pessoas', _pessoasCasais)
+      ..get('/api/casais/responsaveis', (Request req) {
+        if (!Auth.contaDa(req)!.pode(Permissao.casaisGerenciar)) {
+          return _erro(403, 'Somente quem gerencia o ministério pode ver os responsáveis.');
+        }
+        return _json(_responsaveisCasais());
+      })
+      ..get('/api/casais/encontros', (Request _) => _operacaoCasais(() => encontrosCasais.listarEncontros()))
+      ..post('/api/casais/encontros', (Request req) => _operacaoCasais(() async =>
+          encontrosCasais.criarEncontro(await _corpo(req), conta: Auth.contaDa(req)!), status: 201))
+      ..get('/api/casais/encontros/<id>', (Request _, String id) => _operacaoCasais(() =>
+          encontrosCasais.encontro(id)))
+      ..put('/api/casais/encontros/<id>', (Request req, String id) => _operacaoCasais(() async =>
+          encontrosCasais.editarEncontro(id, await _corpo(req), conta: Auth.contaDa(req)!)))
+      ..post('/api/casais/encontros/<id>/cancelar', (Request req, String id) => _operacaoCasais(() =>
+          encontrosCasais.cancelarEncontro(id, conta: Auth.contaDa(req)!)))
+      ..get('/api/casais/encontros/<id>/inscricoes', (Request _, String id) => _operacaoCasais(() =>
+          encontrosCasais.listarInscricoes(id)))
+      ..post('/api/casais/encontros/<id>/inscricoes', (Request req, String id) => _operacaoCasais(() async =>
+          encontrosCasais.inscrever(id, await _corpo(req), conta: Auth.contaDa(req)!), status: 201))
+      ..post('/api/casais/inscricoes/<id>/cancelar', (Request req, String id) => _operacaoCasais(() =>
+          encontrosCasais.cancelarInscricao(id, conta: Auth.contaDa(req)!)))
+      ..put('/api/casais/inscricoes/<id>/participantes/<participanteId>/presenca',
+          (Request req, String id, String participanteId) => _operacaoCasais(() async =>
+              encontrosCasais.registrarPresenca(id, participanteId, await _corpo(req), conta: Auth.contaDa(req)!)))
+      ..get('/api/casais/encontros/<id>/tarefas', (Request _, String id) => _operacaoCasais(() =>
+          _tarefasCasais(id)))
+      ..post('/api/casais/encontros/<id>/tarefas', (Request req, String id) => _operacaoCasais(() async =>
+          encontrosCasais.criarTarefa(id, await _corpo(req), conta: Auth.contaDa(req)!), status: 201))
+      ..put('/api/casais/tarefas/<id>', (Request req, String id) => _operacaoCasais(() async =>
+          encontrosCasais.editarTarefa(id, await _corpo(req), conta: Auth.contaDa(req)!)))
+      ..get('/api/casais/materiais', (Request req) => _operacaoCasais(() =>
+          materiaisCasais.listarMateriais(arquivados: {'1', 'true'}.contains(req.url.queryParameters['arquivados']))))
+      ..post('/api/casais/materiais', (Request req) => _operacaoCasais(() async =>
+          materiaisCasais.criarMaterial(await _corpo(req), conta: Auth.contaDa(req)!), status: 201))
+      ..get('/api/casais/materiais/<id>', (Request _, String id) => _operacaoCasais(() =>
+          materiaisCasais.material(id) ?? (throw ArgumentError('Material não encontrado.'))))
+      ..put('/api/casais/materiais/<id>', (Request req, String id) => _operacaoCasais(() async =>
+          materiaisCasais.editarMaterial(id, await _corpo(req), conta: Auth.contaDa(req)!)))
+      ..put('/api/casais/encontros/<id>/roteiro', (Request req, String id) => _operacaoCasais(() async =>
+          materiaisCasais.associarAoEncontro(id, await _corpo(req), conta: Auth.contaDa(req)!)))
       ..get('/api/recados', _listarRecados)
       ..post('/api/recados', _criarRecado)
       ..put('/api/recados/ordem', _ordenarRecados)
@@ -558,6 +626,61 @@ class Servidor {
 
   // ---------- Autenticação ----------
 
+  static int _numeroCasais(Request req, String campo, int padrao) {
+    final texto = req.url.queryParameters[campo];
+    if (texto == null) return padrao;
+    final n = int.tryParse(texto);
+    if (n == null) throw const FormatException('Mês ou ano inválido.');
+    return n;
+  }
+
+  Future<Response> _operacaoCasais(FutureOr<Object?> Function() executar, {int status = 200}) async {
+    try {
+      return _json(await executar(), status: status);
+    } on FormatException catch (e) {
+      return _erro(400, e.message);
+    } on ArgumentError {
+      return _erro(404, 'Registro do ministério não encontrado.');
+    } on StateError catch (e) {
+      if (e.message.startsWith('Sem permissão')) return _erro(403, 'Sem permissão para esta operação.');
+      if (e.message.contains('não encontrado') || e.message.contains('não encontrada')) return _erro(404, e.message);
+      return _erro(409, e.message);
+    }
+  }
+
+  List<Map<String, String>> _responsaveisCasais() => [
+    {'id': Conta.principal.id, 'nome': Conta.principal.nome},
+    for (final u in _usuarios?.lista ?? <Usuario>[])
+      if (u.ativo && u.perfil.pode(Permissao.casaisGerenciar)) {'id': u.id, 'nome': u.nome},
+  ];
+
+  List<Map<String, dynamic>> _tarefasCasais(String encontroId) {
+    final nomes = {for (final u in _responsaveisCasais()) u['id']: u['nome']};
+    return [for (final tarefa in encontrosCasais.listarTarefas(encontroId))
+      {...tarefa, if (nomes[tarefa['responsavelUsuarioId']] != null) 'responsavelNome': nomes[tarefa['responsavelUsuarioId']]}];
+  }
+
+  Response _pessoasCasais(Request req) {
+    final busca = semAcento((req.url.queryParameters['busca'] ?? '').trim().toLowerCase())!;
+    if (busca.length < 2 || busca.length > 100) return _erro(400, 'Digite de 2 a 100 caracteres para buscar.');
+    final palavras = busca.split(RegExp(r'\s+'));
+    return _json([
+      for (final m in _membros().where((m) => m.ativo &&
+          palavras.every((p) => semAcento(m.nome.toLowerCase())!.contains(p))).take(30))
+        {'id': m.id, 'nome': m.nome, 'status': m.status.name,
+          if (m.conjugeId != null) 'conjugeId': m.conjugeId,
+          if (m.paisIds.isNotEmpty) 'paisIds': m.paisIds},
+    ]);
+  }
+
+  Future<Response> _enviarParabensCasais(Request req) async {
+    if (enviarEmailCasal == null && cfg?.smtpConfigurado != true) {
+      return _erro(409, 'Configure o SMTP na Administração antes de enviar parabéns.');
+    }
+    return _operacaoCasais(() async =>
+        ministerioCasais.enviarParabens(await _corpo(req), conta: Auth.contaDa(req)!));
+  }
+
   Response _consultarCasais(Request req) {
     try {
       int ler(String chave, int padrao) {
@@ -568,7 +691,8 @@ class Servidor {
         return n;
       }
       final agora = _agora();
-      return _json(consultarCasais(_membros(), mes: ler('mes', agora.month), ano: ler('ano', agora.year)));
+      return _json(ministerioCasais.consultar(mes: ler('mes', agora.month), ano: ler('ano', agora.year),
+          conta: Auth.contaDa(req)!));
     } on FormatException catch (e) {
       return _erro(400, e.message);
     }
@@ -2302,10 +2426,12 @@ class Servidor {
     ..remove('casamentoAutorizado')
     ..remove('casamentoConsentimento');
 
-  Future<Response> _excluirMembro(Request req, String id) async {
+  Future<Response> _excluirMembro(Request req, String id) => store.serializarCasais(() async {
     final atual = store.buscar('membros', id);
     if (atual == null) return _erro(404, 'Membro não encontrado.');
     final m = Membro.fromJson(atual);
+    // Falha de limpeza deve impedir a exclusão, para ser possível repeti-la.
+    await _limparMembroCasais(id);
     // Limpa os vínculos nos outros membros (cônjuge e filhos que apontam para este).
     final docs = <Map<String, dynamic>>[];
     if (m.conjugeId != null) {
@@ -2335,6 +2461,37 @@ class Servidor {
           detalhe: 'Membro excluído do cadastro: saiu de $escalas culto(s)');
     }
     return _json({'ok': true, 'escalasAlteradas': escalas});
+  });
+
+  Future<void> _limparMembroCasais(String id) async {
+    for (final contato in store.listar('casaisContatos').where((d) => (d['membrosIds'] as List).contains(id)).toList()) {
+      await store.excluir('casaisContatos', contato['id'] as String);
+    }
+    for (final envio in store.listar('casaisEnvios').where((d) =>
+        d['destinatarioMembroId'] == id || ((d['membrosIds'] as List?) ?? []).contains(id)).toList()) {
+      await store.excluir('casaisEnvios', envio['id'] as String);
+    }
+    for (final inscricao in store.listar('casaisInscricoes').toList()) {
+      final participantes = (inscricao['participantes'] as List).cast<Map>();
+      if (inscricao['responsavelMembroId'] == id) {
+        // Acompanhantes pertencem ao contexto do responsável excluído; membros
+        // independentes da mesma inscrição permanecem, sem os nomes externos.
+        final restantes = participantes.where((p) => p['membroId'] != null && p['membroId'] != id).toList();
+        if (restantes.isEmpty) {
+          await store.excluir('casaisInscricoes', inscricao['id'] as String);
+        } else {
+          await store.salvar('casaisInscricoes', {...inscricao, 'responsavelMembroId': restantes.first['membroId'],
+            'participantes': restantes});
+        }
+      } else if (participantes.any((p) => p['membroId'] == id)) {
+        final restantes = participantes.where((p) => p['membroId'] != id).toList();
+        if (restantes.isEmpty) {
+          await store.excluir('casaisInscricoes', inscricao['id'] as String);
+        } else {
+          await store.salvar('casaisInscricoes', {...inscricao, 'participantes': restantes});
+        }
+      }
+    }
   }
 
   /// Tira a pessoa de todas as escalas e indisponibilidades (ao excluir o membro ou o usuário

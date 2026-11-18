@@ -2,6 +2,14 @@
 #casais-filtro { align-items: end; }
 #casais-filtro label { margin: 0; }
 #casais-filtro input { max-width: 130px; }
+.casais-cartao .conteudo { min-width: 0; width: 100%; }
+.casais-acoes { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 12px 0; }
+.casais-editor textarea { display: block; width: 100%; box-sizing: border-box; resize: vertical; }
+.casais-editor { margin-top: 16px; }
+.casais-previa pre { white-space: pre-wrap; overflow-wrap: anywhere; font: inherit; }
+.casais-historico { border-top: 1px solid var(--linha); padding: 8px 0; }
+.casais-previa:not(:empty) { padding: 16px; background: var(--campo); border: 1px solid var(--linha); border-radius: 12px; }
+@media (max-width: 600px) { .casais-acoes > * { max-width: 100%; } }
 #devocional-editor { margin-top: 20px; }
 .devocional-grade { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 18px; }
 .devocional-grade .largo { grid-column: 1 / -1; }
