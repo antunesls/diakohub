@@ -31,7 +31,7 @@ function ambiente(gestao = true, responder = () => []) {
 test('carga do script é inerte e abertura usa apenas API restrita', async () => {
   const a = ambiente(false); assert.equal(a.chamadas.length, 0);
   await a.run('carregarEncontros()');
-  assert.deepEqual(a.chamadas.map(c => c.url), ['/api/encontros']);
+  assert.deepEqual(a.chamadas.map(c => c.url), ['/api/ministerios', '/api/encontros']);
   assert.ok(a.raiz.children.length);
 });
 test('formulário acessível usa dialog sem HTML inseguro nem dados privados', () => {
@@ -173,7 +173,7 @@ test('roteiro exibe e copia snapshots em ordem sem expor inscritos', async () =>
     ]};
   });
   // Helper aparece depois do script de encontros, como no painel real.
-  a.run('function textoMaterialCasais(m) { return m.titulo + "\\n" + m.objetivo; }');
+  a.run('function textoMaterial(m) { return m.titulo + "\\n" + m.objetivo; }');
   await a.run('detalheEncontro("e")');
   const dlg = a.body.children[0];
   const copiar = todos(dlg).find(n => n.tag === 'button' && n.children.includes('Copiar roteiro utilizado'));
@@ -202,4 +202,31 @@ test('tarefa exibe o nome autorizado do responsável em vez de seu ID', async ()
   const texto = todos(a.body).flatMap(n => n.children.filter(f => typeof f === 'string')).join(' ');
   assert.match(texto, /Liderança Teste/);
   assert.doesNotMatch(texto, /id-interno/);
+});
+
+test('lista mostra o ministério de cada encontro, filtra por ministério e não oferece Conselho', async () => {
+  const a = ambiente(true, (_, url) => {
+    if (url === '/api/ministerios') return { ministerios: [{ id: 'jov', nome: 'Jovens' }, { id: 'conselho', nome: 'Conselho', fixo: true }] };
+    if (url === '/api/encontros') return [
+      { id: 'a', titulo: 'Acampamento', estado: 'aberto', inicio: '2099-01-01T08:00', ministerioId: 'jov' },
+      { id: 'b', titulo: 'Culto de missões', estado: 'aberto', inicio: '2099-02-01T19:00' },
+    ];
+    return [];
+  });
+  await a.run('carregarEncontros()');
+  const textos = () => todos(a.raiz).flatMap(n => n.children.filter(f => typeof f === 'string')).join(' ');
+  assert.match(textos(), /Jovens ·/);
+  assert.match(textos(), /Igreja toda ·/);
+  const filtro = todos(a.raiz).find(n => n.props?.['aria-label'] === 'Filtrar por ministério');
+  assert.ok(filtro);
+  assert.doesNotMatch(todos(filtro).flatMap(n => n.children.filter(f => typeof f === 'string')).join(' '), /Conselho/);
+  filtro.value = 'jov';
+  await filtro.events.change();
+  assert.match(textos(), /Acampamento/);
+  assert.doesNotMatch(textos(), /Culto de missões/);
+  filtro.value = 'igreja';
+  await filtro.events.change();
+  assert.match(textos(), /Culto de missões/);
+  assert.doesNotMatch(textos(), /Acampamento/);
+  await a.run('filtroMinisterioEncontros = ""');
 });

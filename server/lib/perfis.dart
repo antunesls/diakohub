@@ -31,6 +31,7 @@ class Perfis {
   static const _descricoesAntigas = {
     'liderCasais': {
       'Consulta casais e contatos limitados; escreve, publica e envia devocionais. Sem acesso às fichas completas.',
+      'Gerencia contatos e materiais de Casais e Família; organiza encontros e inscrições; escreve, publica e envia devocionais. Sem acesso às fichas completas.',
     },
   };
 

@@ -144,6 +144,15 @@ class Ministerios {
     if (atas > 0) {
       throw FormatException('O ministério tem $atas ${atas == 1 ? 'ata' : 'atas'}: não pode ser excluído.');
     }
+    // Encontros e materiais apontam para o ministério pelo id.
+    final encontros = store.listar('encontros').where((e) => e['ministerioId'] == id).length;
+    final materiais = store.listar('materiais').where((m) => m['ministerioId'] == id).length;
+    if (encontros + materiais > 0) {
+      throw FormatException('O ministério tem ${[
+        if (encontros > 0) '$encontros ${encontros == 1 ? 'encontro' : 'encontros'}',
+        if (materiais > 0) '$materiais ${materiais == 1 ? 'material' : 'materiais'}',
+      ].join(' e ')}: mude o ministério deles antes de excluir.');
+    }
     await _trocarNasPessoas(atual, (lista) => [for (final x in lista) if (chave(x) != chave(atual['nome'] as String)) x]);
     await store.excluir(colecao, id);
   }

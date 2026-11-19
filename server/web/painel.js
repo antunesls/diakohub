@@ -143,6 +143,7 @@ const carregar = {
 
 document.querySelectorAll('[data-ir]').forEach((b) => b.addEventListener('click', (e) => {
   if (b.tagName === 'A') e.preventDefault();
+  if (b.dataset.sub && typeof definirSubAba === 'function') definirSubAba(b.dataset.ir, b.dataset.sub);
   mostrarAba(b.dataset.ir);
 }));
 
@@ -2528,13 +2529,13 @@ function conectarTempoReal() {
     const { tipo } = JSON.parse(e.data);
     if (tipo === 'motivos') { if (pode('motivosVer')) carregarMotivos(); }
     else if (tipo === 'mensagens') { if (pode('mensagens')) carregarMensagens(); }
-    else if (tipo === abaAtual || (tipo === 'membros' && abaAtual === 'recados') || (tipo === 'visitas' && abaAtual === 'membros') ||
+    else if ((tipo === abaAtual && abaAtual !== 'encontros') || (tipo === 'membros' && abaAtual === 'recados') || (tipo === 'visitas' && abaAtual === 'membros') ||
       (abaAtual === 'escalas' && (tipo === 'indisponibilidades' || tipo === 'membros')) ||
       // Mudanças do ministério atualizam a área, mas nunca descartam uma edição
       // aberta nem fecham um diálogo em uso por outra pessoa.
       (abaAtual === 'casais' && tipo.startsWith('casais') && !casaisEdicao && !document.querySelector('dialog[open]')) ||
-      (abaAtual === 'encontros' && ['encontros', 'inscricoes', 'tarefasEncontros'].includes(tipo) &&
-        !document.querySelector('dialog[open]'))) {
+      (abaAtual === 'encontros' && ['encontros', 'inscricoes', 'tarefasEncontros', 'materiais', 'tiposMaterial'].includes(tipo) &&
+        !document.querySelector('dialog[open]') && !document.querySelector('#encontros-materiais form'))) {
       carregar[abaAtual]();
     }
     if (abaAtual === 'inicio') carregarInicio();

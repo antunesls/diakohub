@@ -25,7 +25,6 @@ async function carregarCasais() {
     casaisIniciado = true;
   }
   await consultarCasais();
-  if (typeof carregarCasaisMateriais === 'function') await carregarCasaisMateriais();
 }
 
 async function consultarCasais() {

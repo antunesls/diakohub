@@ -15,6 +15,7 @@ import 'artes_qr.dart';
 import 'fundos_tv.dart';
 import 'galeria.dart';
 import 'qr_oracao.dart';
+import 'materiais.dart';
 import 'repertorio.dart';
 import 'store.dart';
 
@@ -23,7 +24,7 @@ const versaoBackup = 2;
 
 /// Coleções com pessoas e vínculos que precisam ser validadas juntas na restauração.
 const _colecoesMinisterio = [
-  'casaisContatos', 'casaisEnvios', 'casaisMateriais', 'encontros', 'inscricoes', 'tarefasEncontros',
+  'casaisContatos', 'casaisEnvios', 'materiais', 'tiposMaterial', 'encontros', 'inscricoes', 'tarefasEncontros',
 ];
 
 /// Backups em .zip: dados, histórico, cartazes, fotos da galeria do site, fundos das TVs, artes dos QR e configurações públicas
@@ -708,7 +709,8 @@ class Restauracao {
     const camposConteudo = {'titulo', 'publico', 'objetivo', 'duracaoMinutos', 'referenciasBiblicas', 'preparacao', 'passos', 'perguntas'};
     void conteudo(Map d) {
       limite(d['titulo'], 20000, obrigatorio: true);
-      exigir({'casais', 'familia', 'ambos'}.contains(d['publico']));
+      exigir(Materiais.publicos.containsKey(d['publico']));
+      if (d['tipoNome'] != null) limite(d['tipoNome'], 60, obrigatorio: true);
       inteiro(d['duracaoMinutos'], 1, 480);
       var total = (d['titulo'] as String).length;
       for (final campo in ['objetivo', 'referenciasBiblicas', 'preparacao', 'passos', 'perguntas']) {
@@ -727,7 +729,14 @@ class Restauracao {
     }
     final membros = documentos('membros').map((d) => d['id']).whereType<String>().toSet();
     final encontros = documentos('encontros').map((d) => d['id']).whereType<String>().toSet();
-    final materiais = {for (final d in documentos('casaisMateriais')) d['id']: d};
+    final materiais = {for (final d in documentos('materiais')) d['id']: d};
+    final ministerios = documentos('ministerios').map((d) => d['id']).whereType<String>().toSet();
+    final tipos = documentos('tiposMaterial').map((d) => d['id']).whereType<String>().toSet();
+    for (final d in colecoes['tiposMaterial'] ?? <Map<String, dynamic>>[]) {
+      campos(d, {...camposAutoria, 'nome'});
+      autoria(d);
+      limite(d['nome'], 60, obrigatorio: true);
+    }
     for (final d in colecoes['casaisContatos'] ?? <Map<String, dynamic>>[]) {
       exigir(d.keys.every({'id', 'membrosIds', 'casalChave', 'tipo', 'ocorrencia',
         'realizadoEm', 'registradoEm', 'usuarioId', 'usuarioNome', 'anuladoEm', 'anuladoPor'}.contains));
@@ -748,16 +757,19 @@ class Restauracao {
         exigir(texto(d['anuladoPor']));
       }
     }
-    for (final d in colecoes['casaisMateriais'] ?? <Map<String, dynamic>>[]) {
-      campos(d, {...camposConteudo, ...camposAutoria, 'versao', 'arquivado'});
+    for (final d in colecoes['materiais'] ?? <Map<String, dynamic>>[]) {
+      campos(d, {...camposConteudo, ...camposAutoria, 'versao', 'arquivado', 'ministerioId', 'tipoId'});
       autoria(d);
       conteudo(d);
       inteiro(d['versao'], 1, 0x7fffffff);
       exigir(d['arquivado'] is bool);
+      exigir(d['ministerioId'] == null || ministerios.contains(d['ministerioId']));
+      exigir(d['tipoId'] == null || tipos.contains(d['tipoId']));
     }
     for (final d in colecoes['encontros'] ?? <Map<String, dynamic>>[]) {
-      campos(d, {...camposAutoria, 'titulo', 'tipo', 'inicio', 'fim', 'local', 'descricao', 'capacidade', 'estado', 'roteiro'});
+      campos(d, {...camposAutoria, 'titulo', 'tipo', 'inicio', 'fim', 'local', 'descricao', 'capacidade', 'estado', 'roteiro', 'ministerioId'});
       autoria(d);
+      exigir(d['ministerioId'] == null || ministerios.contains(d['ministerioId']));
       limite(d['titulo'], 160, obrigatorio: true);
       exigir({'culto', 'conferencia', 'retiro', 'acampamento', 'jantar', 'palestra', 'treinamento',
         'encontro_familias', 'outro'}.contains(d['tipo']));
@@ -784,7 +796,7 @@ class Restauracao {
           exigir(versaoAtual is int && r['versao'] <= versaoAtual);
           exigir(r['conteudoSnapshot'] is Map);
           final snapshot = r['conteudoSnapshot'] as Map;
-          campos(snapshot, camposConteudo);
+          campos(snapshot, {...camposConteudo, 'tipoNome'});
           conteudo(snapshot);
         }
       }

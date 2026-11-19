@@ -126,7 +126,13 @@ class Encontros {
     if (capacidade != null &&
         (capacidade is! int || capacidade < 1 || capacidade > 100000))
       throw const FormatException('Capacidade inválida.');
+    // Ministério responsável (cadastro de Ministérios); nulo = igreja toda.
+    final ministerio = corpo['ministerioId'];
+    if (ministerio != null &&
+        (ministerio is! String || store.buscar('ministerios', ministerio) == null))
+      throw const FormatException('Ministério não encontrado no cadastro.');
     return {
+      'ministerioId': ministerio,
       'titulo': titulo,
       'tipo': corpo['tipo'],
       'inicio': inicio,
@@ -146,7 +152,8 @@ class Encontros {
     'local',
     'descricao',
     'capacidade',
-    'estado'
+    'estado',
+    'ministerioId'
   };
   Future<Map<String, dynamic>> criarEncontro(Map corpo,
           {required Conta conta}) =>

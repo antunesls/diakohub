@@ -21,7 +21,8 @@ import 'package:test/test.dart';
 void main() {
   test('Store registra todas as coleções do ministério sem duplicar pessoas', () {
     expect(Store.colecoes, containsAll(['casaisContatos', 'casaisEnvios', 'encontros',
-      'inscricoes', 'tarefasEncontros', 'casaisMateriais']));
+      'inscricoes', 'tarefasEncontros', 'materiais', 'tiposMaterial']));
+    expect(Store.colecoes, isNot(contains('casaisMateriais')));
     expect(Store.colecoes, isNot(contains('casaisPessoas')));
   });
 
@@ -107,7 +108,7 @@ void main() {
     expect(store.listar('casaisContatos'), isEmpty);
   });
 
-  test('encontros independem de casais e materiais continuam restritos', () async {
+  test('encontros e materiais independem de casais e exigem a permissão de encontros', () async {
     expect((await chamar('GET', '/api/encontros', token: consulta)).$1, 200);
     expect((await chamar('GET', '/api/encontros', token: midia)).$1, 403);
     expect((await chamar('POST', '/api/encontros', token: midia, corpo: {})).$1, 403);
@@ -116,10 +117,13 @@ void main() {
       'fim': '2026-12-05T21:00', 'estado': 'aberto',
     });
     expect(evento.$1, 201, reason: '${evento.$2}');
-    expect((await chamar('GET', '/api/casais/materiais', token: consulta)).$1, 200);
-    expect((await chamar('POST', '/api/casais/materiais', token: consulta, corpo: {})).$1, 403);
+    expect((await chamar('GET', '/api/materiais', token: consulta)).$1, 200);
+    expect((await chamar('GET', '/api/materiais', token: midia)).$1, 403);
+    expect((await chamar('GET', '/api/materiais/tipos', token: midia)).$1, 403);
+    expect((await chamar('GET', '/api/casais/materiais', token: lider)).$1, 404, reason: 'rota antiga removida');
+    expect((await chamar('POST', '/api/materiais', token: midia, corpo: {})).$1, 403);
     expect((await chamar('GET', '/api/public/encontros')).$1, 404);
-    expect((await chamar('GET', '/api/public/casais/materiais')).$1, 404);
+    expect((await chamar('GET', '/api/public/materiais')).$1, 404);
   });
 
   test('prévia e SMTP falso não marcam contato, revalidam e não duplicam entrega', () async {
@@ -182,13 +186,16 @@ void main() {
     expect((await chamar('POST', '/api/encontros/$id/inscricoes', token: lider, corpo: {
       'responsavelMembroId': 'fantasma', 'participantes': [{'membroId': 'fantasma'}],
     })).$1, 400);
-    final material = await chamar('POST', '/api/casais/materiais', token: lider, corpo: {
-      'titulo': 'Escuta', 'publico': 'ambos', 'duracaoMinutos': 20, 'passos': 'Conversar com gratidão.',
+    final tipos = await chamar('GET', '/api/materiais/tipos', token: lider);
+    expect(tipos.$1, 200, reason: '${tipos.$2}');
+    final material = await chamar('POST', '/api/materiais', token: lider, corpo: {
+      'tipoId': tipos.$2.first['id'],
+      'titulo': 'Escuta', 'publico': 'casais', 'duracaoMinutos': 20, 'passos': 'Conversar com gratidão.',
     });
     expect(material.$1, 201, reason: '${material.$2}');
     expect((await chamar('PUT', '/api/encontros/$id/roteiro', token: lider,
       corpo: {'materiaisIds': [material.$2['id']]})).$1, 200);
-    expect((await chamar('PUT', '/api/casais/materiais/${material.$2['id']}', token: lider,
+    expect((await chamar('PUT', '/api/materiais/${material.$2['id']}', token: lider,
       corpo: {'titulo': 'Escuta revisada'})).$1, 200);
     final detalhe = await chamar('GET', '/api/encontros/$id', token: consulta);
     expect(detalhe.$2['roteiro'].single['conteudoSnapshot']['titulo'], 'Escuta');
@@ -224,5 +231,28 @@ void main() {
       'participantes': [{'id': 'p', 'membroId': 'a', 'crianca': false, 'confirmado': true}]});
     expect((await chamar('DELETE', '/api/membros/a', token: admin)).$1, 200);
     expect(store.listar('inscricoes'), isEmpty);
+  });
+
+  test('encontro e material de um ministério; ministério em uso não pode ser excluído', () async {
+    final ministerio = await chamar('POST', '/api/ministerios', token: admin, corpo: {'nome': 'Jovens'});
+    expect(ministerio.$1, 201, reason: '${ministerio.$2}');
+    final mid = ministerio.$2['id'];
+    final e = await chamar('POST', '/api/encontros', token: lider, corpo: {
+      'titulo': 'Acampamento', 'tipo': 'acampamento', 'inicio': '2027-01-10T08:00',
+      'fim': '2027-01-12T17:00', 'ministerioId': mid,
+    });
+    expect(e.$1, 201, reason: '${e.$2}');
+    expect(e.$2['ministerioId'], mid);
+    expect((await chamar('POST', '/api/encontros', token: lider, corpo: {
+      'titulo': 'X', 'tipo': 'culto', 'inicio': '2027-01-10T08:00', 'fim': '2027-01-10T09:00', 'ministerioId': 'nao-existe',
+    })).$1, 400);
+    final m = await chamar('POST', '/api/materiais', token: lider, corpo: {
+      'titulo': 'Fogueira', 'publico': 'jovens', 'duracaoMinutos': 60, 'ministerioId': mid,
+    });
+    expect(m.$1, 201, reason: '${m.$2}');
+    expect((await chamar('GET', '/api/materiais?ministerio=$mid', token: lider)).$2.single['titulo'], 'Fogueira');
+    final excluir = await chamar('DELETE', '/api/ministerios/$mid', token: admin);
+    expect(excluir.$1, 400, reason: '${excluir.$2}');
+    expect('${excluir.$2}', contains('1 encontro e 1 material'));
   });
 }

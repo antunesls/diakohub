@@ -46,7 +46,7 @@ import 'perfis.dart';
 import 'palavras.dart';
 import 'casais_ministerio.dart';
 import 'encontros.dart';
-import 'casais_materiais.dart';
+import 'materiais.dart';
 import 'email_casais.dart';
 import 'devocionais.dart';
 import 'email_devocionais.dart';
@@ -138,7 +138,7 @@ class Servidor {
       });
   late final Encontros encontros = Encontros(store, agora: _agora,
       responsavelValido: (id) => _responsaveisEncontros().any((u) => u['id'] == id));
-  late final CasaisMateriais materiaisCasais = CasaisMateriais(store, agora: _agora);
+  late final Materiais materiais = Materiais(store, agora: _agora);
   late final GestaoCasa casa = GestaoCasa(store, agora: _agora);
   late final AnexosCasa anexosCasa = AnexosCasa(store.pasta);
   late final Atas atas = Atas(store, agora: _agora);
@@ -356,16 +356,28 @@ class Servidor {
           encontros.criarTarefa(id, await _corpo(req), conta: Auth.contaDa(req)!), status: 201))
       ..put('/api/encontros/tarefas/<id>', (Request req, String id) => _operacaoCasais(() async =>
           encontros.editarTarefa(id, await _corpo(req), conta: Auth.contaDa(req)!)))
-      ..get('/api/casais/materiais', (Request req) => _operacaoCasais(() =>
-          materiaisCasais.listarMateriais(arquivados: {'1', 'true'}.contains(req.url.queryParameters['arquivados']))))
-      ..post('/api/casais/materiais', (Request req) => _operacaoCasais(() async =>
-          materiaisCasais.criarMaterial(await _corpo(req), conta: Auth.contaDa(req)!), status: 201))
-      ..get('/api/casais/materiais/<id>', (Request _, String id) => _operacaoCasais(() =>
-          materiaisCasais.material(id) ?? (throw ArgumentError('Material não encontrado.'))))
-      ..put('/api/casais/materiais/<id>', (Request req, String id) => _operacaoCasais(() async =>
-          materiaisCasais.editarMaterial(id, await _corpo(req), conta: Auth.contaDa(req)!)))
+      // Materiais e roteiros dos encontros, de qualquer ministério (permissão "encontros").
+      // As rotas de tipos vêm antes de /api/materiais/<id>, que capturaria "tipos" como id.
+      ..get('/api/materiais/tipos', (Request _) => _operacaoCasais(() => materiais.listarTipos()))
+      ..post('/api/materiais/tipos', (Request req) => _operacaoCasais(() async =>
+          materiais.criarTipo(await _corpo(req), conta: Auth.contaDa(req)!), status: 201))
+      ..put('/api/materiais/tipos/<id>', (Request req, String id) => _operacaoCasais(() async =>
+          materiais.renomearTipo(id, await _corpo(req), conta: Auth.contaDa(req)!)))
+      ..delete('/api/materiais/tipos/<id>', (Request req, String id) => _operacaoCasais(() async {
+            await materiais.excluirTipo(id, conta: Auth.contaDa(req)!);
+            return {'ok': true};
+          }))
+      ..get('/api/materiais', (Request req) => _operacaoCasais(() => materiais.listarMateriais(
+          arquivados: {'1', 'true'}.contains(req.url.queryParameters['arquivados']),
+          ministerioId: req.url.queryParameters['ministerio'])))
+      ..post('/api/materiais', (Request req) => _operacaoCasais(() async =>
+          materiais.criarMaterial(await _corpo(req), conta: Auth.contaDa(req)!), status: 201))
+      ..get('/api/materiais/<id>', (Request _, String id) => _operacaoCasais(() =>
+          materiais.material(id) ?? (throw const NaoEncontrado('Material não encontrado.'))))
+      ..put('/api/materiais/<id>', (Request req, String id) => _operacaoCasais(() async =>
+          materiais.editarMaterial(id, await _corpo(req), conta: Auth.contaDa(req)!)))
       ..put('/api/encontros/<id>/roteiro', (Request req, String id) => _operacaoCasais(() async =>
-          materiaisCasais.associarAoEncontro(id, await _corpo(req), conta: Auth.contaDa(req)!)))
+          materiais.associarAoEncontro(id, await _corpo(req), conta: Auth.contaDa(req)!)))
       ..get('/api/recados', _listarRecados)
       ..post('/api/recados', _criarRecado)
       ..put('/api/recados/ordem', _ordenarRecados)

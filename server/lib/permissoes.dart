@@ -28,8 +28,8 @@ enum Permissao {
   mensagens('Caixa de mensagens', AreaPermissao.oracao, 'Mensagens enviadas pelo site (dúvidas, sugestões, críticas).'),
   membros('Cadastro de membros', AreaPermissao.pessoas, 'Aba Membros, fichas, certificado de batismo e contato com visitantes.'),
   casais('Consultar Casais e Família', AreaPermissao.pessoas, 'Aniversários de casamento por mês e contatos limitados. Não permite consultar ou editar fichas completas.'),
-  casaisGerenciar('Gerenciar Casais e Família', AreaPermissao.pessoas, 'Registrar contatos e organizar os materiais do ministério. Não permite consultar ou editar fichas completas.'),
-  encontros('Encontros e inscrições', AreaPermissao.pessoas, 'Organizar encontros, inscrições, presença e tarefas para qualquer público. Não exige vínculo de casal nem permite editar fichas completas.'),
+  casaisGerenciar('Gerenciar Casais e Família', AreaPermissao.pessoas, 'Registrar contatos e enviar parabéns aos casais. Não permite consultar ou editar fichas completas.'),
+  encontros('Encontros e inscrições', AreaPermissao.pessoas, 'Organizar encontros de qualquer ministério: inscrições, presença, tarefas, materiais, tipos de material e roteiros. Não permite editar fichas completas.'),
   devocionais('Escrever, publicar e enviar devocionais', AreaPermissao.comunicacao, 'Página Devocionais: escrever, agendar e publicar em qualquer trilha e enviar por e-mail aos assinantes (envio só após confirmação). Não dá acesso a Casais e Família.'),
   ministerios('Cadastro de ministérios', AreaPermissao.pessoas, 'Criar ministérios e dizer quem participa de cada um (decide quem vê as atas de cada ministério).'),
   visitantes('Ver os visitantes do dia e dar as boas-vindas', AreaPermissao.pessoas, ''),
@@ -141,7 +141,7 @@ enum PerfilPadrao {
   gestaoCasa('Gestão da Casa', 'Cuida das pendências, compras planejadas e manutenções preventivas.', {
     Permissao.sessao, Permissao.gestaoCasa,
   }),
-  liderCasais('Líder de Casais e Família', 'Gerencia contatos e materiais de Casais e Família; organiza encontros e inscrições; escreve, publica e envia devocionais. Sem acesso às fichas completas.', {
+  liderCasais('Líder de Casais e Família', 'Cuida dos contatos e parabéns de Casais e Família; organiza encontros, inscrições, materiais e roteiros; escreve, publica e envia devocionais. Sem acesso às fichas completas.', {
     Permissao.sessao, Permissao.casais, Permissao.casaisGerenciar, Permissao.encontros, Permissao.devocionais,
   }),
   comissaoLouvor('Comissão do Louvor', 'Membros da comissão: montam a escala e as músicas do louvor e veem a escala pastoral e a agenda.', {
@@ -275,7 +275,7 @@ Permissao permissaoDaRota(String metodo, String caminho) {
   if (comeca('api/membros')) return Permissao.membros;
   if (comeca('api/casais')) return leitura ? Permissao.casais : Permissao.casaisGerenciar;
   // Encontros e inscrições são uma área própria: não exigem vínculo de casal.
-  if (comeca('api/encontros') || comeca('api/inscricoes')) return Permissao.encontros;
+  if (comeca('api/encontros') || comeca('api/inscricoes') || comeca('api/materiais')) return Permissao.encontros;
   if (comeca('api/devocionais')) return Permissao.devocionais;
   if (comeca('api/solicitacoes-membros')) return Permissao.membros;
   // Certificado de batismo (geração do PDF e as imagens de assinatura/carimbo salvas).

@@ -2,7 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:diako_server/auth.dart';
-import 'package:diako_server/casais_materiais.dart';
+import 'package:diako_server/materiais.dart';
 import 'package:diako_server/permissoes.dart';
 import 'package:diako_server/store.dart';
 import 'package:test/test.dart';
@@ -10,14 +10,14 @@ import 'package:test/test.dart';
 void main() {
   late Directory pasta;
   late Store store;
-  late CasaisMateriais dominio;
+  late Materiais dominio;
   final lider =
       Conta(id: 'l', nome: 'Líder', login: 'lider', perfil: Perfil.liderCasais);
   final consulta =
-      Conta(id: 's', nome: 'Consulta', login: 's', perfil: Perfil.secretaria);
+      Conta(id: 's', nome: 'Consulta', login: 's', perfil: Perfil.midia);
   Map<String, dynamic> corpo() => {
         'titulo': 'Conversa',
-        'publico': 'ambos',
+        'publico': 'casais',
         'objetivo': 'Ouvir',
         'duracaoMinutos': 30,
         'referenciasBiblicas': 'Ef 4:32',
@@ -29,7 +29,7 @@ void main() {
     pasta = await Directory.systemTemp.createTemp('diako_materiais_');
     store = Store(pasta.path);
     await store.carregar();
-    dominio = CasaisMateriais(store, agora: () => DateTime(2026, 11, 18));
+    dominio = Materiais(store, agora: () => DateTime(2026, 11, 18));
   });
   tearDown(() async {
     await store.fechar();
@@ -147,7 +147,7 @@ void main() {
   });
   test('edições de instâncias diferentes não perdem versão', () async {
     final doc = await dominio.criarMaterial(corpo(), conta: lider);
-    final outro = CasaisMateriais(store);
+    final outro = Materiais(store);
     await Future.wait([
       dominio.editarMaterial(doc['id'], {'titulo': 'Novo'}, conta: lider),
       outro.editarMaterial(doc['id'], {'objetivo': 'Outro objetivo'},
@@ -197,7 +197,7 @@ void main() {
     });
     await isolado.carregar();
     try {
-      final servico = CasaisMateriais(isolado);
+      final servico = Materiais(isolado);
       final doc = await servico.criarMaterial(corpo(), conta: lider);
       falhar = true;
       await expectLater(
@@ -217,7 +217,7 @@ void main() {
   test('limite total exato, opcionais ausentes e leitura após reinício',
       () async {
     final doc = await dominio.criarMaterial(
-        {'titulo': 'a' * 20000, 'publico': 'familia', 'duracaoMinutos': 1},
+        {'titulo': 'a' * 20000, 'publico': 'familias', 'duracaoMinutos': 1},
         conta: lider);
     expect(doc['objetivo'], '');
     await expectLater(
@@ -229,10 +229,62 @@ void main() {
     final recarregado = Store(pasta.path);
     await recarregado.carregar();
     try {
-      expect(CasaisMateriais(recarregado).material(doc['id'])!['titulo'],
+      expect(Materiais(recarregado).material(doc['id'])!['titulo'],
           doc['titulo']);
     } finally {
       await recarregado.fechar();
     }
+  });
+
+  test('tipos: padrões na primeira vez, nomes únicos sem acento, uso impede exclusão', () async {
+    final tipos = await dominio.listarTipos();
+    expect(tipos.map((t) => t['nome']), containsAll(Materiais.tiposPadrao));
+    expect((await dominio.listarTipos()).length, Materiais.tiposPadrao.length, reason: 'não recria');
+    await expectLater(dominio.criarTipo({'nome': 'dinamica'}, conta: lider), throwsFormatException);
+    await expectLater(dominio.criarTipo({'nome': '  '}, conta: lider), throwsFormatException);
+    await expectLater(dominio.criarTipo({'nome': 'Teatro'}, conta: consulta), throwsStateError);
+    final teatro = await dominio.criarTipo({'nome': 'Teatro'}, conta: lider);
+    final m = await dominio.criarMaterial({...corpo(), 'tipoId': teatro['id']}, conta: lider);
+    expect(m['tipoNome'], 'Teatro');
+    await expectLater(dominio.excluirTipo(teatro['id'], conta: lider), throwsFormatException);
+    await dominio.renomearTipo(teatro['id'], {'nome': 'Encenação'}, conta: lider);
+    expect(dominio.material(m['id'])!['tipoNome'], 'Encenação');
+    expect((await dominio.listarTipos()).firstWhere((t) => t['id'] == teatro['id'])['materiais'], 1);
+    await dominio.editarMaterial(m['id'], {'tipoId': null}, conta: lider);
+    await dominio.excluirTipo(teatro['id'], conta: lider);
+    await expectLater(dominio.excluirTipo('nao-existe', conta: lider), throwsA(isA<NaoEncontrado>()));
+    await expectLater(dominio.criarMaterial({...corpo(), 'tipoId': 'nao-existe'}, conta: lider), throwsFormatException);
+  });
+
+  test('sempre fica ao menos um tipo', () async {
+    final tipos = await dominio.listarTipos();
+    for (final t in tipos.skip(1)) {
+      await dominio.excluirTipo(t['id'], conta: lider);
+    }
+    await expectLater(dominio.excluirTipo(tipos.first['id'], conta: lider), throwsFormatException);
+  });
+
+  test('material de ministério ou geral; filtro por ministério inclui os gerais', () async {
+    await store.salvar('ministerios', {'id': 'jovens', 'nome': 'Jovens'});
+    await store.salvar('ministerios', {'id': 'louvor', 'nome': 'Louvor'});
+    await dominio.criarMaterial({...corpo(), 'titulo': 'Geral'}, conta: lider);
+    await dominio.criarMaterial({...corpo(), 'titulo': 'Dos jovens', 'ministerioId': 'jovens', 'publico': 'jovens'}, conta: lider);
+    await dominio.criarMaterial({...corpo(), 'titulo': 'Do louvor', 'ministerioId': 'louvor'}, conta: lider);
+    expect(dominio.listarMateriais(ministerioId: 'jovens').map((m) => m['titulo']), ['Dos jovens', 'Geral']);
+    expect(dominio.listarMateriais(), hasLength(3));
+    await expectLater(dominio.criarMaterial({...corpo(), 'ministerioId': 'nao-existe'}, conta: lider), throwsFormatException);
+  });
+
+  test('roteiro guarda o nome do tipo da versão usada e recusa encontro cancelado', () async {
+    final tipo = (await dominio.listarTipos()).first;
+    final m = await dominio.criarMaterial({...corpo(), 'tipoId': tipo['id']}, conta: lider);
+    await store.salvar('encontros', {'id': 'e', 'estado': 'aberto'});
+    final e = await dominio.associarAoEncontro('e', {'materiaisIds': [m['id']]}, conta: lider);
+    final snapshot = (e['roteiro'] as List).single['conteudoSnapshot'] as Map;
+    expect(snapshot['tipoNome'], tipo['nome']);
+    expect(snapshot.keys, isNot(contains('tipoId')));
+    expect(snapshot.keys, isNot(contains('ministerioId')));
+    await store.salvar('encontros', {'id': 'c', 'estado': 'cancelado'});
+    await expectLater(dominio.associarAoEncontro('c', {'materiaisIds': [m['id']]}, conta: lider), throwsFormatException);
   });
 }

@@ -6,7 +6,7 @@
 <title>Painel — DiakoHub</title>
 <link rel="icon" href="/logo.png" type="image/png">
 <link rel="stylesheet" href="/estilo.css?v=5">
-<link rel="stylesheet" href="/casais.css?v=4">
+<link rel="stylesheet" href="/casais.css?v=5">
 <style>
   .topo {
     display: flex; flex-wrap: wrap; align-items: center; gap: 16px;
@@ -897,11 +897,10 @@
 
     <section data-painel="casais" hidden>
       <h1>Casais e Família</h1>
-      <p class="dica">Aniversários de casamento, contatos e materiais para cuidar dos casais e das famílias. Não registre detalhes de aconselhamento, conflitos íntimos ou informações de saúde: o histórico guarda somente contatos operacionais.</p>
-      <nav class="barra" aria-label="Seções de Casais e Família">
-        <a class="botao secundario pequeno" href="#casais-titulo">Aniversários</a>
-        <a class="botao secundario pequeno" href="#casais-materiais-titulo">Roteiros e atividades</a>
+      <p class="dica">Aniversários de casamento e contatos para cuidar dos casais e das famílias. Não registre detalhes de aconselhamento, conflitos íntimos ou informações de saúde: o histórico guarda somente contatos operacionais.</p>
+      <nav class="barra" aria-label="Atalhos de Casais e Família">
         <a class="botao secundario pequeno" href="#" data-ir="encontros" data-permissao="encontros">Encontros e inscrições ›</a>
+        <a class="botao secundario pequeno" href="#" data-ir="encontros" data-sub="materiais" data-permissao="encontros">Materiais e roteiros ›</a>
         <a class="botao secundario pequeno" href="#" data-ir="devocionais" data-permissao="devocionais">Devocionais ›</a>
       </nav>
       <section aria-labelledby="casais-titulo">
@@ -915,16 +914,17 @@
         <p id="casais-resultado" role="status"></p>
         <div id="casais-lista" class="lista"></div>
       </section>
-      <section aria-labelledby="casais-materiais-titulo">
-        <h2 id="casais-materiais-titulo">Roteiros e atividades</h2>
-        <div id="casais-materiais-conteudo" class="lista"></div>
-      </section>
     </section>
 
     <section data-painel="encontros" hidden>
       <h1>Encontros e inscrições</h1>
-      <p class="dica">Culto, conferência, retiro, acampamento, treinamento, jantar ou encontro de famílias: inscrições internas, com cada pessoa confirmada individualmente. Não registre saúde, documentos, data de nascimento ou observações íntimas.</p>
+      <p class="dica">Encontros de qualquer ministério (culto, conferência, retiro, acampamento, treinamento, jantar, encontro de famílias), com inscrições, presença, tarefas e roteiro. Não registre saúde, documentos, data de nascimento ou observações íntimas.</p>
+      <div class="abas-devocionais" id="encontros-abas" role="tablist" aria-label="Seções de Encontros">
+        <button type="button" role="tab" data-encontros-aba="encontros" aria-selected="true">Encontros</button>
+        <button type="button" role="tab" data-encontros-aba="materiais" aria-selected="false">Materiais e roteiros</button>
+      </div>
       <div id="encontros-conteudo" class="lista"></div>
+      <div id="encontros-materiais" class="lista" hidden></div>
     </section>
 
     <section data-painel="devocionais" hidden>
@@ -1606,11 +1606,11 @@
 <script src="/menu-lateral.js?v=11"></script>
 <script src="/gestao-casa.js?v=1"></script>
 <script src="/atas.js?v=2"></script>
-<script src="/encontros.js?v=2"></script>
-<script src="/casais-materiais.js?v=3"></script>
-<script src="/casais.js?v=5"></script>
+<script src="/encontros.js?v=3"></script>
+<script src="/materiais.js?v=1"></script>
+<script src="/casais.js?v=6"></script>
 <script src="/devocionais.js?v=2"></script>
-<script src="/painel.js?v=31"></script>
+<script src="/painel.js?v=32"></script>
 <script src="/certificado.js?v=1"></script>
 <script src="/acessos-escala.js?v=4"></script>
 <script src="/ministerios.js?v=1"></script>

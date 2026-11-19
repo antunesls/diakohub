@@ -7,6 +7,36 @@ const estadosTarefaEncontro = { pendente: 'Pendente', concluida: 'Concluída', c
 const caminhoEncontro = id => '/api/encontros/' + encodeURIComponent(id);
 const listaEncontros = (resposta, chave) => Array.isArray(resposta) ? resposta : resposta[chave] || [];
 
+// Aba aberta dentro de Encontros ("encontros" ou "materiais") e ministérios do cadastro
+// (sem Conselho, Diretoria e Assembleia, que são das atas).
+let encontrosAba = 'encontros';
+let encontrosIniciado = false;
+let ministeriosEncontros = [];
+let filtroMinisterioEncontros = '';
+
+/** Chamado pelo painel antes de abrir a aba, por atalhos como "Materiais e roteiros ›". */
+function definirSubAba(aba, sub) {
+  if (aba === 'encontros' && ['encontros', 'materiais'].includes(sub)) encontrosAba = sub;
+}
+
+async function carregarMinisteriosEncontros() {
+  try {
+    const r = await api('GET', '/api/ministerios');
+    ministeriosEncontros = listaEncontros(r, 'ministerios').filter(m => !m.fixo);
+  } catch (_) { ministeriosEncontros = []; }
+}
+
+const nomeMinisterioEncontro = id => id ? (ministeriosEncontros.find(m => m.id === id)?.nome || 'Ministério removido') : 'Igreja toda';
+const opcoesMinisterioEncontro = rotuloVazio => ({ '': rotuloVazio, ...Object.fromEntries(ministeriosEncontros.map(m => [m.id, m.nome])) });
+
+function mostrarAbaEncontros(nome) {
+  encontrosAba = nome;
+  const abas = $('encontros-abas');
+  for (const b of abas?.querySelectorAll?.('[data-encontros-aba]') || []) b.setAttribute('aria-selected', String(b.dataset.encontrosAba === nome));
+  const lista = $('encontros-conteudo'), materiais = $('encontros-materiais');
+  if (lista && materiais && lista !== materiais) { lista.hidden = nome !== 'encontros'; materiais.hidden = nome !== 'materiais'; }
+}
+
 /** "2026-12-05T19:30" → "05/12/2026 às 19:30"; "2026-12-05" → "05/12/2026". Lê o texto, sem fuso. */
 function dataEncontro(iso) {
   if (!iso) return '';
@@ -74,7 +104,7 @@ function cartaoEncontro(e) {
   return el('article', { class: 'item' },
     el('div', { class: 'conteudo' },
       el('div', { class: 'titulo' }, e.titulo || 'Encontro', ' ', etiquetaEncontro(e)),
-      el('p', { class: 'sub' }, `${tiposEncontro[e.tipo] || 'Encontro'} · ${periodoEncontro(e)} · ${e.local || 'Local a definir'}`),
+      el('p', { class: 'sub' }, `${nomeMinisterioEncontro(e.ministerioId)} · ${tiposEncontro[e.tipo] || 'Encontro'} · ${periodoEncontro(e)} · ${e.local || 'Local a definir'}`),
       el('p', { class: 'sub' }, vagasEncontro(e))),
     el('div', { class: 'acoes' }, botao('Ver encontro', () => detalheEncontro(e.id))));
 }
@@ -82,24 +112,48 @@ function cartaoEncontro(e) {
 async function carregarEncontros() {
   const alvo = $('encontros-conteudo');
   if (!alvo) return;
+  const abas = $('encontros-abas');
+  if (!encontrosIniciado && abas && abas !== alvo && abas.querySelectorAll) {
+    encontrosIniciado = true;
+    abas.addEventListener('click', (ev) => {
+      const b = ev.target.closest && ev.target.closest('[data-encontros-aba]');
+      if (b && b.dataset.encontrosAba !== encontrosAba) { mostrarAbaEncontros(b.dataset.encontrosAba); carregarEncontros(); }
+    });
+  }
+  mostrarAbaEncontros(encontrosAba);
   try {
-    const encontros = listaEncontros(await api('GET', '/api/encontros'), 'encontros');
+    await carregarMinisteriosEncontros();
+    if (encontrosAba === 'materiais') {
+      if (typeof carregarMateriais === 'function') await carregarMateriais();
+      return;
+    }
+    const todos = listaEncontros(await api('GET', '/api/encontros'), 'encontros');
+    // Filtro por ministério: "" = todos, "igreja" = sem ministério, ou o id do ministério.
+    const encontros = todos.filter(e => !filtroMinisterioEncontros ||
+      (filtroMinisterioEncontros === 'igreja' ? !e.ministerioId : e.ministerioId === filtroMinisterioEncontros));
     const agora = new Date();
     const proximos = encontros.filter(e => ['rascunho', 'aberto'].includes(e.estado) && new Date(e.inicio) >= agora);
     const anteriores = encontros.filter(e => !proximos.includes(e)).reverse();
     const tarefas = el('div', { class: 'lista' });
+    const filtro = el('select', { 'aria-label': 'Filtrar por ministério' },
+      ...Object.entries({ '': 'Todos os ministérios', igreja: 'Igreja toda', ...Object.fromEntries(ministeriosEncontros.map(m => [m.id, m.nome])) })
+        .map(([v, t]) => el('option', { value: v }, t)));
+    filtro.value = filtroMinisterioEncontros;
+    filtro.addEventListener('change', () => { filtroMinisterioEncontros = filtro.value; return carregarEncontros(); });
     alvo.replaceChildren(...[
-      pode('encontros') ? el('div', { class: 'barra' }, botao('Criar encontro', () => formularioEncontro(), 'pequeno')) : null,
+      el('div', { class: 'barra' }, pode('encontros') ? botao('Criar encontro', () => formularioEncontro(), 'pequeno') : null,
+        el('span', { class: 'espaco' }), ministeriosEncontros.length ? filtro : null),
       el('h2', {}, 'Próximos encontros'),
       el('div', { class: 'lista' }, ...(proximos.length ? proximos.map(cartaoEncontro)
-        : [el('p', { class: 'vazio' }, encontros.length ? 'Nenhum encontro futuro em rascunho ou aberto.' : 'Nenhum encontro cadastrado.')])),
+        : [el('p', { class: 'vazio' }, encontros.length ? 'Nenhum encontro futuro em rascunho ou aberto.'
+          : todos.length ? 'Nenhum encontro deste ministério.' : 'Nenhum encontro cadastrado.')])),
       el('h2', {}, 'Tarefas pendentes'),
       tarefas,
       anteriores.length ? el('h2', {}, 'Anteriores, encerrados e cancelados') : null,
       anteriores.length ? el('div', { class: 'lista' }, ...anteriores.map(cartaoEncontro)) : null,
     ].filter(Boolean));
     await tarefasPendentesEncontros(tarefas, encontros);
-  } catch (e) { mensagem(alvo, e.message, false); }
+  } catch (e) { mensagem(encontrosAba === 'materiais' ? $('encontros-materiais') || alvo : alvo, e.message, false); }
 }
 
 async function tarefasPendentesEncontros(alvo, encontros) {
@@ -129,10 +183,10 @@ async function tarefasPendentesEncontros(alvo, encontros) {
 function roteiroUtilizadoEncontro(alvo, encontro) {
   const roteiro = Array.isArray(encontro.roteiro) ? encontro.roteiro : [];
   alvo.append(el('h3', {}, 'Roteiro utilizado'));
-  if (!roteiro.length) { alvo.append(el('p', { class: 'dica' }, 'Nenhum material associado. Associe materiais em Casais e Família › Materiais e atividades.')); return; }
+  if (!roteiro.length) { alvo.append(el('p', { class: 'dica' }, pode('encontros') && encontro.estado !== 'cancelado' ? 'Nenhum material no roteiro. Use "Montar roteiro" para escolher materiais da biblioteca.' : 'Nenhum material no roteiro.')); return; }
   const textos = roteiro.map(item => {
     const snapshot = item.conteudoSnapshot || {};
-    if (typeof textoMaterialCasais === 'function') return textoMaterialCasais(snapshot);
+    if (typeof textoMaterial === 'function') return textoMaterial(snapshot);
     // Fallback de leitura quando a biblioteca ainda não está carregada.
     return [snapshot.titulo, snapshot.objetivo, snapshot.duracaoMinutos ? `Duração: ${snapshot.duracaoMinutos} minutos` : '',
       snapshot.referenciasBiblicas, snapshot.preparacao, snapshot.passos, snapshot.perguntas].filter(Boolean).join('\n\n');
@@ -152,6 +206,7 @@ function formularioEncontro(atual, atualizar = carregarEncontros) {
   const { conteudo } = janelaEncontro(atual ? 'Editar encontro' : 'Criar encontro', async () => {
     const corpo = Object.fromEntries(Object.entries(campos).map(([chave, input]) => [chave, input.value]));
     corpo.capacidade = corpo.capacidade === '' ? null : Number(corpo.capacidade);
+    corpo.ministerioId = corpo.ministerioId || null;
     await api(atual ? 'PUT' : 'POST', atual ? caminhoEncontro(atual.id) : '/api/encontros', corpo);
     await atualizar();
   });
@@ -159,6 +214,7 @@ function formularioEncontro(atual, atualizar = carregarEncontros) {
   conteudo.append(grade);
   const adicionar = (chave, rotulo, opcoes = {}) => { campos[chave] = campoEncontro(grade, rotulo, atual?.[chave] ?? '', opcoes); };
   adicionar('titulo', 'Título', { obrigatorio: true, limite: 160, largo: true });
+  adicionar('ministerioId', 'Ministério responsável', { opcoes: opcoesMinisterioEncontro('Igreja toda') });
   adicionar('tipo', 'Tipo', { opcoes: tiposEncontro }); if (!atual) campos.tipo.value = 'jantar';
   adicionar('estado', 'Situação', { opcoes: estadosEncontro }); if (!atual) campos.estado.value = 'rascunho';
   adicionar('inicio', 'Início', { tipo: 'datetime-local', obrigatorio: true });
@@ -204,12 +260,13 @@ async function detalheEncontro(id) {
     const atualizar = async () => { janela.dlg.close(); await carregarEncontros(); await detalheEncontro(id); };
     const c = janela.conteudo;
     c.append(el('div', { class: 'titulo encontro-titulo' }, e.titulo || 'Encontro', ' ', etiquetaEncontro(e)),
-      el('p', { class: 'dica' }, `${tiposEncontro[e.tipo] || 'Encontro'} · ${periodoEncontro(e)} · ${e.local || 'Local a definir'}`),
+      el('p', { class: 'dica' }, `${nomeMinisterioEncontro(e.ministerioId)} · ${tiposEncontro[e.tipo] || 'Encontro'} · ${periodoEncontro(e)} · ${e.local || 'Local a definir'}`),
       e.descricao ? el('p', { class: 'encontro-texto' }, e.descricao) : el('p', { class: 'dica' }, 'Sem descrição.'),
       el('p', {}, vagasEncontro(e)));
     if (gestao && ativo) c.append(el('div', { class: 'barra' },
       e.estado === 'aberto' ? botao('Inscrever pessoas', () => formularioInscricao(e, atualizar), 'pequeno') : null,
       botao('Editar encontro', () => formularioEncontro(e, atualizar)),
+      typeof montarRoteiroEncontro === 'function' ? botao('Montar roteiro', () => montarRoteiroEncontro(e, atualizar)) : null,
       botao('Preparar convite', () => prepararConviteEncontro(e)),
       botao('Cancelar encontro', () => confirmarEncontro('Cancelar encontro', 'Novas inscrições e presenças serão bloqueadas. O histórico será preservado.', async () => {
         await api('POST', caminhoEncontro(id) + '/cancelar', {}); await atualizar();

@@ -5,17 +5,17 @@ import 'package:archive/archive.dart';
 import 'package:diako_server/auth.dart';
 import 'package:diako_server/backup.dart';
 import 'package:diako_server/encontros.dart';
-import 'package:diako_server/casais_materiais.dart';
+import 'package:diako_server/materiais.dart';
 import 'package:diako_server/permissoes.dart';
 import 'package:diako_server/store.dart';
 import 'package:path/path.dart' as p;
 import 'package:test/test.dart';
 
 const colecoesCasais = ['casaisContatos', 'casaisEnvios', 'encontros',
-  'inscricoes', 'tarefasEncontros', 'casaisMateriais'];
+  'inscricoes', 'tarefasEncontros', 'materiais', 'tiposMaterial'];
 const data = '2026-11-18T10:00:00.000';
 final autoria = {'criadoEm': data, 'atualizadoEm': data, 'usuarioId': 'lider', 'usuarioNome': 'Líder'};
-Map<String, dynamic> conteudo() => {'titulo': 'Atividade fictícia', 'publico': 'ambos',
+Map<String, dynamic> conteudo() => {'titulo': 'Atividade fictícia', 'publico': 'casais',
   'objetivo': '', 'duracaoMinutos': 30, 'referenciasBiblicas': '', 'preparacao': '', 'passos': '', 'perguntas': ''};
 
 Map<String, List<Map<String, dynamic>>> base() => {
@@ -25,10 +25,12 @@ Map<String, List<Map<String, dynamic>>> base() => {
     'tipo': 'parabenizado', 'ocorrencia': '2026-11-18', 'realizadoEm': '2026-11-18',
     'registradoEm': data, 'usuarioId': 'lider', 'usuarioNome': 'Líder',
   }],
-  'casaisMateriais': [{'id': 'mat1', ...conteudo(), 'versao': 2, 'arquivado': true, ...autoria}],
+  'ministerios': [{'id': 'min1', 'nome': 'Jovens'}],
+  'tiposMaterial': [{'id': 'tp1', 'nome': 'Dinâmica', ...autoria}],
+  'materiais': [{'id': 'mat1', ...conteudo(), 'versao': 2, 'arquivado': true, 'ministerioId': 'min1', 'tipoId': 'tp1', ...autoria}],
   'encontros': [{'id': 'e1', 'titulo': 'Encontro fictício', 'tipo': 'jantar',
     'inicio': data, 'fim': '2026-11-18T12:00:00.000', 'local': '', 'descricao': '',
-    'estado': 'aberto', 'capacidade': 10, ...autoria,
+    'estado': 'aberto', 'capacidade': 10, 'ministerioId': 'min1', ...autoria,
     'roteiro': [{'materialId': 'mat1', 'versao': 1, 'conteudoSnapshot': conteudo()}],
   }],
   'inscricoes': [{'id': 'i1', 'encontroId': 'e1', 'responsavelMembroId': 'm1',
@@ -120,7 +122,7 @@ void main() {
   test('aceita contratos gerados pelos domínios, inclusive reversão de presença', () async {
     final lider = Conta(id: 'lider', nome: 'Líder', login: 'lider', perfil: Perfil.liderCasais);
     final encontros = Encontros(store, agora: () => DateTime.parse(data), responsavelValido: (_) => true);
-    final materiais = CasaisMateriais(store, agora: () => DateTime.parse(data));
+    final materiais = Materiais(store, agora: () => DateTime.parse(data));
     await store.substituir('membros', base()['membros']!);
     final encontro = await encontros.criarEncontro({'titulo': 'Encontro', 'tipo': 'jantar',
       'inicio': data, 'fim': '2026-11-18T12:00:00.000', 'estado': 'aberto'}, conta: lider);
@@ -162,13 +164,18 @@ void main() {
     'participante com tipo inválido': (b) => (b['inscricoes']!.single['participantes'] as List).first['crianca'] = 'sim',
     'tarefa órfã': (b) => b['tarefasEncontros']!.single['encontroId'] = 'ausente',
     'tarefa com estado inválido': (b) => b['tarefasEncontros']!.single['estado'] = 'aberta',
-    'material com duração inválida': (b) => b['casaisMateriais']!.single['duracaoMinutos'] = 481,
-    'material com tipo inválido': (b) => b['casaisMateriais']!.single['arquivado'] = 'sim',
-    'material com versão inválida': (b) => b['casaisMateriais']!.single['versao'] = 0,
-    'snapshot inválido': (b) => b['encontros']!.single['roteiro'][0]['conteudoSnapshot']['publico'] = 'todos',
+    'material com duração inválida': (b) => b['materiais']!.single['duracaoMinutos'] = 481,
+    'material com tipo inválido': (b) => b['materiais']!.single['arquivado'] = 'sim',
+    'material com versão inválida': (b) => b['materiais']!.single['versao'] = 0,
+    'snapshot inválido': (b) => b['encontros']!.single['roteiro'][0]['conteudoSnapshot']['publico'] = 'ninguem',
     'material do roteiro inexistente': (b) => b['encontros']!.single['roteiro'][0]['materialId'] = 'ausente',
     'snapshot com versão futura': (b) => b['encontros']!.single['roteiro'][0]['versao'] = 3,
-    'IDs duplicados': (b) => b['casaisMateriais']!.add({...b['casaisMateriais']!.single}),
+    'IDs duplicados': (b) => b['materiais']!.add({...b['materiais']!.single}),
+    'material com ministério inexistente': (b) => b['materiais']!.single['ministerioId'] = 'ausente',
+    'material com tipo de material inexistente': (b) => b['materiais']!.single['tipoId'] = 'ausente',
+    'encontro com ministério inexistente': (b) => b['encontros']!.single['ministerioId'] = 'ausente',
+    'tipo de material sem nome': (b) => b['tiposMaterial']!.single['nome'] = '',
+    'snapshot com nome de tipo inválido': (b) => b['encontros']!.single['roteiro'][0]['conteudoSnapshot']['tipoNome'] = 42,
     'envio com estado inválido': (b) => b['casaisEnvios']!.single['estado'] = 'enviado',
     'envio com hash inválido': (b) => b['casaisEnvios']!.single['destinatarioHash'] = 'email@exemplo.com',
     'envio com destinatário inexistente': (b) => b['casaisEnvios']!.single['destinatarioMembroId'] = 'ausente',
