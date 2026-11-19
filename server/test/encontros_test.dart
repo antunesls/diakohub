@@ -302,4 +302,22 @@ void main() {
     expect((await edicao)['roteiro'], hasLength(1));
     expect(dominio.encontro(e['id'])['titulo'], 'Novo título');
   });
+
+  test('exclusão de encontro: só a Administração, leva inscrições e tarefas e não mexe nos outros', () async {
+    final admin = Conta(id: 'adm', nome: 'Administrador', login: 'admin', perfil: Perfil.administrador);
+    final apagar = await dominio.criarEncontro(dados(), conta: lider);
+    final manter = await dominio.criarEncontro({...dados(), 'titulo': 'Outro'}, conta: lider);
+    await dominio.inscrever(apagar['id'], inscricao('a'), conta: lider);
+    await dominio.inscrever(manter['id'], inscricao('a'), conta: lider);
+    await dominio.criarTarefa(apagar['id'], {'descricao': 'Comprar'}, conta: lider);
+    await dominio.criarTarefa(manter['id'], {'descricao': 'Limpar'}, conta: lider);
+    await expectLater(dominio.excluirEncontro(apagar['id'], conta: lider), throwsStateError,
+        reason: 'quem gerencia encontros sem Administração não exclui');
+    await expectLater(dominio.excluirEncontro(apagar['id'], conta: semEncontros), throwsStateError);
+    expect(await dominio.excluirEncontro(apagar['id'], conta: admin), {'inscricoes': 1, 'tarefas': 1});
+    expect(store.buscar('encontros', apagar['id']), isNull);
+    expect(store.listar('inscricoes').map((i) => i['encontroId']), [manter['id']]);
+    expect(store.listar('tarefasEncontros').map((t) => t['encontroId']), [manter['id']]);
+    await expectLater(dominio.excluirEncontro(apagar['id'], conta: admin), throwsA(isA<NaoEncontrado>()));
+  });
 }

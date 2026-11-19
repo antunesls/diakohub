@@ -17,7 +17,7 @@ class Auditoria {
   Future<void> _fila = Future.value();
 
   /// Tipos de evento (a listagem só aceita estes como filtro).
-  static const tipos = ['escala', 'musicas', 'repertorio', 'roteiro', 'indisponibilidade', 'acesso'];
+  static const tipos = ['escala', 'musicas', 'repertorio', 'roteiro', 'indisponibilidade', 'acesso', 'encontro'];
 
   /// Registra o evento. [usuario] e [perfil] identificam a conta responsável pela
   /// alteração. A gravação é serializada e melhor-esforço: uma falha aqui nunca

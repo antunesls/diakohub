@@ -339,6 +339,13 @@ class Servidor {
           encontros.encontro(id)))
       ..put('/api/encontros/<id>', (Request req, String id) => _operacaoCasais(() async =>
           encontros.editarEncontro(id, await _corpo(req), conta: Auth.contaDa(req)!)))
+      ..delete('/api/encontros/<id>', (Request req, String id) => _operacaoCasais(() async {
+            final atual = store.buscar('encontros', id);
+            final removidos = await encontros.excluirEncontro(id, conta: Auth.contaDa(req)!);
+            await _auditar(req, tipo: 'encontro', acao: 'encontro-excluido', alvo: '${atual?['titulo'] ?? id}',
+                detalhe: '${removidos['inscricoes']} inscrição(ões) e ${removidos['tarefas']} tarefa(s) removidas');
+            return {'ok': true, ...removidos};
+          }))
       ..post('/api/encontros/<id>/cancelar', (Request req, String id) => _operacaoCasais(() =>
           encontros.cancelarEncontro(id, conta: Auth.contaDa(req)!)))
       ..get('/api/encontros/<id>/inscricoes', (Request _, String id) => _operacaoCasais(() =>

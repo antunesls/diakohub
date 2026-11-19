@@ -190,6 +190,26 @@ class Encontros {
   Future<Map<String, dynamic>> cancelarEncontro(String id,
           {required Conta conta}) =>
       editarEncontro(id, {'estado': 'cancelado'}, conta: conta);
+
+  /// Exclui o encontro com as inscrições e tarefas dele (só a Administração).
+  /// Apaga primeiro os filhos: se algo falhar, o encontro continua e a exclusão pode ser repetida.
+  Future<Map<String, int>> excluirEncontro(String id, {required Conta conta}) =>
+      _alterar(conta, () async {
+        if (!conta.pode(Permissao.admin))
+          throw StateError('Sem permissão: só a Administração exclui encontros.');
+        _buscar('encontros', id);
+        final inscricoes = store.listar('inscricoes').where((i) => i['encontroId'] == id).toList();
+        final tarefas = store.listar('tarefasEncontros').where((t) => t['encontroId'] == id).toList();
+        for (final i in inscricoes) {
+          await store.excluir('inscricoes', i['id'] as String);
+        }
+        for (final t in tarefas) {
+          await store.excluir('tarefasEncontros', t['id'] as String);
+        }
+        await store.excluir('encontros', id);
+        return {'inscricoes': inscricoes.length, 'tarefas': tarefas.length};
+      });
+
   List<Map<String, dynamic>> listarInscricoes(String encontroId) {
     _buscar('encontros', encontroId);
     return store

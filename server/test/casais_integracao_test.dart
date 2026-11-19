@@ -255,4 +255,20 @@ void main() {
     expect(excluir.$1, 400, reason: '${excluir.$2}');
     expect('${excluir.$2}', contains('1 encontro e 1 material'));
   });
+
+  test('excluir encontro pela API: 403 sem Administração, 200 com, e fica na auditoria', () async {
+    final e = await chamar('POST', '/api/encontros', token: lider, corpo: {
+      'titulo': '[EXEMPLO] Teste', 'tipo': 'culto', 'inicio': '2027-01-10T08:00', 'fim': '2027-01-10T09:00', 'estado': 'aberto',
+    });
+    final id = e.$2['id'];
+    await chamar('POST', '/api/encontros/$id/tarefas', token: lider, corpo: {'descricao': 'Teste'});
+    expect((await chamar('DELETE', '/api/encontros/$id', token: lider)).$1, 403);
+    final r = await chamar('DELETE', '/api/encontros/$id', token: admin);
+    expect(r.$1, 200, reason: '${r.$2}');
+    expect(r.$2['tarefas'], 1);
+    expect((await chamar('GET', '/api/encontros/$id', token: admin)).$1, 404);
+    expect((await chamar('DELETE', '/api/encontros/$id', token: admin)).$1, 404);
+    final trilha = await chamar('GET', '/api/auditoria?tipo=encontro', token: admin);
+    expect('${trilha.$2}', contains('[EXEMPLO] Teste'));
+  });
 }

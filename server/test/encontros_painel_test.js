@@ -230,3 +230,23 @@ test('lista mostra o ministério de cada encontro, filtra por ministério e não
   assert.doesNotMatch(textos(), /Acampamento/);
   await a.run('filtroMinisterioEncontros = ""');
 });
+
+test('excluir encontro só aparece com Administração e chama DELETE após confirmar', async () => {
+  const responder = (_, url) => url.endsWith('/inscricoes') ? [{ id: 'i', estado: 'confirmada', participantes: [] }]
+    : url.endsWith('/tarefas') ? [] : { id: 'e', titulo: 'Jantar', estado: 'cancelado' };
+  const semAdmin = ambiente(true, responder);
+  semAdmin.run("pode = p => p === 'encontros'");
+  await semAdmin.run('detalheEncontro("e")');
+  assert.ok(!todos(semAdmin.body).some(n => n.tag === 'button' && n.children.includes('Excluir encontro')));
+  const comAdmin = ambiente(true, responder);
+  await comAdmin.run('detalheEncontro("e")');
+  const excluir = todos(comAdmin.body).find(n => n.tag === 'button' && n.children.includes('Excluir encontro'));
+  assert.ok(excluir, 'aparece mesmo em encontro cancelado');
+  excluir.props.onclick();
+  const confirmacao = comAdmin.body.children.at(-1);
+  const texto = todos(confirmacao).flatMap(n => n.children.filter(f => typeof f === 'string')).join(' ');
+  assert.match(texto, /1 inscrição e 0 tarefas/);
+  assert.match(texto, /Não dá para desfazer/);
+  await todos(confirmacao).find(n => n.tag === 'form').events.submit({ preventDefault() {} });
+  assert.ok(comAdmin.chamadas.some(c => c.metodo === 'DELETE' && c.url === '/api/encontros/e'));
+});

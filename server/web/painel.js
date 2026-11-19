@@ -502,12 +502,14 @@ const TIPOS_AUDITORIA = {
   roteiro: 'Roteiro',
   indisponibilidade: 'Indisponibilidade',
   acesso: 'Acesso',
+  encontro: 'Encontro',
 };
 
 const ACOES_AUDITORIA = {
   'culto-criado': 'Culto criado',
   'culto-alterado': 'Culto alterado',
   'culto-excluido': 'Culto excluído',
+  'encontro-excluido': 'Encontro excluído',
   'cultos-gerados': 'Cultos gerados',
   'escala-repetida': 'Escala repetida',
   'funcao-alterada': 'Função alterada',

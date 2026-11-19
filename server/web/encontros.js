@@ -272,6 +272,19 @@ async function detalheEncontro(id) {
         await api('POST', caminhoEncontro(id) + '/cancelar', {}); await atualizar();
       }), 'perigo pequeno')));
     if (gestao && ativo && e.estado !== 'aberto') c.append(el('p', { class: 'dica' }, 'Para receber inscrições, edite o encontro e mude a situação para "Aberto".'));
+    // Excluir de vez (só a Administração): para cadastros de teste ou feitos por engano.
+    // No dia a dia, prefira cancelar, que preserva o histórico.
+    if (gestao && pode('admin')) {
+      const qtdInscricoes = listaEncontros(respostaI, 'inscricoes').length, qtdTarefas = listaEncontros(respostaT, 'tarefas').length;
+      c.append(el('div', { class: 'barra' }, botao('Excluir encontro', () => confirmarEncontro('Excluir encontro',
+        `Excluir "${e.titulo || 'Encontro'}" com ${qtdInscricoes} ${qtdInscricoes === 1 ? 'inscrição' : 'inscrições'} e ${qtdTarefas} ${qtdTarefas === 1 ? 'tarefa' : 'tarefas'}? ` +
+        'Não dá para desfazer (só restaurando um backup). Para encerrar um encontro real, prefira "Cancelar encontro", que preserva o histórico.',
+        async () => {
+          await api('DELETE', caminhoEncontro(id));
+          janela.dlg.close();
+          await carregarEncontros();
+        }), 'perigo pequeno')));
+    }
 
     c.append(el('h3', {}, 'Inscrições e presença'));
     const inscricoes = listaEncontros(respostaI, 'inscricoes');
