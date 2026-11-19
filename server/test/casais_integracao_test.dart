@@ -8,6 +8,7 @@ import 'package:diako_server/cartazes.dart';
 import 'package:diako_server/config.dart';
 import 'package:diako_server/configuracoes.dart';
 import 'package:diako_server/email_casais.dart';
+import 'package:diako_server/email_inscricao.dart';
 import 'package:diako_server/historico.dart';
 import 'package:diako_server/holyrics.dart';
 import 'package:diako_server/permissoes.dart';
@@ -31,6 +32,7 @@ void main() {
   late Handler handler;
   late String lider, consulta, midia, admin;
   late List<EmailCasais> enviados;
+  late List<EmailInscricao> emailsInscricao;
   Future<(int, dynamic)> chamar(String metodo, String rota, {String? token, Object? corpo}) async {
     final r = await handler(Request(metodo, Uri.parse('http://teste$rota'), headers: {
       if (token != null) 'authorization': 'Bearer $token', 'content-type': 'application/json',
@@ -40,6 +42,7 @@ void main() {
   }
   setUp(() async {
     enviados = [];
+    emailsInscricao = [];
     pasta = await Directory.systemTemp.createTemp('diako_casais_integracao_');
     final cfgInicial = Config.lerJson('{"senhaAdmin":"admin-teste-123"}', pastaBase: pasta.path);
     final cfg = await Configuracoes.carregar(cfgInicial, urlDetectada: 'http://teste');
@@ -55,7 +58,8 @@ void main() {
       cartazes: Cartazes(cfgInicial.pastaCartazes), backup: Backup(pastaDados: store.pasta),
       pastaWeb: 'web', urlOracao: cfg.urlOracao, cartazesNoHolyrics: false,
       historico: Historico(store.pasta), cfg: cfg, relogio: () => DateTime(2026, 11, 18, 12),
-      enviarEmailCasal: (email) async => enviados.add(email)).handler;
+      enviarEmailCasal: (email) async => enviados.add(email),
+      enviarInscricao: (email) async => emailsInscricao.add(email)).handler;
     admin = (await chamar('POST', '/api/login', corpo: {'senha': 'admin-teste-123'})).$2['token'] as String;
     lider = (await chamar('POST', '/api/login', corpo: {'usuario': 'lider', 'senha': 'lider-teste-123'})).$2['token'] as String;
     consulta = (await chamar('POST', '/api/login', corpo: {'usuario': 'consulta', 'senha': 'consulta-teste-123'})).$2['token'] as String;
@@ -270,5 +274,98 @@ void main() {
     expect((await chamar('DELETE', '/api/encontros/$id', token: admin)).$1, 404);
     final trilha = await chamar('GET', '/api/auditoria?tipo=encontro', token: admin);
     expect('${trilha.$2}', contains('[EXEMPLO] Teste'));
+  });
+
+  test('inscrição pelo link público: página, vagas, espera, e-mails, cancelamento e proteções', () async {
+    final e = await chamar('POST', '/api/encontros', token: lider, corpo: {
+      'titulo': 'Retiro', 'tipo': 'retiro', 'inicio': '2026-12-10T08:00', 'fim': '2026-12-12T17:00',
+      'estado': 'aberto', 'capacidade': 2,
+    });
+    final id = e.$2['id'];
+    expect((await chamar('PUT', '/api/encontros/$id/link', token: midia, corpo: {'ativo': true})).$1, 403);
+    final cfgLink = await chamar('PUT', '/api/encontros/$id/link', token: lider, corpo: {'ativo': true, 'pergunta': 'Vai de carona?'});
+    expect(cfgLink.$1, 200, reason: '${cfgLink.$2}');
+    final codigo = cfgLink.$2['codigo'] as String;
+
+    // Página e QR são públicos; a API pública não mostra inscritos.
+    final pagina = await handler(Request('GET', Uri.parse('http://teste/inscricao/$codigo')));
+    expect(pagina.statusCode, 200);
+    expect(await pagina.readAsString(), contains('inscricao.js'));
+    final qr = await handler(Request('GET', Uri.parse('http://teste/inscricao/$codigo/qr.png')));
+    expect(qr.statusCode, 200);
+    expect(qr.headers['content-type'], 'image/png');
+    final telao = await handler(Request('GET', Uri.parse('http://teste/inscricao/$codigo/qr.png?telao=1')));
+    expect(telao.statusCode, 200);
+    expect((await telao.read().expand((b) => b).toList()).length, greaterThan((await qr.read().expand((b) => b).toList()).length));
+    expect((await handler(Request('GET', Uri.parse('http://teste/inscricao/naoexiste123/qr.png')))).statusCode, 404);
+    final info = await chamar('GET', '/api/public/inscricao/$codigo');
+    expect(info.$1, 200);
+    expect(info.$2['pergunta'], 'Vai de carona?');
+    expect(info.$2['vagasRestantes'], 2);
+
+    // Vale na hora; quem não cabe vai para a espera.
+    final primeira = await chamar('POST', '/api/public/inscricao/$codigo', corpo: {
+      'nome': 'Maria', 'whatsapp': '11 91111-1111', 'email': 'maria@exemplo.test', 'consentimento': true,
+      'acompanhantes': [{'nome': 'João', 'crianca': true}], 'resposta': 'Sim',
+    });
+    expect(primeira.$1, 201, reason: '${primeira.$2}');
+    expect(primeira.$2['estado'], 'confirmada');
+    expect(primeira.$2['emailEnviado'], isTrue);
+    expect(emailsInscricao.single.assunto, contains('confirmada'));
+    final linkCancelar = RegExp(r'https?://\S+/inscricao/cancelar\?token=([\w-]+)').firstMatch(emailsInscricao.single.texto)!;
+    final espera = await chamar('POST', '/api/public/inscricao/$codigo', corpo: {
+      'nome': 'Pedro', 'whatsapp': '11 92222-2222', 'email': 'pedro@exemplo.test', 'consentimento': true,
+    });
+    expect(espera.$2['estado'], 'espera');
+    expect(emailsInscricao.last.assunto, contains('Lista de espera'));
+    expect((await chamar('POST', '/api/public/inscricao/$codigo', corpo: {
+      'nome': 'Maria de novo', 'whatsapp': '(11) 91111-1111', 'consentimento': true,
+    })).$1, 400, reason: 'mesmo WhatsApp');
+
+    // A equipe vê contato e resposta; o encontro conta a espera à parte.
+    final lista = await chamar('GET', '/api/encontros/$id/inscricoes', token: consulta);
+    final daMaria = (lista.$2 as List).firstWhere((i) => i['responsavelNome'] == 'Maria');
+    expect(daMaria['origem'], 'link');
+    expect(daMaria['resposta'], 'Sim');
+    expect(daMaria['whatsapp'], '5511911111111');
+    final detalhe = await chamar('GET', '/api/encontros/$id', token: consulta);
+    expect(detalhe.$2['vagasOcupadas'], 2);
+    expect(detalhe.$2['emEspera'], 1);
+
+    // Cancelamento pelo link do e-mail; depois a equipe promove quem esperava (e ele recebe e-mail).
+    final token = linkCancelar.group(1);
+    expect((await chamar('POST', '/api/public/inscricoes/consultar', corpo: {'token': token})).$2['estado'], 'confirmada');
+    expect((await chamar('POST', '/api/public/inscricoes/cancelar', corpo: {'token': token})).$2['estado'], 'cancelada');
+    expect((await chamar('POST', '/api/public/inscricoes/cancelar', corpo: {'token': 'x' * 30})).$1, 404);
+    final idEspera = (lista.$2 as List).firstWhere((i) => i['responsavelNome'] == 'Pedro')['id'];
+    expect((await chamar('POST', '/api/inscricoes/$idEspera/promover', token: midia)).$1, 403);
+    final promovida = await chamar('POST', '/api/inscricoes/$idEspera/promover', token: lider);
+    expect(promovida.$1, 200, reason: '${promovida.$2}');
+    expect(promovida.$2['emailEnviado'], isTrue);
+    expect(emailsInscricao.last.assunto, contains('Vaga confirmada'));
+    expect(emailsInscricao.last.destinatario, 'pedro@exemplo.test');
+
+    // Vincular ao cadastro.
+    final vinculo = await chamar('PUT', '/api/inscricoes/$idEspera/vincular', token: lider, corpo: {'membroId': 'b'});
+    expect(vinculo.$1, 200, reason: '${vinculo.$2}');
+    expect(vinculo.$2['responsavelMembroId'], 'b');
+
+    // Robô (campo invisível) recebe "ok" sem gravar; depois de 5 envios o IP espera.
+    final antes = store.listar('inscricoes').length;
+    expect((await chamar('POST', '/api/public/inscricao/$codigo', corpo: {'website': 'spam', 'nome': 'Bot'})).$1, 201);
+    expect(store.listar('inscricoes').length, antes);
+    var limitado = false;
+    for (var n = 0; n < 6 && !limitado; n++) {
+      limitado = (await chamar('POST', '/api/public/inscricao/$codigo', corpo: {'nome': 'X', 'whatsapp': '1199999000$n'})).$1 == 429;
+    }
+    expect(limitado, isTrue);
+
+    // O backup aceita e restaura as inscrições pelo link e a configuração do link.
+    final bytes = await Backup(pastaDados: store.pasta).gerarZip();
+    final inscricoesAntes = jsonEncode(store.listar('inscricoes'));
+    final restauracao = Restauracao(store: store, backup: Backup(pastaDados: store.pasta), pastaDados: store.pasta,
+        pastaCartazes: '${pasta.path}/cartazes');
+    await restauracao.restaurar(bytes);
+    expect(jsonEncode(store.listar('inscricoes')), inscricoesAntes);
   });
 }

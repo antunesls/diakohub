@@ -59,7 +59,9 @@ function periodoEncontro(e) {
 function vagasEncontro(e) {
   const ocupadas = e.vagasOcupadas || 0;
   const pessoas = `${ocupadas} ${ocupadas === 1 ? 'participante' : 'participantes'}`;
-  return e.vagasDisponiveis == null ? `${pessoas} · sem limite de vagas` : `${pessoas} · ${e.vagasDisponiveis} vagas disponíveis`;
+  const base = e.vagasDisponiveis == null ? `${pessoas} · sem limite de vagas`
+    : `${pessoas} · ${e.vagasDisponiveis} ${e.vagasDisponiveis === 1 ? 'vaga disponível' : 'vagas disponíveis'}`;
+  return e.emEspera ? `${base} · ${e.emEspera} na lista de espera` : base;
 }
 
 const etiquetaEncontro = e => el('span', { class: `etiqueta ${e.estado === 'aberto' ? 'nova' : e.estado === 'cancelado' ? 'alerta' : ''}` },
@@ -103,7 +105,8 @@ function campoEncontro(alvo, rotulo, valor = '', { tipo = 'text', opcoes, obriga
 function cartaoEncontro(e) {
   return el('article', { class: 'item' },
     el('div', { class: 'conteudo' },
-      el('div', { class: 'titulo' }, e.titulo || 'Encontro', ' ', etiquetaEncontro(e)),
+      el('div', { class: 'titulo' }, e.titulo || 'Encontro', ' ', etiquetaEncontro(e),
+        ...(e.linkInscricao?.ativo && e.estado === 'aberto' ? [' ', el('span', { class: 'etiqueta' }, 'Inscrições pelo link')] : [])),
       el('p', { class: 'sub' }, `${nomeMinisterioEncontro(e.ministerioId)} · ${tiposEncontro[e.tipo] || 'Encontro'} · ${periodoEncontro(e)} · ${e.local || 'Local a definir'}`),
       el('p', { class: 'sub' }, vagasEncontro(e))),
     el('div', { class: 'acoes' }, botao('Ver encontro', () => detalheEncontro(e.id))));
@@ -286,20 +289,42 @@ async function detalheEncontro(id) {
         }), 'perigo pequeno')));
     }
 
+    if (gestao) linkInscricaoEncontro(c, e, atualizar);
+
     c.append(el('h3', {}, 'Inscrições e presença'));
-    const inscricoes = listaEncontros(respostaI, 'inscricoes');
+    // Confirmadas primeiro, depois a lista de espera (por ordem de chegada) e as canceladas.
+    const ordemEstado = { confirmada: 0, espera: 1, cancelada: 2 };
+    const inscricoes = listaEncontros(respostaI, 'inscricoes')
+      .sort((a, b) => (ordemEstado[a.estado] ?? 3) - (ordemEstado[b.estado] ?? 3) || String(a.criadoEm).localeCompare(String(b.criadoEm)));
     if (!inscricoes.length) c.append(el('p', { class: 'dica' }, 'Nenhuma inscrição.'));
     for (const i of inscricoes) {
       const participantes = i.participantes || [];
       const responsavel = participantes.find(p => p.membroId && p.membroId === i.responsavelMembroId);
       const editavel = gestao && ativo && i.estado === 'confirmada';
+      const pessoas = participantes.length;
+      const contato = i.origem === 'link' ? [
+        i.whatsapp ? el('a', { href: 'https://wa.me/' + encodeURIComponent(i.whatsapp), target: '_blank', rel: 'noopener noreferrer' }, 'WhatsApp ' + whatsappEncontro(i.whatsapp)) : null,
+        i.email ? el('a', { href: 'mailto:' + i.email }, i.email) : null,
+      ].filter(Boolean).flatMap((x, n) => n ? [' · ', x] : [x]) : [];
       const bloco = el('section', { class: 'item encontro-bloco' },
         el('div', { class: 'encontro-bloco-topo' },
-          el('div', { class: 'titulo' }, responsavel ? `Inscrição de ${responsavel.nome}` : 'Inscrição',
+          el('div', { class: 'titulo' }, `Inscrição de ${responsavel?.nome || i.responsavelNome || 'pessoa removida'}`,
+            ...(i.origem === 'link' ? [' ', el('span', { class: 'etiqueta' }, 'Pelo link')] : []),
+            ...(i.estado === 'espera' ? [' ', el('span', { class: 'etiqueta conflito' }, `Lista de espera · ${pessoas} ${pessoas === 1 ? 'pessoa' : 'pessoas'}`)] : []),
             ...(i.estado === 'cancelada' ? [' ', el('span', { class: 'etiqueta alerta' }, 'Cancelada')] : [])),
-          editavel ? botao('Cancelar inscrição', () => confirmarEncontro('Cancelar inscrição', 'As vagas desta inscrição serão liberadas. O histórico será preservado.', async () => {
-            await api('POST', '/api/inscricoes/' + encodeURIComponent(i.id) + '/cancelar', {}); await atualizar();
-          }), 'perigo pequeno') : null));
+          el('div', { class: 'acoes' },
+            gestao && ativo && i.estado === 'espera' ? botao('Confirmar vaga', () => confirmarEncontro('Confirmar vaga',
+              `Tirar ${i.responsavelNome || 'esta inscrição'} da lista de espera e ocupar ${pessoas} ${pessoas === 1 ? 'vaga' : 'vagas'}?` +
+              (i.email ? ' A pessoa recebe um e-mail avisando.' : ' Avise a pessoa pelo WhatsApp.'), async () => {
+                await api('POST', '/api/inscricoes/' + encodeURIComponent(i.id) + '/promover', {}); await atualizar();
+              }), 'pequeno') : null,
+            gestao && i.origem === 'link' && !i.responsavelMembroId && i.estado !== 'cancelada'
+              ? botao('Vincular ao cadastro', () => vincularInscricaoAoCadastro(i, atualizar)) : null,
+            (editavel || (gestao && ativo && i.estado === 'espera')) ? botao('Cancelar inscrição', () => confirmarEncontro('Cancelar inscrição', 'As vagas desta inscrição serão liberadas. O histórico será preservado.', async () => {
+              await api('POST', '/api/inscricoes/' + encodeURIComponent(i.id) + '/cancelar', {}); await atualizar();
+            }), 'perigo pequeno') : null)),
+        contato.length ? el('p', { class: 'sub' }, ...contato) : null,
+        i.resposta ? el('p', { class: 'sub' }, `${e.linkInscricao?.pergunta || 'Resposta'}: ${i.resposta}`) : null);
       for (const p of participantes) {
         const nome = p.nome || p.nomeAcompanhante || 'Membro removido';
         const situacao = [p.confirmado ? 'Confirmado' : 'Aguardando confirmação',
@@ -315,7 +340,7 @@ async function detalheEncontro(id) {
         bloco.append(el('div', { class: 'encontro-linha' },
           el('div', { class: 'conteudo' },
             el('strong', {}, nome), ...(p.crianca ? [' ', el('span', { class: 'etiqueta' }, 'Criança')] : []),
-            ...(p.nomeAcompanhante ? [' ', el('span', { class: 'etiqueta' }, 'Acompanhante')] : []),
+            ...(p.nomeAcompanhante && !p.titular ? [' ', el('span', { class: 'etiqueta' }, 'Acompanhante')] : []),
             el('p', { class: 'sub' }, situacao.join(' · '))),
           acoes));
       }
@@ -334,6 +359,101 @@ async function detalheEncontro(id) {
 
     roteiroUtilizadoEncontro(c, e);
   } catch (e) { mensagem(janela.erro, e.message, false); }
+}
+
+/** "5511912345678" → "(11) 91234-5678". */
+function whatsappEncontro(numero) {
+  const n = String(numero || '').replace(/\D/g, '').replace(/^55(?=\d{10,11}$)/, '');
+  if (n.length === 11) return `(${n.slice(0, 2)}) ${n.slice(2, 7)}-${n.slice(7)}`;
+  if (n.length === 10) return `(${n.slice(0, 2)}) ${n.slice(2, 6)}-${n.slice(6)}`;
+  return numero || '';
+}
+
+/** Seção "Inscrições pelo link" do detalhe: endereço, QR, prazo, pergunta e ligar/desligar. */
+function linkInscricaoEncontro(alvo, e, atualizar) {
+  const link = e.linkInscricao || {};
+  const endereco = link.codigo ? `${location.origin}/inscricao/${encodeURIComponent(link.codigo)}` : '';
+  const status = el('p', { role: 'status' });
+  alvo.append(el('h3', {}, 'Inscrições pelo link'));
+  if (!link.ativo) {
+    alvo.append(el('p', { class: 'dica' }, e.estado === 'cancelado' ? 'Encontro cancelado: o link está desligado.'
+      : 'Gere um link público para as pessoas se inscreverem sozinhas, sem login. A inscrição vale na hora; quando as vagas acabam, entra na lista de espera.'),
+    e.estado === 'cancelado' ? null : el('div', { class: 'barra' }, botao('Ativar inscrições pelo link', () => configurarLinkInscricao(e, atualizar, true), 'pequeno')));
+    return;
+  }
+  const campo = el('input', { readonly: true, 'aria-label': 'Endereço de inscrição', class: 'encontro-campo-largo' });
+  campo.value = endereco;
+  const texto = `Inscrições abertas: ${e.titulo}\n${periodoEncontro(e)}${e.local ? '\n' + e.local : ''}\n\nInscreva-se: ${endereco}`;
+  alvo.append(
+    el('p', { class: 'dica' }, [
+      e.estado === 'aberto' ? 'Link ativo.' : 'Link ativo, mas só aceita inscrições com o encontro "Aberto".',
+      link.ate ? `Aceita inscrições até ${dataEncontro(link.ate)}.` : 'Aceita inscrições até o início do encontro.',
+      link.pergunta ? `Pergunta: "${link.pergunta}".` : '',
+    ].filter(Boolean).join(' ')),
+    el('div', { class: 'encontro-link' },
+      el('img', { src: `/inscricao/${encodeURIComponent(link.codigo)}/qr.png`, alt: 'QR code do link de inscrição', class: 'encontro-qr', width: 140, height: 140 }),
+      el('div', { class: 'conteudo' }, campo,
+        el('div', { class: 'barra' },
+          botao('Copiar link', async () => {
+            try { await navigator.clipboard.writeText(endereco); mensagem(status, 'Link copiado.'); }
+            catch (_) { campo.select?.(); mensagem(status, 'Selecione o endereço e copie.', false); }
+          }, 'pequeno'),
+          el('a', { class: 'botao secundario pequeno', href: 'https://wa.me/?text=' + encodeURIComponent(texto), target: '_blank', rel: 'noopener noreferrer' }, 'Enviar no WhatsApp'),
+          el('a', { class: 'botao secundario pequeno', href: endereco, target: '_blank', rel: 'noopener noreferrer' }, 'Abrir página'),
+          el('a', { class: 'botao secundario pequeno', href: `/inscricao/${encodeURIComponent(link.codigo)}/qr.png`, download: `inscricao-${(e.titulo || 'encontro').toLowerCase().replace(/[^a-z0-9]+/g, '-')}.png` }, 'Baixar QR'),
+          el('a', { class: 'botao secundario pequeno', href: `/inscricao/${encodeURIComponent(link.codigo)}/qr.png?telao=1`, download: `inscricao-${(e.titulo || 'encontro').toLowerCase().replace(/[^a-z0-9]+/g, '-')}-telao.png` }, 'QR para o telão')),
+        status)),
+    el('div', { class: 'barra' },
+      botao('Configurar link', () => configurarLinkInscricao(e, atualizar, true)),
+      botao('Gerar novo link', () => confirmarEncontro('Gerar novo link', 'O link e o QR atuais param de funcionar (útil se o link foi parar onde não devia). As inscrições feitas continuam valendo.', async () => {
+        await api('PUT', caminhoEncontro(e.id) + '/link', { novoCodigo: true }); await atualizar();
+      })),
+      botao('Desativar link', () => confirmarEncontro('Desativar link', 'A página passa a mostrar que as inscrições não estão abertas. As inscrições feitas continuam valendo.', async () => {
+        await api('PUT', caminhoEncontro(e.id) + '/link', { ativo: false }); await atualizar();
+      }), 'perigo pequeno')));
+}
+
+function configurarLinkInscricao(e, atualizar, ativar) {
+  const link = e.linkInscricao || {};
+  const campos = {};
+  const { conteudo } = janelaEncontro('Inscrições pelo link', async () => {
+    await api('PUT', caminhoEncontro(e.id) + '/link', { ativo: ativar, ate: campos.ate.value || null, pergunta: campos.pergunta.value.trim() || null });
+    await atualizar();
+  }, { textoSalvar: link.ativo ? 'Salvar' : 'Ativar link' });
+  const grade = el('div', { class: 'grade-form' });
+  conteudo.append(el('p', { class: 'dica' }, 'Quem tiver o link se inscreve sem login, com nome, WhatsApp, e-mail opcional e acompanhantes. ' +
+    'A inscrição vale na hora; sem vagas, entra na lista de espera e a equipe confirma por aqui. Quem informa e-mail recebe a confirmação com um link para cancelar.'), grade);
+  campos.ate = campoEncontro(grade, 'Aceitar inscrições até (opcional)', link.ate || '', { tipo: 'date' });
+  campos.pergunta = campoEncontro(grade, 'Pergunta para quem se inscreve (opcional)', link.pergunta || '', { limite: 200, largo: true });
+  campos.pergunta.placeholder = 'Ex.: Vai de carona? Precisa de transporte?';
+  grade.append(el('p', { class: 'dica largo' }, 'Não pergunte sobre saúde, documentos ou outros dados sensíveis.'));
+  if (e.estado !== 'aberto') conteudo.append(el('p', { class: 'erro' }, 'Atenção: o encontro não está "Aberto". O link só aceita inscrições quando a situação for "Aberto".'));
+}
+
+/** Liga quem se inscreveu pelo link ao cadastro de membros (busca pelo nome). */
+function vincularInscricaoAoCadastro(inscricao, atualizar) {
+  const { conteudo, erro, dlg } = janelaEncontro('Vincular ao cadastro');
+  const busca = el('input', { type: 'search', 'aria-label': 'Buscar membro para vincular', maxlength: 100 });
+  busca.value = inscricao.responsavelNome || '';
+  const resultados = el('div', { class: 'lista' });
+  const pesquisar = botao('Buscar', async () => {
+    const termo = busca.value.trim();
+    if (termo.length < 2) { mensagem(erro, 'Digite ao menos duas letras.', false); return; }
+    try {
+      const lista = listaEncontros(await api('GET', '/api/encontros/pessoas?busca=' + encodeURIComponent(termo)), 'pessoas');
+      resultados.replaceChildren(...(lista.length ? lista.map(p => el('div', { class: 'item encontro-linha' }, el('div', { class: 'conteudo' }, p.nome),
+        el('div', { class: 'acoes' }, botao('Vincular', async () => {
+          try {
+            await api('PUT', '/api/inscricoes/' + encodeURIComponent(inscricao.id) + '/vincular', { membroId: p.id });
+            dlg.close(); await atualizar();
+          } catch (e) { mensagem(erro, e.message, false); }
+        }, 'pequeno'))))
+        : [el('p', { class: 'dica' }, 'Nenhum membro encontrado. Se a pessoa não é membro, a inscrição pode ficar como está.')]));
+    } catch (e) { mensagem(erro, e.message, false); }
+  });
+  conteudo.append(el('p', { class: 'dica' }, `${inscricao.responsavelNome} se inscreveu pelo link. Se for alguém do cadastro, vincule para a inscrição aparecer com a ficha da pessoa. Os acompanhantes continuam como estão.`),
+    el('div', { class: 'campo-com-botao' }, busca, pesquisar), resultados);
+  if ((busca.value || '').trim().length >= 2) pesquisar.click?.();
 }
 
 async function formularioInscricao(encontro, atualizar = carregarEncontros) {

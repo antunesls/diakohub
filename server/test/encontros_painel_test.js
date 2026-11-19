@@ -16,7 +16,7 @@ function ambiente(gestao = true, responder = () => []) {
     setAttribute(k, v) { this.props[k] = v; }
   }
   const raiz = new No('div'), body = new No('body'), chamadas = [], copiados = [];
-  const contexto = vm.createContext({ Date, console,
+  const contexto = vm.createContext({ Date, console, location: { origin: 'https://igreja.test' },
     navigator: { clipboard: { writeText: async texto => copiados.push(texto) } },
     $: () => raiz, el: (tag, props = {}, ...filhos) => new No(tag, props, filhos),
     botao: (texto, fn) => new No('button', { onclick: fn }, [texto]),
@@ -249,4 +249,69 @@ test('excluir encontro só aparece com Administração e chama DELETE após conf
   assert.match(texto, /Não dá para desfazer/);
   await todos(confirmacao).find(n => n.tag === 'form').events.submit({ preventDefault() {} });
   assert.ok(comAdmin.chamadas.some(c => c.metodo === 'DELETE' && c.url === '/api/encontros/e'));
+});
+
+test('link público: desligado oferece ativar; ligado mostra endereço, QR e ações', async () => {
+  const desligado = ambiente(true, (_, url) => url.endsWith('/inscricoes') || url.endsWith('/tarefas') ? [] : { id: 'e', titulo: 'Retiro', estado: 'aberto' });
+  await desligado.run('detalheEncontro("e")');
+  assert.ok(todos(desligado.body).some(n => n.tag === 'button' && n.children.includes('Ativar inscrições pelo link')));
+  const ligado = ambiente(true, (metodo, url) => url.endsWith('/inscricoes') || url.endsWith('/tarefas') ? []
+    : { id: 'e', titulo: 'Retiro', estado: 'aberto', inicio: '2026-12-10T08:00', linkInscricao: { ativo: true, codigo: 'abcdefghijkl', ate: '2026-12-01', pergunta: 'Vai de carona?' } });
+  await ligado.run('detalheEncontro("e")');
+  const nos = todos(ligado.body);
+  assert.equal(nos.find(n => n.props?.['aria-label'] === 'Endereço de inscrição').value, 'https://igreja.test/inscricao/abcdefghijkl');
+  assert.ok(nos.some(n => n.tag === 'img' && n.props.src === '/inscricao/abcdefghijkl/qr.png'));
+  const textos = nos.flatMap(n => n.children.filter(f => typeof f === 'string')).join(' ');
+  assert.match(textos, /01\/12\/2026/);
+  assert.match(textos, /Vai de carona\?/);
+  for (const b of ['Copiar link', 'Configurar link', 'Gerar novo link', 'Desativar link']) {
+    assert.ok(nos.some(n => n.tag === 'button' && n.children.includes(b)), b);
+  }
+  nos.find(n => n.tag === 'button' && n.children.includes('Desativar link')).props.onclick();
+  const confirmacao = ligado.body.children.at(-1);
+  await todos(confirmacao).find(n => n.tag === 'form').events.submit({ preventDefault() {} });
+  assert.ok(ligado.chamadas.some(c => c.metodo === 'PUT' && c.url === '/api/encontros/e/link' && c.corpo.ativo === false));
+});
+
+test('inscrição pelo link mostra contato e resposta; lista de espera tem "Confirmar vaga"', async () => {
+  const a = ambiente(true, (_, url) => {
+    if (url.endsWith('/inscricoes')) return [
+      { id: 'w', estado: 'espera', origem: 'link', responsavelNome: 'Pedro', whatsapp: '5511922222222', criadoEm: '2', participantes: [{ id: 'p', nomeAcompanhante: 'Pedro', titular: true, confirmado: true }] },
+      { id: 'c', estado: 'confirmada', origem: 'link', responsavelNome: 'Maria', whatsapp: '5511911111111', email: 'maria@exemplo.test', resposta: 'Sim', criadoEm: '1',
+        participantes: [{ id: 'm', nomeAcompanhante: 'Maria', titular: true, confirmado: true }] },
+    ];
+    if (url.endsWith('/tarefas')) return [];
+    return { id: 'e', titulo: 'Retiro', estado: 'aberto', linkInscricao: { ativo: false, pergunta: 'Vai de carona?' } };
+  });
+  await a.run('detalheEncontro("e")');
+  const nos = todos(a.body);
+  const textos = nos.flatMap(n => n.children.filter(f => typeof f === 'string')).join(' ');
+  assert.ok(textos.indexOf('Inscrição de Maria') < textos.indexOf('Inscrição de Pedro'), 'confirmadas antes da espera');
+  assert.match(textos, /WhatsApp \(11\) 91111-1111/);
+  assert.match(textos, /Vai de carona\?: Sim/);
+  assert.match(textos, /Lista de espera · 1 pessoa/);
+  assert.equal(nos.filter(n => n.tag === 'button' && n.children.includes('Vincular ao cadastro')).length, 2);
+  nos.find(n => n.tag === 'button' && n.children.includes('Confirmar vaga')).props.onclick();
+  await todos(a.body.children.at(-1)).find(n => n.tag === 'form').events.submit({ preventDefault() {} });
+  assert.ok(a.chamadas.some(c => c.metodo === 'POST' && c.url === '/api/inscricoes/w/promover'));
+});
+
+test('página pública de inscrição: sem indexação, campo invisível, aceite e sem dados de inscritos', () => {
+  const html = fs.readFileSync(require('node:path').join(__dirname, '../web/inscricao.html'), 'utf8');
+  const js = fs.readFileSync(require('node:path').join(__dirname, '../web/inscricao.js'), 'utf8');
+  assert.match(html, /<meta name="robots" content="noindex">/);
+  assert.match(html, /id="website"/);
+  assert.match(html, /id="consentimento"[^>]*required/);
+  assert.match(js, /history\.replaceState\(null, '', '\/inscricao\/cancelar'\)/, 'tira o token da barra de endereço');
+  assert.doesNotMatch(js, /innerHTML|\/api\/encontros|\/api\/membros/);
+});
+
+test('quem se inscreveu pelo link não aparece como acompanhante; vaga no singular', async () => {
+  const a = ambiente(true, (_, url) => url.endsWith('/inscricoes') ? [{ id: 'c', estado: 'confirmada', origem: 'link', responsavelNome: 'Maria',
+    participantes: [{ id: 't', nomeAcompanhante: 'Maria', titular: true, confirmado: true }, { id: 'f', nomeAcompanhante: 'João', crianca: true, confirmado: true }] }]
+    : url.endsWith('/tarefas') ? [] : { id: 'e', titulo: 'Retiro', estado: 'aberto', vagasOcupadas: 2, vagasDisponiveis: 1 });
+  await a.run('detalheEncontro("e")');
+  const textos = todos(a.body).flatMap(n => n.children.filter(f => typeof f === 'string')).join(' ');
+  assert.equal((textos.match(/Acompanhante/g) || []).length, 1, 'só o João é acompanhante');
+  assert.match(textos, /1 vaga disponível/);
 });

@@ -101,9 +101,14 @@ class Encontros {
   Map<String, dynamic> encontro(String id) {
     final doc = _buscar('encontros', id);
     final ocupadas = _ocupadas(id);
+    final espera = store
+        .listar('inscricoes')
+        .where((i) => i['encontroId'] == id && i['estado'] == 'espera')
+        .fold<int>(0, (n, i) => n + (i['participantes'] as List).length);
     return {
       ...doc,
       'vagasOcupadas': ocupadas,
+      'emEspera': espera,
       'vagasDisponiveis': doc['capacidade'] == null
           ? null
           : (doc['capacidade'] as int) - ocupadas
@@ -246,9 +251,10 @@ class Encontros {
           throw const FormatException('Informe de 1 a 100 participantes.');
         final chaves = <String>{};
         for (final i in listarInscricoes(encontroId)
-            .where((i) => i['estado'] == 'confirmada')) {
+            .where((i) => i['estado'] != 'cancelada')) {
           for (final p in i['participantes'] as List) {
-            chaves.add(_chave(p as Map, i['responsavelMembroId'] as String));
+            // Inscrição pelo link pode não ter membro responsável: usa o id dela.
+            chaves.add(_chave(p as Map, (i['responsavelMembroId'] ?? i['id']) as String));
           }
         }
         final participantes = <Map<String, dynamic>>[];

@@ -48,6 +48,8 @@ import 'casais_ministerio.dart';
 import 'encontros.dart';
 import 'materiais.dart';
 import 'email_casais.dart';
+import 'email_inscricao.dart';
+import 'inscricao_link.dart';
 import 'devocionais.dart';
 import 'email_devocionais.dart';
 import 'permissoes.dart';
@@ -84,6 +86,7 @@ class Servidor {
     this.enviarAta,
     this.enviarDevocional,
     this.enviarEmailCasal,
+    this.enviarInscricao,
     this.senhaMinima = 6,
     DateTime Function()? relogio,
     LimiteTaxa? limitePedidos,
@@ -127,6 +130,7 @@ class Servidor {
   final Auditoria auditoria;
   final String versao;
   final Store store;
+  late final InscricoesPeloLink inscricoesLink = InscricoesPeloLink(store, agora: _agora);
   late final MinisterioCasais ministerioCasais = MinisterioCasais(store, agora: _agora,
       igreja: () => nomeIgreja, enviar: (email) async {
         if (enviarEmailCasal != null) return enviarEmailCasal!(email);
@@ -204,6 +208,9 @@ class Servidor {
   final Future<void> Function(EmailDevocional email)? enviarDevocional;
   final Future<void> Function(EmailCasais email)? enviarEmailCasal;
 
+  /// E-mails das inscrições pelo link (substituível nos testes; sem ele, usa o SMTP do /admin).
+  final Future<void> Function(EmailInscricao email)? enviarInscricao;
+
   /// Tamanho mínimo da senha ao trocar pelo painel (10 quando o servidor está na internet).
   final int senhaMinima;
 
@@ -224,6 +231,8 @@ class Servidor {
   final LimiteTaxa _limiteLgpd = LimiteTaxa(maximo: 20, janela: const Duration(minutes: 10));
   final LimiteTaxa _limiteVisitantes = LimiteTaxa(maximo: 5, janela: const Duration(minutes: 10));
   final LimiteTaxa _limiteCadastros = LimiteTaxa(maximo: 5, janela: const Duration(minutes: 10));
+  final LimiteTaxa _limiteInscricoes = LimiteTaxa(maximo: 5, janela: const Duration(minutes: 10));
+  final LimiteTaxa _limiteConsultaInscricao = LimiteTaxa(maximo: 20, janela: const Duration(minutes: 10));
   final Set<String> _aprovacoesEmCurso = {};
   List<Map<String, String>> _temasCache = [];
   static const maximoTemas = 500;
@@ -248,6 +257,15 @@ class Servidor {
       ..get('/visitante', (Request _) => cfg?.visitanteQrAtivo == false ? _paginaDesligada() : _pagina('visitante.html'))
       ..get('/cadastro', (Request _) => _pagina('cadastro.html'))
       ..get('/devocional', (Request _) => _pagina('devocional.html'))
+      // Inscrição em encontro pelo link público. "cancelar" vem antes de <codigo>.
+      ..get('/inscricao/cancelar', (Request _) => _pagina('inscricao.html'))
+      ..get('/inscricao/<codigo>/qr.png', _qrInscricao)
+      ..get('/inscricao/<codigo>', (Request _, String codigo) => _pagina('inscricao.html'))
+      ..get('/api/public/inscricao/<codigo>', (Request _, String codigo) =>
+          _operacaoCasais(() => inscricoesLink.info(codigo)))
+      ..post('/api/public/inscricao/<codigo>', _inscreverPeloLink)
+      ..post('/api/public/inscricoes/consultar', (Request req) => _tokenInscricao(req, cancelar: false))
+      ..post('/api/public/inscricoes/cancelar', (Request req) => _tokenInscricao(req, cancelar: true))
       ..get('/qr-visitante.png', _qrVisitante)
       ..get('/qr-minha-escala.png', (Request _) => Response.ok(gerarPngQr('$_urlBase/minha-escala', rotulo: 'MINHA ESCALA'),
           headers: {'content-type': 'image/png', 'cache-control': 'no-cache'}))
@@ -354,6 +372,11 @@ class Servidor {
           encontros.inscrever(id, await _corpo(req), conta: Auth.contaDa(req)!), status: 201))
       ..post('/api/inscricoes/<id>/cancelar', (Request req, String id) => _operacaoCasais(() =>
           encontros.cancelarInscricao(id, conta: Auth.contaDa(req)!)))
+      ..put('/api/encontros/<id>/link', (Request req, String id) => _operacaoCasais(() async =>
+          inscricoesLink.configurar(id, await _corpo(req), conta: Auth.contaDa(req)!)))
+      ..post('/api/inscricoes/<id>/promover', _promoverInscricao)
+      ..put('/api/inscricoes/<id>/vincular', (Request req, String id) => _operacaoCasais(() async =>
+          inscricoesLink.vincular(id, await _corpo(req), conta: Auth.contaDa(req)!)))
       ..put('/api/inscricoes/<id>/participantes/<participanteId>/presenca',
           (Request req, String id, String participanteId) => _operacaoCasais(() async =>
               encontros.registrarPresenca(id, participanteId, await _corpo(req), conta: Auth.contaDa(req)!)))
@@ -696,6 +719,93 @@ class Servidor {
           if (m.conjugeId != null) 'conjugeId': m.conjugeId,
           if (m.paisIds.isNotEmpty) 'paisIds': m.paisIds},
     ]);
+  }
+
+  // ---------- Inscrição em encontro pelo link público ----------
+
+  /// Envia o e-mail da inscrição sem atrasar nem derrubar quem se inscreveu: sem SMTP ou com
+  /// falha, a inscrição continua valendo (a pessoa viu a confirmação na tela).
+  Future<bool> _emailInscricao(Map<String, dynamic> inscricao, Map<String, dynamic> encontro,
+      {required String situacao, String? token}) async {
+    final email = inscricao['email'];
+    if (email is! String || email.isEmpty) return false;
+    final envio = montarEmailInscricao(
+      destinatario: email,
+      nome: inscricao['responsavelNome'] as String? ?? '',
+      encontro: encontro,
+      pessoas: (inscricao['participantes'] as List).length,
+      situacao: situacao,
+      igreja: nomeIgreja,
+      linkCancelar: token == null ? null : '$_urlBase/inscricao/cancelar?token=$token',
+    );
+    try {
+      if (enviarInscricao != null) {
+        await enviarInscricao!(envio);
+      } else {
+        final configuracao = cfg;
+        if (configuracao == null || !configuracao.smtpConfigurado) return false;
+        await enviarEmailInscricao(configuracao, envio);
+      }
+      return true;
+    } catch (e) {
+      stderr.writeln('E-mail da inscrição não enviado: $e');
+      return false;
+    }
+  }
+
+  /// POST /api/public/inscricao/<codigo> — a pessoa se inscreve pela página pública.
+  Future<Response> _inscreverPeloLink(Request req, String codigo) async {
+    final bytes = await _lerBytes(req, 20 * 1024);
+    if (bytes == null) return _erro(413, 'Inscrição muito grande.');
+    final Map<String, dynamic> corpo;
+    try {
+      corpo = Map<String, dynamic>.from(jsonDecode(utf8.decode(bytes)) as Map);
+    } catch (_) {
+      return _erro(400, 'Dados inválidos.');
+    }
+    // Campo invisível: robôs preenchem, pessoas não. Finge sucesso sem gravar.
+    if ((corpo['website'] as String? ?? '').isNotEmpty) return _json({'estado': 'confirmada'}, status: 201);
+    if (!_limiteInscricoes.permitir(_ip(req))) return _erro(429, 'Aguarde alguns minutos antes de enviar novamente.');
+    return _operacaoCasais(() async {
+      final r = await inscricoesLink.inscrever(codigo, corpo);
+      final enviado = await _emailInscricao(r.inscricao, r.encontro, situacao: r.inscricao['estado'] as String, token: r.token);
+      return {
+        'estado': r.inscricao['estado'],
+        'pessoas': (r.inscricao['participantes'] as List).length,
+        'emailEnviado': enviado,
+      };
+    }, status: 201);
+  }
+
+  /// POST /api/public/inscricoes/consultar|cancelar  {token} — link do e-mail.
+  Future<Response> _tokenInscricao(Request req, {required bool cancelar}) async {
+    if (!_limiteConsultaInscricao.permitir(_ip(req))) return _erro(429, 'Aguarde alguns minutos e tente de novo.');
+    return _operacaoCasais(() async {
+      final token = (await _corpo(req))['token'];
+      return cancelar ? inscricoesLink.cancelar(token) : inscricoesLink.consultar(token);
+    });
+  }
+
+  /// POST /api/inscricoes/<id>/promover — a equipe confirma alguém da lista de espera.
+  Future<Response> _promoverInscricao(Request req, String id) => _operacaoCasais(() async {
+        final doc = await inscricoesLink.promover(id, conta: Auth.contaDa(req)!);
+        final encontro = store.buscar('encontros', doc['encontroId'] as String) ?? {};
+        final enviado = await _emailInscricao(doc, encontro, situacao: 'promovida');
+        return {...doc, 'emailEnviado': enviado};
+      });
+
+  /// GET /inscricao/<codigo>/qr.png — QR quadrado do link (painel, cartaz, WhatsApp);
+  /// com `?telao=1`, a arte 16:9 para projetar. O link já é público.
+  Response _qrInscricao(Request req, String codigo) {
+    try {
+      inscricoesLink.info(codigo);
+    } on NaoEncontrado {
+      return Response.notFound('Link de inscrição não encontrado.');
+    }
+    final url = '$_urlBase/inscricao/$codigo';
+    final telao = req.url.queryParameters['telao'] == '1';
+    return Response.ok(telao ? gerarPngQr(url, rotulo: 'INSCRICAO') : gerarPngQrQuadrado(url),
+        headers: {'content-type': 'image/png', 'cache-control': 'no-cache'});
   }
 
   Future<Response> _enviarParabensCasais(Request req) async {

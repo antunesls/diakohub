@@ -767,9 +767,20 @@ class Restauracao {
       exigir(d['tipoId'] == null || tipos.contains(d['tipoId']));
     }
     for (final d in colecoes['encontros'] ?? <Map<String, dynamic>>[]) {
-      campos(d, {...camposAutoria, 'titulo', 'tipo', 'inicio', 'fim', 'local', 'descricao', 'capacidade', 'estado', 'roteiro', 'ministerioId'});
+      campos(d, {...camposAutoria, 'titulo', 'tipo', 'inicio', 'fim', 'local', 'descricao', 'capacidade', 'estado', 'roteiro',
+        'ministerioId', 'linkInscricao'});
       autoria(d);
       exigir(d['ministerioId'] == null || ministerios.contains(d['ministerioId']));
+      if (d['linkInscricao'] != null) {
+        exigir(d['linkInscricao'] is Map);
+        final link = d['linkInscricao'] as Map;
+        campos(link, {'ativo', 'codigo', 'ate', 'pergunta'});
+        exigir(link['ativo'] is bool);
+        limite(link['codigo'], 64, obrigatorio: true);
+        exigir((link['codigo'] as String).length >= 12);
+        if (link['ate'] != null) data(link['ate'], dia: true);
+        if (link['pergunta'] != null) limite(link['pergunta'], 200, obrigatorio: true);
+      }
       limite(d['titulo'], 160, obrigatorio: true);
       exigir({'culto', 'conferencia', 'retiro', 'acampamento', 'jantar', 'palestra', 'treinamento',
         'encontro_familias', 'outro'}.contains(d['tipo']));
@@ -804,10 +815,31 @@ class Restauracao {
     final ocupacaoPorEncontro = <String, int>{};
     final membrosPorEncontro = <String, Set<String>>{};
     for (final d in colecoes['inscricoes'] ?? <Map<String, dynamic>>[]) {
-      campos(d, {...camposAutoria, 'encontroId', 'responsavelMembroId', 'participantes', 'estado'});
+      campos(d, {...camposAutoria, 'encontroId', 'responsavelMembroId', 'participantes', 'estado',
+        // Inscrição pelo link público.
+        'origem', 'responsavelNome', 'whatsapp', 'email', 'resposta', 'consentimentoEm', 'consentimentoVersao',
+        'cancelamentoHash', 'confirmadaEm'});
       autoria(d);
-      exigir(encontros.contains(d['encontroId']) && membros.contains(d['responsavelMembroId']));
-      exigir({'confirmada', 'cancelada'}.contains(d['estado']));
+      exigir(encontros.contains(d['encontroId']));
+      if (d['origem'] == 'link') {
+        exigir(d['responsavelMembroId'] == null || membros.contains(d['responsavelMembroId']));
+        limite(d['responsavelNome'], 120, obrigatorio: true);
+        exigir(d['whatsapp'] is String && RegExp(r'^55\d{10,11}$').hasMatch(d['whatsapp']));
+        if (d['email'] != null) {
+          exigir(d['email'] is String && RegExp(r'^[^\s@,;<>]+@[^\s@,;<>]+\.[^\s@,;<>]+$').hasMatch(d['email']));
+        }
+        if (d['resposta'] != null) limite(d['resposta'], 500);
+        data(d['consentimentoEm']);
+        inteiro(d['consentimentoVersao'], 1, 1000);
+        exigir(d['cancelamentoHash'] is String && RegExp(r'^[a-f0-9]{64}$').hasMatch(d['cancelamentoHash']));
+      } else {
+        exigir(d['origem'] == null && membros.contains(d['responsavelMembroId']));
+        for (final campo in ['responsavelNome', 'whatsapp', 'email', 'resposta', 'consentimentoEm', 'cancelamentoHash']) {
+          exigir(d[campo] == null);
+        }
+      }
+      if (d['confirmadaEm'] != null) data(d['confirmadaEm']);
+      exigir({'confirmada', 'cancelada', 'espera'}.contains(d['estado']));
       final participantes = d['participantes'];
       exigir(participantes is List && participantes.isNotEmpty && participantes.length <= 100);
       final ids = <String>{};
@@ -815,7 +847,7 @@ class Restauracao {
       for (final item in participantes as List) {
         exigir(item is Map);
         final pessoa = item as Map;
-        campos(pessoa, {'id', 'membroId', 'nomeAcompanhante', 'crianca', 'confirmado',
+        campos(pessoa, {'id', 'membroId', 'nomeAcompanhante', 'crianca', 'confirmado', 'titular',
           'presenteEm', 'presencaPor', 'presencaPorNome', 'presencaAlteradaEm', 'presencaAlteradaPor'});
         exigir(texto(pessoa['id']));
         exigir(ids.add(pessoa['id'] as String));
@@ -823,14 +855,14 @@ class Restauracao {
         if (pessoa['membroId'] != null) {
           exigir(texto(pessoa['membroId']) && membros.contains(pessoa['membroId']));
           exigir(membrosInscritos.add(pessoa['membroId'] as String));
-          if (d['estado'] == 'confirmada') {
+          if (d['estado'] != 'cancelada') {
             exigir(membrosPorEncontro.putIfAbsent(d['encontroId'] as String, () => <String>{})
                 .add(pessoa['membroId'] as String));
           }
         } else {
           limite(pessoa['nomeAcompanhante'], 160, obrigatorio: true);
         }
-        exigir(pessoa['crianca'] is bool && pessoa['confirmado'] is bool);
+        exigir(pessoa['crianca'] is bool && pessoa['confirmado'] is bool && (pessoa['titular'] == null || pessoa['titular'] is bool));
         if (pessoa['presenteEm'] != null || pessoa['presencaPor'] != null) {
           data(pessoa['presenteEm']);
           exigir(texto(pessoa['presencaPor']) && pessoa['confirmado'] == true);

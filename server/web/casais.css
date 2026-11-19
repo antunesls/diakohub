@@ -135,3 +135,10 @@ body.devocional-publico main { max-width: 800px; padding: 30px 20px 60px; }
 .devocional-publico .dev-serie { border-left: 0; background: var(--primaria-suave); border-radius: 14px; padding: 14px 18px; margin: 24px 0; }
 .devocional-publico .dev-serie ol { margin: 8px 0 0; padding-left: 22px; }
 .devocional-publico .dev-voltar { display: inline-block; margin-bottom: 16px; }
+
+/* Inscrições pelo link (detalhe do encontro) */
+.encontro-link { display: flex; flex-wrap: wrap; gap: 16px; align-items: flex-start; margin: 8px 0; }
+.encontro-link .conteudo { flex: 1 1 280px; min-width: 0; }
+.encontro-link .barra { margin: 8px 0 0; }
+.encontro-qr { width: 140px; height: 140px; border: 1px solid var(--linha); border-radius: 12px; background: #fff; flex-shrink: 0; }
+.encontro-bloco > .sub a { overflow-wrap: anywhere; }
