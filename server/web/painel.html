@@ -6,7 +6,7 @@
 <title>Painel — DiakoHub</title>
 <link rel="icon" href="/logo.png" type="image/png">
 <link rel="stylesheet" href="/estilo.css?v=5">
-<link rel="stylesheet" href="/casais.css?v=3">
+<link rel="stylesheet" href="/casais.css?v=4">
 <style>
   .topo {
     display: flex; flex-wrap: wrap; align-items: center; gap: 16px;
@@ -897,15 +897,12 @@
 
     <section data-painel="casais" hidden>
       <h1>Casais e Família</h1>
-      <p class="dica">Contatos e materiais para cuidar dos casais e das famílias. Encontros e inscrições ficam na área própria, para qualquer público. Os devocionais continuam na área própria.</p>
-      <p class="dica">Não registre detalhes de aconselhamento, conflitos íntimos ou informações de saúde. O histórico guarda somente contatos operacionais.</p>
+      <p class="dica">Aniversários de casamento, contatos e materiais para cuidar dos casais e das famílias. Não registre detalhes de aconselhamento, conflitos íntimos ou informações de saúde: o histórico guarda somente contatos operacionais.</p>
       <nav class="barra" aria-label="Seções de Casais e Família">
-        <a href="#casais-titulo">Aniversários</a>
-        <a href="#casais-materiais-titulo">Roteiros e atividades</a>
-        <a href="#" data-ir="encontros" data-permissao="encontros">Encontros e inscrições</a>
-        <a href="/devocional?trilha=casais">Ler devocionais de Casais</a>
-        <a href="/devocional?trilha=familia">Ler devocionais de Família</a>
-        <a href="#" data-ir="devocionais" data-permissao="devocionais">Gerenciar devocionais</a>
+        <a class="botao secundario pequeno" href="#casais-titulo">Aniversários</a>
+        <a class="botao secundario pequeno" href="#casais-materiais-titulo">Roteiros e atividades</a>
+        <a class="botao secundario pequeno" href="#" data-ir="encontros" data-permissao="encontros">Encontros e inscrições ›</a>
+        <a class="botao secundario pequeno" href="#" data-ir="devocionais" data-permissao="devocionais">Devocionais ›</a>
       </nav>
       <section aria-labelledby="casais-titulo">
         <h2 id="casais-titulo">Aniversários de casamento</h2>
@@ -914,6 +911,7 @@
           <label>Ano <input id="casais-ano" type="number" min="1900" max="2200" required></label>
           <button class="botao secundario" type="submit">Consultar</button>
         </form>
+        <p class="dica" data-permissao="casaisGerenciar">Copiar, abrir o WhatsApp ou enviar e-mail não registra os parabéns. Depois de falar com o casal, use "Registrar contato realizado", sem observações íntimas.</p>
         <p id="casais-resultado" role="status"></p>
         <div id="casais-lista" class="lista"></div>
       </section>
@@ -925,8 +923,7 @@
 
     <section data-painel="encontros" hidden>
       <h1>Encontros e inscrições</h1>
-      <p class="dica">Organize encontros para qualquer público: culto, conferência, retiro, acampamento, treinamento, jantar ou encontro de famílias. As inscrições são internas e cada pessoa é confirmada individualmente.</p>
-      <p class="dica">Não registre saúde, documentos, data de nascimento ou observações íntimas. Acompanhantes sem ficha existem apenas dentro da inscrição e não criam cadastros de membros.</p>
+      <p class="dica">Culto, conferência, retiro, acampamento, treinamento, jantar ou encontro de famílias: inscrições internas, com cada pessoa confirmada individualmente. Não registre saúde, documentos, data de nascimento ou observações íntimas.</p>
       <div id="encontros-conteudo" class="lista"></div>
     </section>
 
@@ -1609,9 +1606,9 @@
 <script src="/menu-lateral.js?v=11"></script>
 <script src="/gestao-casa.js?v=1"></script>
 <script src="/atas.js?v=2"></script>
-<script src="/encontros.js?v=1"></script>
-<script src="/casais-materiais.js?v=2"></script>
-<script src="/casais.js?v=4"></script>
+<script src="/encontros.js?v=2"></script>
+<script src="/casais-materiais.js?v=3"></script>
+<script src="/casais.js?v=5"></script>
 <script src="/devocionais.js?v=2"></script>
 <script src="/painel.js?v=31"></script>
 <script src="/certificado.js?v=1"></script>

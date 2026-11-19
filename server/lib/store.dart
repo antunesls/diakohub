@@ -10,6 +10,12 @@ import 'package:path/path.dart' as p;
 /// mudança aparece em [listar]/[buscar], incrementa a versão e é avisada em [mudancas];
 /// se a gravação falhar, nada muda e o erro vai só para quem pediu aquela operação.
 /// Enquanto uma gravação está em andamento, as leituras mostram o último estado gravado.
+/// O registro indicado no caminho da rota não existe (a API responde 404).
+/// Estende [FormatException] para manter o contrato dos módulos que já a tratam.
+class NaoEncontrado extends FormatException {
+  const NaoEncontrado([super.message = 'Registro não encontrado.']);
+}
+
 class Store {
   Store(this.pasta, {Future<void> Function(String caminho, String conteudo)? gravar})
       : _gravar = gravar ?? gravarArquivo;

@@ -4,12 +4,57 @@
 #casais-filtro input { max-width: 130px; }
 .casais-cartao .conteudo { min-width: 0; width: 100%; }
 .casais-acoes { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 12px 0; }
+.casais-acoes select, .casais-acoes input { width: auto; min-width: 0; flex: 0 1 200px; }
+.casais-registro { padding-top: 12px; border-top: 1px solid var(--linha); }
+.casais-detalhes summary { cursor: pointer; color: var(--suave); font-size: 14px; font-weight: 600; padding: 4px 0; }
+.casais-historico { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; }
+.casais-historico p { margin: 0; font-size: 14px; }
 .casais-editor textarea { display: block; width: 100%; box-sizing: border-box; resize: vertical; }
 .casais-editor { margin-top: 16px; }
 .casais-previa pre { white-space: pre-wrap; overflow-wrap: anywhere; font: inherit; }
 .casais-historico { border-top: 1px solid var(--linha); padding: 8px 0; }
 .casais-previa:not(:empty) { padding: 16px; background: var(--campo); border: 1px solid var(--linha); border-radius: 12px; }
 @media (max-width: 600px) { .casais-acoes > * { max-width: 100%; } }
+
+/* Encontros e inscrições (e o painel de Casais), no padrão de cartões .item do painel. */
+.etiqueta.alerta { background: #fae7e0; color: #8a3525; }
+[data-painel="encontros"] h2, [data-painel="casais"] h3 { margin: 28px 0 12px; }
+[data-painel="encontros"] .barra { margin: 4px 0 0; }
+.encontro-titulo { font-size: 20px; font-weight: 700; margin-bottom: 4px; }
+.encontro-texto { white-space: pre-wrap; overflow-wrap: anywhere; font: inherit; margin: 8px 0; }
+.item.encontro-bloco { flex-direction: column; align-items: stretch; gap: 6px; margin-bottom: 8px; }
+.encontro-bloco-topo { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; }
+.encontro-linha { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; }
+.encontro-bloco .encontro-linha { padding-top: 10px; border-top: 1px solid var(--linha); }
+.encontro-linha .conteudo { flex: 1 1 240px; min-width: 0; }
+.encontro-linha .acoes { display: flex; flex-wrap: wrap; gap: 6px; }
+.encontro-marcas { display: flex; flex-wrap: wrap; gap: 4px 18px; margin-top: 4px; }
+.encontro-marcas label { display: inline-flex; align-items: center; gap: 6px; font-weight: 400; margin: 0; }
+.encontro-marcas input { width: auto; }
+.grade-form { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 16px; }
+.grade-form .largo { grid-column: 1 / -1; }
+.grade-form textarea, .encontro-campo-largo { display: block; width: 100%; box-sizing: border-box; resize: vertical; }
+.dialogo-largo .dialogo-rolagem .barra { margin: 12px 0; }
+.grade-form label { display: block; min-width: 0; }
+.grade-form input, .grade-form select, .grade-form textarea { display: block; width: 100%; box-sizing: border-box; }
+/* O estilo.css não cobre datetime-local; mesmo visual dos outros campos. */
+.grade-form input[type=datetime-local] { padding: 12px 14px; border: 1px solid var(--borda); border-radius: 12px; background: var(--campo); font: inherit; color: inherit; }
+
+/* Materiais de Casais e Família */
+.casais-filtros-materiais { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; margin: 16px 0 12px; }
+.casais-filtros-materiais input[type=search] { flex: 1 1 260px; min-width: 0; }
+.casais-filtros-materiais select { flex: 0 1 220px; width: auto; }
+.casais-marcar { display: inline-flex; align-items: center; gap: 6px; margin: 0; font-weight: 400; }
+.casais-marcar input { width: auto; }
+.casais-trabalho:not(:empty) { padding: 18px 20px; margin: 12px 0; background: var(--superficie); border: 1px solid var(--borda); border-radius: var(--raio); overflow-wrap: anywhere; }
+.casais-trabalho h3 { margin-top: 0; }
+.casais-trabalho textarea { display: block; width: 100%; box-sizing: border-box; resize: vertical; }
+.casais-roteiro-ordem { padding-left: 22px; }
+.casais-roteiro-ordem li { padding: 6px 0; border-bottom: 1px solid var(--linha); }
+.casais-roteiro-ordem li.dica { list-style: none; margin-left: -22px; border-bottom: 0; }
+.casais-roteiro-ordem li .acoes { display: inline-flex; flex-wrap: wrap; gap: 6px; margin-left: 10px; vertical-align: middle; }
+@media (max-width: 600px) { .grade-form { grid-template-columns: minmax(0, 1fr); } }
+
 #devocional-editor { margin-top: 20px; }
 .devocional-grade { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 18px; }
 .devocional-grade .largo { grid-column: 1 / -1; }

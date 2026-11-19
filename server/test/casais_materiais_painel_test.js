@@ -92,3 +92,15 @@ test('associação guarda IDs em ordem explícita e nunca envia snapshot', async
   assert.equal(envio.url, '/api/encontros/e/roteiro');
   assert.equal(JSON.stringify(envio.corpo), JSON.stringify({ materiaisIds: ['b', 'm'] }));
 });
+test('associação parte do roteiro atual do encontro e ignora encontros cancelados', async () => {
+  const a = ambiente({ materiais: [material, { ...material, id: 'b', titulo: 'Segundo' }], encontros: [
+    { id: 'x', titulo: 'Cancelado', estado: 'cancelado' },
+    { id: 'e', titulo: 'Encontro', estado: 'aberto', roteiro: [{ materialId: 'b', versao: 1 }] },
+  ] });
+  await a.carregar(); await a.bot('Associar ao encontro').props.onclick();
+  const encontro = a.todos().find(n => n.props['aria-label'] === 'Encontro do roteiro');
+  assert.ok(!a.todos(encontro).some(n => n.props.value === 'x'), 'encontro cancelado não aparece');
+  await a.bot('Salvar roteiro').props.onclick();
+  const envio = a.chamadas.find(c => c.metodo === 'PUT');
+  assert.equal(JSON.stringify(envio.corpo), JSON.stringify({ materiaisIds: ['b'] }), 'salvar sem mexer mantém o roteiro');
+});

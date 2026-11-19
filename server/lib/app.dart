@@ -330,6 +330,8 @@ class Servidor {
         }
         return _json(_responsaveisEncontros());
       })
+      // Antes de /api/encontros/<id>, que capturaria "tarefas" como id.
+      ..get('/api/encontros/tarefas', (Request _) => _operacaoCasais(() => _tarefasEncontros()))
       ..get('/api/encontros', (Request _) => _operacaoCasais(() => encontros.listarEncontros()))
       ..post('/api/encontros', (Request req) => _operacaoCasais(() async =>
           encontros.criarEncontro(await _corpo(req), conta: Auth.contaDa(req)!), status: 201))
@@ -637,6 +639,8 @@ class Servidor {
   Future<Response> _operacaoCasais(FutureOr<Object?> Function() executar, {int status = 200}) async {
     try {
       return _json(await executar(), status: status);
+    } on NaoEncontrado catch (e) {
+      return _erro(404, e.message);
     } on FormatException catch (e) {
       return _erro(400, e.message);
     } on ArgumentError {
@@ -654,9 +658,11 @@ class Servidor {
       if (u.ativo && u.perfil.pode(Permissao.encontros)) {'id': u.id, 'nome': u.nome},
   ];
 
-  List<Map<String, dynamic>> _tarefasEncontros(String encontroId) {
+  /// Tarefas de um encontro, ou as pendentes de todos (sem [encontroId]), com o nome do responsável.
+  List<Map<String, dynamic>> _tarefasEncontros([String? encontroId]) {
     final nomes = {for (final u in _responsaveisEncontros()) u['id']: u['nome']};
-    return [for (final tarefa in encontros.listarTarefas(encontroId))
+    final lista = encontroId == null ? encontros.listarTarefasPendentes() : encontros.listarTarefas(encontroId);
+    return [for (final tarefa in lista)
       {...tarefa, if (nomes[tarefa['responsavelUsuarioId']] != null) 'responsavelNome': nomes[tarefa['responsavelUsuarioId']]}];
   }
 

@@ -113,6 +113,21 @@ void main() {
       expect(recarregado.buscar('liderCasais')!.pode(encontros), isFalse);
     });
 
+    test('descrição de fábrica antiga é atualizada; descrição editada é preservada', () async {
+      await File(p.join(pasta.path, 'perfis.json')).writeAsString(jsonEncode({
+        'permissoesConhecidas': [for (final q in Permissao.values) q.name],
+        'perfis': [
+          {'id': 'liderCasais', 'nome': 'Líder de Casais e Família', 'permissoes': ['sessao', 'casais'],
+            'descricao': 'Consulta casais e contatos limitados; escreve, publica e envia devocionais. Sem acesso às fichas completas.'},
+          {'id': 'pastor', 'nome': 'Pastor', 'permissoes': ['sessao'], 'descricao': 'Texto escrito pela igreja.'},
+        ],
+      }));
+      final perfis = Perfis(pasta.path);
+      await perfis.carregar();
+      expect(perfis.buscar('liderCasais')!.descricao, PerfilPadrao.liderCasais.descricao);
+      expect(perfis.buscar('pastor')!.descricao, 'Texto escrito pela igreja.');
+    });
+
     test('dependências entre permissões e página de entrada do perfil', () {
       expect(Permissao.completar({Permissao.atasSigilosas}), {Permissao.sessao, Permissao.atas, Permissao.atasSigilosas});
       expect(Permissao.completar({Permissao.musicasMinistro}), {Permissao.sessao, Permissao.minhaEscala, Permissao.musicasMinistro});

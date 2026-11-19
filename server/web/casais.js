@@ -60,16 +60,24 @@ function acaoCasal(rotulo, fn, resultado) {
   return b;
 }
 
+const tiposContatoCasal = { parabenizado: 'Parabéns', convite_enviado: 'Convite enviado', contato_realizado: 'Contato realizado' };
+// "2026-11-19" ou "2026-11-19T10:00:00" → "19/11/2026" (lê o texto, sem fuso).
+const diaCasal = (iso) => String(iso || '').slice(0, 10).split('-').reverse().join('/');
+
 function cartaoCasal(casal) {
   const resultado = el('p', { role: 'status', 'aria-live': 'polite' });
-  const conteudo = el('div', { class: 'conteudo' }, el('strong', {}, `${casal.nome} e ${casal.conjugeNome || 'cônjuge não informado'}`),
-    el('p', { class: 'sub' }, `${(casal.dataAniversario || '').split('-').reverse().join('/')} · ${casal.anos} ${casal.anos === 1 ? 'ano' : 'anos'} de casamento`),
-    ...(casal.contatos || []).map(c => el('p', { class: 'sub' }, `${c.nome}: ${[c.telefone, c.whatsapp, c.email].filter(Boolean).join(' · ') || 'Sem contato informado'}`)),
-    el('p', { class: 'sub' }, casal.parabenizado ? `Parabenizado por ${casal.parabenizado.usuarioNome || 'responsável'} em ${casal.parabenizado.realizadoEm || ''}` : 'Parabéns ainda não registrados neste aniversário.'));
+  const historicoLista = casal.contatosHistory || [];
+  const conteudo = el('div', { class: 'conteudo' },
+    el('div', { class: 'titulo' }, `${casal.nome} e ${casal.conjugeNome || 'cônjuge não informado'}`, ' ',
+      el('span', { class: `etiqueta ${casal.parabenizado ? 'nova' : ''}` }, casal.parabenizado ? 'Parabenizado' : 'Parabéns pendentes')),
+    el('p', { class: 'sub' }, `${diaCasal(casal.dataAniversario)} · ${casal.anos} ${casal.anos === 1 ? 'ano' : 'anos'} de casamento`),
+    ...(casal.contatos || []).map(c => el('p', { class: 'sub' }, `${c.nome}: ${[...new Set([c.telefone, c.whatsapp, c.email].filter(Boolean))].join(' · ') || 'Sem contato informado'}`)),
+    casal.parabenizado ? el('p', { class: 'sub' }, `Parabéns registrados por ${casal.parabenizado.usuarioNome || 'responsável'} em ${diaCasal(casal.parabenizado.realizadoEm)}.`) : null);
   const gerenciar = pode('casaisGerenciar');
-  const historico = el('details', {}, el('summary', {}, 'Histórico operacional'));
-  for (const contato of casal.contatosHistory || []) {
-    const linha = el('div', { class: 'casais-historico' }, el('p', {}, `${contato.tipo} · ${contato.realizadoEm || ''} · ${contato.usuarioNome || 'Responsável'}${contato.anuladoEm ? ` · Anulado em ${contato.anuladoEm} por ${contato.anuladoPor || ''}` : ''}`));
+  const historico = el('details', { class: 'casais-detalhes' }, el('summary', {}, `Histórico operacional (${historicoLista.length})`));
+  if (!historicoLista.length) historico.append(el('p', { class: 'dica' }, 'Nenhum contato registrado.'));
+  for (const contato of historicoLista) {
+    const linha = el('div', { class: 'casais-historico' }, el('p', {}, `${tiposContatoCasal[contato.tipo] || contato.tipo} · ${diaCasal(contato.realizadoEm)} · ${contato.usuarioNome || 'Responsável'}${contato.anuladoEm ? ` · anulado em ${diaCasal(contato.anuladoEm)}` : ''}`));
     if (gerenciar && !contato.anuladoEm) linha.append(acaoCasal('Anular registro', async () => {
       if (!confirm('Anular este registro? A autoria e a anulação serão preservadas.')) return;
       await api('POST', `/api/casais/contatos/${encodeURIComponent(contato.id)}/anular`, {});
@@ -77,31 +85,30 @@ function cartaoCasal(casal) {
     }, resultado));
     historico.append(linha);
   }
-  conteudo.append(historico);
   if (gerenciar) {
     const editor = el('div', { class: 'casais-editor' });
-    conteudo.append(acaoCasal('Preparar mensagem', async () => {
+    const preparar = acaoCasal('Preparar mensagem', async () => {
       if (casaisEdicao && !confirm('Descartar edição anterior e preparar esta mensagem?')) return;
       if (casaisEditorAtivo) casaisEditorAtivo.replaceChildren();
       editor.replaceChildren();
       casaisEditorAtivo = editor;
       abrirMensagemCasal(casal, editor, resultado);
       casaisEdicao = true;
-    }, resultado), editor);
+    }, resultado);
     const tipo = el('select', { 'aria-label': 'Tipo de contato' },
-      ...[['parabenizado', 'Parabenizado'], ['convite_enviado', 'Convite enviado'], ['contato_realizado', 'Contato realizado']].map(([v, t]) => el('option', { value: v }, t)));
+      ...Object.entries(tiposContatoCasal).map(([v, t]) => el('option', { value: v }, t)));
     tipo.value = 'parabenizado';
     const hoje = new Date();
     const data = el('input', { type: 'date', 'aria-label': 'Data do contato', value: `${hoje.getFullYear()}-${String(hoje.getMonth() + 1).padStart(2, '0')}-${String(hoje.getDate()).padStart(2, '0')}` });
-    conteudo.append(el('p', { class: 'sub' }, 'Copiar, abrir WhatsApp ou aceitar no SMTP não registra parabéns. Registre somente o contato realizado, sem observações íntimas.'),
-      el('div', { class: 'casais-acoes' }, tipo, data, acaoCasal('Registrar contato realizado', async () => {
+    conteudo.append(el('div', { class: 'casais-acoes' }, preparar), editor,
+      el('div', { class: 'casais-acoes casais-registro' }, el('span', { class: 'dica' }, 'Registrar contato feito:'), tipo, data, acaoCasal('Registrar contato realizado', async () => {
         if (!confirm('Confirmar que este contato foi realizado?')) return;
         await api('POST', '/api/casais/contatos', { ...baseCasal(casal), tipo: tipo.value, realizadoEm: data.value,
           ...(tipo.value === 'parabenizado' ? { ocorrencia: casal.dataAniversario } : {}) });
         await consultarCasais();
       }, resultado)));
   }
-  conteudo.append(resultado);
+  conteudo.append(historico, resultado);
   return el('article', { class: 'item casais-cartao' }, conteudo);
 }
 

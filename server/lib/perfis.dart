@@ -26,6 +26,17 @@ class Perfis {
 
   static const maximo = 60;
 
+  /// Descrições de fábrica de versões anteriores. Um perfil padrão que ainda guarda uma delas
+  /// (a administração não a editou) passa a mostrar a descrição atual.
+  static const _descricoesAntigas = {
+    'liderCasais': {
+      'Consulta casais e contatos limitados; escreve, publica e envia devocionais. Sem acesso às fichas completas.',
+    },
+  };
+
+  static String _descricaoAtual(PerfilPadrao? fabrica, String salva) =>
+      fabrica != null && (_descricoesAntigas[fabrica.id]?.contains(salva) ?? false) ? fabrica.descricao : salva;
+
   List<Perfil> get lista => List.unmodifiable(_lista);
   Perfil? buscar(String id) => _lista.where((x) => x.id == id).firstOrNull;
 
@@ -60,7 +71,7 @@ class Perfis {
       lidos.add(Perfil(
           id: id,
           nome: m['nome'] as String? ?? id,
-          descricao: m['descricao'] as String? ?? '',
+          descricao: _descricaoAtual(fabrica, m['descricao'] as String? ?? ''),
           permissoes: id == PerfilPadrao.administrador.id ? fabrica!.permissoes : permissoes,
           padrao: fabrica != null));
     }

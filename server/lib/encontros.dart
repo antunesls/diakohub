@@ -65,8 +65,14 @@ class Encontros {
 
   Map<String, dynamic> _buscar(String colecao, String id) {
     final doc = store.buscar(colecao, id);
-    if (doc == null) throw const FormatException('Registro não encontrado.');
+    if (doc == null) throw const NaoEncontrado('Registro não encontrado.');
     return _copia(doc);
+  }
+
+  /// Membro citado no corpo do pedido: dado inválido (400), não rota inexistente (404).
+  void _exigirMembro(String id) {
+    if (store.buscar('membros', id) == null)
+      throw const FormatException('Membro não encontrado no cadastro.');
   }
 
   Map<String, dynamic> _autoria(Conta conta, {bool novo = false}) => {
@@ -207,7 +213,7 @@ class Encontros {
         final responsavel = _texto(
             corpo['responsavelMembroId'], 'Responsável', 200,
             obrigatorio: true);
-        _buscar('membros', responsavel);
+        _exigirMembro(responsavel);
         final pessoas = corpo['participantes'];
         if (pessoas is! List || pessoas.isEmpty || pessoas.length > 100)
           throw const FormatException('Informe de 1 a 100 participantes.');
@@ -232,7 +238,7 @@ class Encontros {
           if (pessoa['membroId'] != null) {
             final id =
                 _texto(pessoa['membroId'], 'Membro', 200, obrigatorio: true);
-            _buscar('membros', id);
+            _exigirMembro(id);
             p['membroId'] = id;
           } else {
             p['nomeAcompanhante'] = _texto(
@@ -296,7 +302,7 @@ class Encontros {
             .where((p) => p['id'] == participanteId)
             .firstOrNull;
         if (p == null)
-          throw const FormatException('Participante não encontrado.');
+          throw const NaoEncontrado('Participante não encontrado.');
         if (corpo.containsKey('confirmado'))
           p['confirmado'] = corpo['confirmado'];
         if (corpo['presente'] == true && p['confirmado'] != true)
@@ -322,6 +328,13 @@ class Encontros {
         .map(_copia)
         .toList();
   }
+
+  /// Tarefas pendentes de todos os encontros (resumo da área), numa única leitura.
+  List<Map<String, dynamic>> listarTarefasPendentes() => store
+      .listar('tarefasEncontros')
+      .where((t) => t['estado'] == 'pendente')
+      .map(_copia)
+      .toList();
 
   Map<String, dynamic> _validarTarefa(Map corpo) {
     final responsavel = corpo['responsavelUsuarioId'];

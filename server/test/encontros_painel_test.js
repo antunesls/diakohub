@@ -79,7 +79,7 @@ test('inscrição envia confirmação individual explícita e responsável selec
   await buscarBotao('Buscar').props.onclick();
   buscarBotao('Selecionar pessoa').props.onclick();
   assert.equal(a.chamadas.length, 1);
-  buscarBotao('Definir responsável').props.onclick();
+  assert.equal(buscarBotao('Definir responsável'), undefined, 'quem já é responsável não mostra o botão');
   const checks = todos(dlg).filter(n => n.props?.type === 'checkbox');
   checks[0].checked = true;
   await todos(dlg).find(n => n.tag === 'form').events.submit({preventDefault() {}});
@@ -134,9 +134,9 @@ test('resumo mostra próximos encontros e tarefas vencidas de encontros antigos 
       {id:'antigo', titulo:'Encontro antigo', estado:'encerrado', inicio:'2000-01-01T18:00'},
       {id:'futuro', titulo:'Próximo jantar', estado:'aberto', inicio:'2099-01-01T18:00'},
     ];
-    if (url.includes('/antigo/tarefas')) return [
-      {id:'t', descricao:'Pendência antiga', estado:'pendente', prazo:'2000-01-01'},
-      {id:'c', descricao:'Não exibir concluída', estado:'concluida', prazo:'2000-01-01'},
+    if (url === '/api/encontros/tarefas') return [
+      {id:'t', encontroId:'antigo', descricao:'Pendência antiga', estado:'pendente', prazo:'2000-01-01'},
+      {id:'c', encontroId:'antigo', descricao:'Não exibir concluída', estado:'concluida', prazo:'2000-01-01'},
     ];
     return [];
   });
@@ -146,7 +146,22 @@ test('resumo mostra próximos encontros e tarefas vencidas de encontros antigos 
   assert.match(textos, /Pendência antiga/);
   assert.match(textos, /Vencida/);
   assert.doesNotMatch(textos, /Não exibir concluída/);
-  assert.ok(a.chamadas.some(c => c.url === '/api/encontros/antigo/tarefas'));
+  assert.match(textos, /Encontro antigo/);
+  // Uma só consulta de tarefas, não uma por encontro.
+  assert.equal(a.chamadas.filter(c => c.url.endsWith('/tarefas')).length, 1);
+});
+test('primeiro membro incluído já vira o responsável da inscrição', async () => {
+  const a = ambiente(true, (metodo, url) => url.includes('pessoas?') ? [{id: 'a', nome: 'Ana'}] : []);
+  await a.run('formularioInscricao({id:"e"})');
+  const dlg = a.body.children[0];
+  const buscarBotao = texto => todos(dlg).find(n => n.tag === 'button' && n.children.includes(texto));
+  todos(dlg).find(n => n.props?.['aria-label'] === 'Buscar pessoas').value = 'Ana';
+  await buscarBotao('Buscar').props.onclick();
+  buscarBotao('Selecionar pessoa').props.onclick();
+  await todos(dlg).find(n => n.tag === 'form').events.submit({preventDefault() {}});
+  const envio = a.chamadas.find(c => c.metodo === 'POST');
+  assert.ok(envio, 'deve enviar sem exigir "Definir responsável"');
+  assert.equal(envio.corpo.responsavelMembroId, 'a');
 });
 test('roteiro exibe e copia snapshots em ordem sem expor inscritos', async () => {
   const a = ambiente(false, (_, url) => {

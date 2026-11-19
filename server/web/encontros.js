@@ -3,18 +3,47 @@
 // Inerte na carga: identidade/permissões só existem após o painel autenticar.
 const tiposEncontro = { culto: 'Culto', conferencia: 'Conferência', retiro: 'Retiro', acampamento: 'Acampamento', jantar: 'Jantar', palestra: 'Palestra', treinamento: 'Treinamento', encontro_familias: 'Encontro de famílias', outro: 'Outro' };
 const estadosEncontro = { rascunho: 'Rascunho', aberto: 'Aberto', encerrado: 'Encerrado', cancelado: 'Cancelado' };
+const estadosTarefaEncontro = { pendente: 'Pendente', concluida: 'Concluída', cancelada: 'Cancelada' };
 const caminhoEncontro = id => '/api/encontros/' + encodeURIComponent(id);
 const listaEncontros = (resposta, chave) => Array.isArray(resposta) ? resposta : resposta[chave] || [];
 
-function janelaEncontro(titulo, salvar) {
+/** "2026-12-05T19:30" → "05/12/2026 às 19:30"; "2026-12-05" → "05/12/2026". Lê o texto, sem fuso. */
+function dataEncontro(iso) {
+  if (!iso) return '';
+  const [dia, hora] = String(iso).split('T');
+  const data = dia.split('-').reverse().join('/');
+  return hora ? `${data} às ${hora.slice(0, 5)}` : data;
+}
+
+/** Início e fim em uma linha: mesmo dia mostra só o horário final. */
+function periodoEncontro(e) {
+  if (!e.inicio) return 'Data a definir';
+  if (!e.fim) return dataEncontro(e.inicio);
+  const [diaInicio] = String(e.inicio).split('T');
+  const [diaFim, horaFim] = String(e.fim).split('T');
+  return diaInicio === diaFim && horaFim
+    ? `${dataEncontro(e.inicio)}–${horaFim.slice(0, 5)}`
+    : `${dataEncontro(e.inicio)} até ${dataEncontro(e.fim)}`;
+}
+
+function vagasEncontro(e) {
+  const ocupadas = e.vagasOcupadas || 0;
+  const pessoas = `${ocupadas} ${ocupadas === 1 ? 'participante' : 'participantes'}`;
+  return e.vagasDisponiveis == null ? `${pessoas} · sem limite de vagas` : `${pessoas} · ${e.vagasDisponiveis} vagas disponíveis`;
+}
+
+const etiquetaEncontro = e => el('span', { class: `etiqueta ${e.estado === 'aberto' ? 'nova' : e.estado === 'cancelado' ? 'alerta' : ''}` },
+  estadosEncontro[e.estado] || e.estado || '');
+
+/** Diálogo do painel: título, área com rolagem, mensagem de erro e botões no rodapé. */
+function janelaEncontro(titulo, salvar, { textoSalvar = 'Salvar', textoFechar } = {}) {
   const erro = el('p', { role: 'alert' });
-  const conteudo = el('div', { class: 'dialogo-coluna' });
-  const form = el('form', {}, el('h2', {}, titulo), conteudo);
+  const conteudo = el('div', { class: 'dialogo-rolagem' });
+  const fechar = botao(textoFechar || (salvar ? 'Cancelar' : 'Fechar'), () => dlg.close(), 'secundario');
+  const enviar = el('button', { type: 'submit', class: 'botao' }, textoSalvar);
+  const form = el('form', {}, el('h2', {}, titulo), conteudo, erro,
+    el('div', { class: 'dialogo-acoes' }, fechar, salvar ? enviar : null));
   const dlg = el('dialog', { class: 'dialogo-largo', 'aria-label': titulo }, form);
-  const fechar = botao('Fechar', () => dlg.close());
-  const enviar = el('button', { type: 'submit', class: 'botao' }, 'Salvar');
-  const rodape = el('div', { class: 'acoes' }, fechar, salvar ? enviar : null);
-  form.append(erro, rodape);
   let ocupado = false;
   form.addEventListener('submit', async evento => {
     evento.preventDefault();
@@ -30,15 +59,24 @@ function janelaEncontro(titulo, salvar) {
   return { dlg, conteudo, erro };
 }
 
-function campoEncontro(alvo, rotulo, valor = '', { tipo = 'text', opcoes, obrigatorio = false, limite = 300 } = {}) {
+function campoEncontro(alvo, rotulo, valor = '', { tipo = 'text', opcoes, obrigatorio = false, limite = 300, largo = false } = {}) {
   const input = el(opcoes ? 'select' : tipo === 'textarea' ? 'textarea' : 'input', {
     type: opcoes || tipo === 'textarea' ? null : tipo,
-    required: obrigatorio, maxlength: limite,
+    required: obrigatorio, maxlength: limite, rows: tipo === 'textarea' ? 4 : null,
   });
   if (opcoes) for (const [id, nome] of Object.entries(opcoes)) input.append(el('option', { value: id }, nome));
   input.value = valor ?? '';
-  alvo.append(el('label', {}, rotulo, input));
+  alvo.append(el('label', { class: largo ? 'largo' : null }, rotulo, input));
   return input;
+}
+
+function cartaoEncontro(e) {
+  return el('article', { class: 'item' },
+    el('div', { class: 'conteudo' },
+      el('div', { class: 'titulo' }, e.titulo || 'Encontro', ' ', etiquetaEncontro(e)),
+      el('p', { class: 'sub' }, `${tiposEncontro[e.tipo] || 'Encontro'} · ${periodoEncontro(e)} · ${e.local || 'Local a definir'}`),
+      el('p', { class: 'sub' }, vagasEncontro(e))),
+    el('div', { class: 'acoes' }, botao('Ver encontro', () => detalheEncontro(e.id))));
 }
 
 async function carregarEncontros() {
@@ -46,53 +84,52 @@ async function carregarEncontros() {
   if (!alvo) return;
   try {
     const encontros = listaEncontros(await api('GET', '/api/encontros'), 'encontros');
-    const resumo = el('section', { 'aria-label': 'Resumo de encontros e tarefas' });
-    alvo.replaceChildren(...[el('h3', {}, 'Encontros e inscrições'),
-      el('p', { class: 'dica' }, 'Inscrições internas. Cada pessoa é confirmada individualmente. Não registre saúde, documentos ou informações íntimas.'),
-      resumo,
-      pode('encontros') ? botao('Criar encontro', () => formularioEncontro()) : null,
-      ...encontros.map(e => el('article', { class: 'item' }, el('div', {}, el('h4', {}, e.titulo),
-        el('p', {}, `${estadosEncontro[e.estado] || e.estado} · ${new Date(e.inicio).toLocaleString('pt-BR')} · ${e.local || 'Local a definir'}`),
-        el('p', {}, `${e.vagasOcupadas || 0} participantes · ${e.vagasDisponiveis == null ? 'Sem limite de vagas' : e.vagasDisponiveis + ' vagas disponíveis'}`)),
-      botao('Ver encontro', () => detalheEncontro(e.id)))),
-      encontros.length ? null : el('p', {}, 'Nenhum encontro cadastrado.')].filter(Boolean));
-    await resumoEncontros(resumo, encontros);
+    const agora = new Date();
+    const proximos = encontros.filter(e => ['rascunho', 'aberto'].includes(e.estado) && new Date(e.inicio) >= agora);
+    const anteriores = encontros.filter(e => !proximos.includes(e)).reverse();
+    const tarefas = el('div', { class: 'lista' });
+    alvo.replaceChildren(...[
+      pode('encontros') ? el('div', { class: 'barra' }, botao('Criar encontro', () => formularioEncontro(), 'pequeno')) : null,
+      el('h2', {}, 'Próximos encontros'),
+      el('div', { class: 'lista' }, ...(proximos.length ? proximos.map(cartaoEncontro)
+        : [el('p', { class: 'vazio' }, encontros.length ? 'Nenhum encontro futuro em rascunho ou aberto.' : 'Nenhum encontro cadastrado.')])),
+      el('h2', {}, 'Tarefas pendentes'),
+      tarefas,
+      anteriores.length ? el('h2', {}, 'Anteriores, encerrados e cancelados') : null,
+      anteriores.length ? el('div', { class: 'lista' }, ...anteriores.map(cartaoEncontro)) : null,
+    ].filter(Boolean));
+    await tarefasPendentesEncontros(tarefas, encontros);
   } catch (e) { mensagem(alvo, e.message, false); }
 }
 
-async function resumoEncontros(alvo, encontros) {
-  // Não depende dos filtros de aniversário: pendências antigas continuam visíveis.
+async function tarefasPendentesEncontros(alvo, encontros) {
+  // Uma única consulta com as pendentes de todos os encontros, inclusive antigos e
+  // cancelados: não esconder pendências.
   const agora = new Date();
   const hoje = `${agora.getFullYear()}-${String(agora.getMonth() + 1).padStart(2, '0')}-${String(agora.getDate()).padStart(2, '0')}`;
-  const proximos = encontros.filter(e => ['rascunho', 'aberto'].includes(e.estado) && new Date(e.inicio) >= agora)
-    .sort((a, b) => new Date(a.inicio) - new Date(b.inicio));
-  alvo.replaceChildren(...[el('h4', {}, 'Próximos encontros'),
-    ...proximos.map(e => el('div', { class: 'item' }, `${e.titulo} · ${new Date(e.inicio).toLocaleString('pt-BR')}`, botao('Abrir encontro', () => detalheEncontro(e.id)))),
-    proximos.length ? null : el('p', {}, 'Nenhum próximo encontro.'),
-    el('h4', {}, 'Tarefas abertas e vencidas')].filter(Boolean));
-  const tarefas = [];
-  const falhas = [];
-  // Limita requisições simultâneas e inclui encontros antigos/cancelados: não esconder pendências.
-  for (let inicio = 0; inicio < encontros.length; inicio += 5) {
-    await Promise.all(encontros.slice(inicio, inicio + 5).map(async encontro => {
-      try {
-        const lista = listaEncontros(await api('GET', caminhoEncontro(encontro.id) + '/tarefas'), 'tarefas');
-        tarefas.push(...lista.filter(t => t.estado === 'pendente').map(t => ({ ...t, encontro })));
-      } catch (_) { falhas.push(encontro.titulo); }
-    }));
+  let tarefas = [];
+  if (encontros.length) try {
+    const porId = new Map(encontros.map(e => [e.id, e]));
+    tarefas = listaEncontros(await api('GET', '/api/encontros/tarefas'), 'tarefas')
+      .filter(t => t.estado === 'pendente' && porId.has(t.encontroId))
+      .map(t => ({ ...t, encontro: porId.get(t.encontroId) }));
+  } catch (_) {
+    alvo.replaceChildren(el('p', { role: 'alert', class: 'erro' }, 'Não foi possível consultar as tarefas. Reabra a área para tentar novamente.'));
+    return;
   }
   tarefas.sort((a, b) => (a.prazo || '9999').localeCompare(b.prazo || '9999'));
-  alvo.append(...[...tarefas.map(t => el('div', { class: 'item' },
-    el('p', {}, `${t.prazo && t.prazo < hoje ? 'Vencida · ' : ''}${t.descricao} · ${t.prazo || 'Sem prazo'} · ${t.encontro.titulo}`),
-    botao('Ver tarefa no encontro', () => detalheEncontro(t.encontro.id)))),
-    tarefas.length ? null : el('p', {}, falhas.length ? 'Não foi possível consultar todas as tarefas.' : 'Nenhuma tarefa aberta.'),
-    falhas.length ? el('p', { role: 'alert' }, 'Falha ao carregar tarefas de: ' + falhas.join(', ') + '. Reabra a área para tentar novamente.') : null].filter(Boolean));
+  alvo.replaceChildren(...(tarefas.length ? tarefas.map(t => el('div', { class: 'item' },
+    el('div', { class: 'conteudo' },
+      el('div', { class: 'titulo' }, t.descricao, ...(t.prazo && t.prazo < hoje ? [' ', el('span', { class: 'etiqueta alerta' }, 'Vencida')] : [])),
+      el('p', { class: 'sub' }, [t.prazo ? `Prazo ${dataEncontro(t.prazo)}` : 'Sem prazo', t.encontro.titulo, t.responsavelNome].filter(Boolean).join(' · '))),
+    el('div', { class: 'acoes' }, botao('Ver tarefa no encontro', () => detalheEncontro(t.encontro.id)))))
+    : [el('p', { class: 'vazio' }, 'Nenhuma tarefa pendente.')]));
 }
 
 function roteiroUtilizadoEncontro(alvo, encontro) {
   const roteiro = Array.isArray(encontro.roteiro) ? encontro.roteiro : [];
   alvo.append(el('h3', {}, 'Roteiro utilizado'));
-  if (!roteiro.length) { alvo.append(el('p', {}, 'Nenhum material associado.')); return; }
+  if (!roteiro.length) { alvo.append(el('p', { class: 'dica' }, 'Nenhum material associado. Associe materiais em Casais e Família › Materiais e atividades.')); return; }
   const textos = roteiro.map(item => {
     const snapshot = item.conteudoSnapshot || {};
     if (typeof textoMaterialCasais === 'function') return textoMaterialCasais(snapshot);
@@ -100,14 +137,14 @@ function roteiroUtilizadoEncontro(alvo, encontro) {
     return [snapshot.titulo, snapshot.objetivo, snapshot.duracaoMinutos ? `Duração: ${snapshot.duracaoMinutos} minutos` : '',
       snapshot.referenciasBiblicas, snapshot.preparacao, snapshot.passos, snapshot.perguntas].filter(Boolean).join('\n\n');
   });
-  roteiro.forEach((item, indice) => alvo.append(el('article', { class: 'item' },
-    el('h4', {}, `${indice + 1}. ${item.conteudoSnapshot?.titulo || 'Material'} · versão ${item.versao}`),
-    el('pre', { style: 'white-space:pre-wrap;overflow-wrap:anywhere;font:inherit' }, textos[indice]))));
   const status = el('p', { role: 'status' });
-  alvo.append(botao('Copiar roteiro utilizado', async () => {
+  alvo.append(el('div', { class: 'barra' }, botao('Copiar roteiro utilizado', async () => {
     try { await navigator.clipboard.writeText(textos.join('\n\n')); mensagem(status, 'Roteiro copiado. Nenhum dado de participantes foi incluído.'); }
     catch (_) { mensagem(status, 'Não foi possível copiar. Selecione o texto do roteiro e copie manualmente.', false); }
-  }), status);
+  })), status);
+  roteiro.forEach((item, indice) => alvo.append(el('article', { class: 'item encontro-bloco' },
+    el('div', { class: 'titulo' }, `${indice + 1}. ${item.conteudoSnapshot?.titulo || 'Material'}`, ' ', el('span', { class: 'etiqueta' }, `versão ${item.versao}`)),
+    el('pre', { class: 'encontro-texto' }, textos[indice]))));
 }
 
 function formularioEncontro(atual, atualizar = carregarEncontros) {
@@ -118,39 +155,43 @@ function formularioEncontro(atual, atualizar = carregarEncontros) {
     await api(atual ? 'PUT' : 'POST', atual ? caminhoEncontro(atual.id) : '/api/encontros', corpo);
     await atualizar();
   });
-  const adicionar = (chave, rotulo, opcoes = {}) => { campos[chave] = campoEncontro(conteudo, rotulo, atual?.[chave] ?? '', opcoes); };
-  adicionar('titulo', 'Título', { obrigatorio: true, limite: 160 });
+  const grade = el('div', { class: 'grade-form' });
+  conteudo.append(grade);
+  const adicionar = (chave, rotulo, opcoes = {}) => { campos[chave] = campoEncontro(grade, rotulo, atual?.[chave] ?? '', opcoes); };
+  adicionar('titulo', 'Título', { obrigatorio: true, limite: 160, largo: true });
   adicionar('tipo', 'Tipo', { opcoes: tiposEncontro }); if (!atual) campos.tipo.value = 'jantar';
+  adicionar('estado', 'Situação', { opcoes: estadosEncontro }); if (!atual) campos.estado.value = 'rascunho';
   adicionar('inicio', 'Início', { tipo: 'datetime-local', obrigatorio: true });
   adicionar('fim', 'Fim', { tipo: 'datetime-local', obrigatorio: true });
-  adicionar('local', 'Local'); adicionar('descricao', 'Descrição', { tipo: 'textarea', limite: 3000 });
-  adicionar('capacidade', 'Capacidade (todas as pessoas, inclusive crianças)', { tipo: 'number' }); campos.capacidade.min = '1'; campos.capacidade.max = '100000';
-  adicionar('estado', 'Estado', { opcoes: estadosEncontro }); if (!atual) campos.estado.value = 'rascunho';
+  adicionar('local', 'Local');
+  adicionar('capacidade', 'Vagas (todas as pessoas, inclusive crianças)', { tipo: 'number' }); campos.capacidade.min = '1'; campos.capacidade.max = '100000';
+  adicionar('descricao', 'Descrição', { tipo: 'textarea', limite: 3000, largo: true });
+  grade.append(el('p', { class: 'dica largo' }, 'Inscrições só são aceitas com a situação "Aberto". Deixe as vagas em branco para não limitar.'));
 }
 
 function confirmarEncontro(titulo, texto, executar) {
-  const { conteudo } = janelaEncontro(titulo, executar);
+  const { conteudo } = janelaEncontro(titulo, executar, { textoSalvar: 'Confirmar', textoFechar: 'Voltar' });
   conteudo.append(el('p', {}, texto));
 }
 
 function textoConviteEncontro(encontro) {
   return [`Convite: ${encontro.titulo || 'Encontro'}`,
-    new Date(encontro.inicio).toLocaleString('pt-BR'), encontro.local || 'Local a confirmar',
+    periodoEncontro(encontro), encontro.local || 'Local a confirmar',
     encontro.descricao || '', 'Confirme sua participação com a liderança do ministério.'].filter(Boolean).join('\n\n');
 }
 
 function prepararConviteEncontro(encontro) {
   const janela = janelaEncontro('Prévia do convite');
-  const texto = el('textarea', { rows: 9, maxlength: 10000, 'aria-label': 'Texto do convite', style: 'width:100%;box-sizing:border-box' });
+  const texto = el('textarea', { rows: 9, maxlength: 10000, 'aria-label': 'Texto do convite', class: 'encontro-campo-largo' });
   texto.value = textoConviteEncontro(encontro);
-  const compartilhar = el('a', { class: 'botao secundario', target: '_blank', rel: 'noopener noreferrer' }, 'Abrir no WhatsApp');
+  const compartilhar = el('a', { class: 'botao secundario pequeno', target: '_blank', rel: 'noopener noreferrer' }, 'Abrir no WhatsApp');
   const atualizar = () => { compartilhar.href = 'https://wa.me/?text=' + encodeURIComponent(texto.value); };
   texto.addEventListener('input', atualizar); atualizar();
-  janela.conteudo.append(el('p', {}, 'Confira o convite. Copiar ou abrir WhatsApp não envia, não confirma presença e não registra contato.'),
-    texto, botao('Copiar convite', async () => {
+  janela.conteudo.append(el('p', { class: 'dica' }, 'Confira o convite. Copiar ou abrir WhatsApp não envia, não confirma presença e não registra contato.'),
+    texto, el('div', { class: 'barra' }, botao('Copiar convite', async () => {
       try { await navigator.clipboard.writeText(texto.value); mensagem(janela.erro, 'Convite copiado. Envio depende de ação humana.'); }
       catch (_) { mensagem(janela.erro, 'Não foi possível copiar. Selecione o texto para copiar.', false); }
-    }), compartilhar);
+    }), compartilhar));
 }
 
 async function detalheEncontro(id) {
@@ -161,46 +202,67 @@ async function detalheEncontro(id) {
     ]);
     const gestao = pode('encontros'), ativo = e.estado !== 'cancelado';
     const atualizar = async () => { janela.dlg.close(); await carregarEncontros(); await detalheEncontro(id); };
-    janela.conteudo.append(el('h3', {}, e.titulo), el('p', {}, e.descricao || ''), el('p', {}, `${e.local || 'Local a definir'} · ${estadosEncontro[e.estado]}`),
-      el('p', {}, `${e.vagasOcupadas || 0} participantes · ${e.vagasDisponiveis == null ? 'Sem limite' : e.vagasDisponiveis + ' vagas disponíveis'}`));
-    roteiroUtilizadoEncontro(janela.conteudo, e);
-    if (gestao && ativo) janela.conteudo.append(botao('Preparar convite', () => prepararConviteEncontro(e)));
-    if (gestao && ativo) janela.conteudo.append(botao('Editar encontro', () => formularioEncontro(e, atualizar)),
+    const c = janela.conteudo;
+    c.append(el('div', { class: 'titulo encontro-titulo' }, e.titulo || 'Encontro', ' ', etiquetaEncontro(e)),
+      el('p', { class: 'dica' }, `${tiposEncontro[e.tipo] || 'Encontro'} · ${periodoEncontro(e)} · ${e.local || 'Local a definir'}`),
+      e.descricao ? el('p', { class: 'encontro-texto' }, e.descricao) : el('p', { class: 'dica' }, 'Sem descrição.'),
+      el('p', {}, vagasEncontro(e)));
+    if (gestao && ativo) c.append(el('div', { class: 'barra' },
+      e.estado === 'aberto' ? botao('Inscrever pessoas', () => formularioInscricao(e, atualizar), 'pequeno') : null,
+      botao('Editar encontro', () => formularioEncontro(e, atualizar)),
+      botao('Preparar convite', () => prepararConviteEncontro(e)),
       botao('Cancelar encontro', () => confirmarEncontro('Cancelar encontro', 'Novas inscrições e presenças serão bloqueadas. O histórico será preservado.', async () => {
         await api('POST', caminhoEncontro(id) + '/cancelar', {}); await atualizar();
-      })));
-    if (gestao && e.estado === 'aberto') janela.conteudo.append(botao('Inscrever pessoas', () => formularioInscricao(e, atualizar)));
-    janela.conteudo.append(el('h3', {}, 'Inscrições e presença'));
+      }), 'perigo pequeno')));
+    if (gestao && ativo && e.estado !== 'aberto') c.append(el('p', { class: 'dica' }, 'Para receber inscrições, edite o encontro e mude a situação para "Aberto".'));
+
+    c.append(el('h3', {}, 'Inscrições e presença'));
     const inscricoes = listaEncontros(respostaI, 'inscricoes');
-    if (!inscricoes.length) janela.conteudo.append(el('p', {}, 'Nenhuma inscrição.'));
+    if (!inscricoes.length) c.append(el('p', { class: 'dica' }, 'Nenhuma inscrição.'));
     for (const i of inscricoes) {
-      const bloco = el('section', { class: 'item' }, el('h4', {}, i.estado === 'cancelada' ? 'Inscrição cancelada' : 'Inscrição familiar / individual'));
-      for (const p of i.participantes || []) {
+      const participantes = i.participantes || [];
+      const responsavel = participantes.find(p => p.membroId && p.membroId === i.responsavelMembroId);
+      const editavel = gestao && ativo && i.estado === 'confirmada';
+      const bloco = el('section', { class: 'item encontro-bloco' },
+        el('div', { class: 'encontro-bloco-topo' },
+          el('div', { class: 'titulo' }, responsavel ? `Inscrição de ${responsavel.nome}` : 'Inscrição',
+            ...(i.estado === 'cancelada' ? [' ', el('span', { class: 'etiqueta alerta' }, 'Cancelada')] : [])),
+          editavel ? botao('Cancelar inscrição', () => confirmarEncontro('Cancelar inscrição', 'As vagas desta inscrição serão liberadas. O histórico será preservado.', async () => {
+            await api('POST', '/api/inscricoes/' + encodeURIComponent(i.id) + '/cancelar', {}); await atualizar();
+          }), 'perigo pequeno') : null));
+      for (const p of participantes) {
         const nome = p.nome || p.nomeAcompanhante || 'Membro removido';
-        const linha = el('div', {}, el('strong', {}, nome), p.crianca ? ' · Criança' : '',
-          el('p', {}, `${p.confirmado ? 'Confirmado' : 'Aguardando confirmação'} · ${p.presenteEm ? 'Presente' : 'Sem presença'}`),
-          p.presenteEm ? el('small', {}, `Registrado em ${new Date(p.presenteEm).toLocaleString('pt-BR')} por ${p.presencaPorNome || p.presencaPor || 'responsável'}`) : null);
-        if (gestao && ativo && i.estado === 'confirmada') {
+        const situacao = [p.confirmado ? 'Confirmado' : 'Aguardando confirmação',
+          p.presenteEm ? `Presente (registrado em ${new Date(p.presenteEm).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })} por ${p.presencaPorNome || p.presencaPor || 'responsável'})` : 'Sem presença'];
+        const acoes = el('div', { class: 'acoes' });
+        if (editavel) {
           const alterar = corpo => confirmarEncontro('Atualizar participante', `Confirmar alteração para ${nome}?`, async () => {
             await api('PUT', '/api/inscricoes/' + encodeURIComponent(i.id) + '/participantes/' + encodeURIComponent(p.id) + '/presenca', corpo); await atualizar();
           });
-          linha.append(...[botao(p.confirmado ? 'Desfazer confirmação' : 'Confirmar pessoa', () => alterar({ confirmado: !p.confirmado })),
-            p.confirmado ? botao(p.presenteEm ? 'Desfazer check-in' : 'Registrar presença', () => alterar({ presente: !p.presenteEm })) : null].filter(Boolean));
+          acoes.append(...[botao(p.confirmado ? 'Desfazer confirmação' : 'Confirmar pessoa', () => alterar({ confirmado: !p.confirmado })),
+            p.confirmado ? botao(p.presenteEm ? 'Desfazer check-in' : 'Registrar presença', () => alterar({ presente: !p.presenteEm }), p.presenteEm ? 'secundario pequeno' : 'pequeno') : null].filter(Boolean));
         }
-        bloco.append(linha);
+        bloco.append(el('div', { class: 'encontro-linha' },
+          el('div', { class: 'conteudo' },
+            el('strong', {}, nome), ...(p.crianca ? [' ', el('span', { class: 'etiqueta' }, 'Criança')] : []),
+            ...(p.nomeAcompanhante ? [' ', el('span', { class: 'etiqueta' }, 'Acompanhante')] : []),
+            el('p', { class: 'sub' }, situacao.join(' · '))),
+          acoes));
       }
-      if (gestao && i.estado === 'confirmada') bloco.append(botao('Cancelar inscrição', () => confirmarEncontro('Cancelar inscrição', 'As vagas desta inscrição serão liberadas. O histórico será preservado.', async () => {
-        await api('POST', '/api/inscricoes/' + encodeURIComponent(i.id) + '/cancelar', {}); await atualizar();
-      })));
-      janela.conteudo.append(bloco);
+      c.append(bloco);
     }
-    janela.conteudo.append(el('h3', {}, 'Tarefas da equipe'));
-    if (gestao && ativo) janela.conteudo.append(botao('Criar tarefa', () => formularioTarefaEncontro(e, null, atualizar)));
+
+    c.append(el('h3', {}, 'Tarefas da equipe'));
+    if (gestao && ativo) c.append(el('div', { class: 'barra' }, botao('Criar tarefa', () => formularioTarefaEncontro(e, null, atualizar))));
     const tarefas = listaEncontros(respostaT, 'tarefas');
-    if (!tarefas.length) janela.conteudo.append(el('p', {}, 'Nenhuma tarefa.'));
-    for (const t of tarefas) janela.conteudo.append(el('article', { class: 'item' }, el('p', {}, t.descricao),
-      el('p', {}, `${t.estado} · ${t.prazo || 'Sem prazo'} · ${t.responsavelNome || (t.responsavelUsuarioId ? 'Responsável indisponível' : 'Sem responsável')}`),
-      gestao ? botao('Editar tarefa', () => formularioTarefaEncontro(e, t, atualizar)) : null));
+    if (!tarefas.length) c.append(el('p', { class: 'dica' }, 'Nenhuma tarefa.'));
+    for (const t of tarefas) c.append(el('article', { class: 'item' },
+      el('div', { class: 'conteudo' }, el('div', { class: 'titulo' }, t.descricao),
+        el('p', { class: 'sub' }, [estadosTarefaEncontro[t.estado] || t.estado, t.prazo ? `Prazo ${dataEncontro(t.prazo)}` : 'Sem prazo',
+          t.responsavelNome || (t.responsavelUsuarioId ? 'Responsável indisponível' : 'Sem responsável')].join(' · '))),
+      gestao ? el('div', { class: 'acoes' }, botao('Editar tarefa', () => formularioTarefaEncontro(e, t, atualizar))) : null));
+
+    roteiroUtilizadoEncontro(c, e);
   } catch (e) { mensagem(janela.erro, e.message, false); }
 }
 
@@ -214,35 +276,50 @@ async function formularioInscricao(encontro, atualizar = carregarEncontros) {
       responsavelMembroId: responsavel,
       participantes: selecionados.map(p => ({ ...(p.membroId ? { membroId: p.membroId } : { nomeAcompanhante: p.nomeAcompanhante }), crianca: p.crianca.checked, confirmado: p.confirmado.checked })),
     }); await atualizar();
-  });
-  conteudo.append(el('p', { class: 'dica' }, 'Selecione cada pessoa e confirme individualmente. Todos ocupam vaga, inclusive crianças. Convidados são nomes apenas desta inscrição; não informe saúde, documentos ou data de nascimento.'));
-  const busca = el('input', { type: 'search', 'aria-label': 'Buscar pessoas', minlength: 2, maxlength: 100 });
-  const resultados = el('div', { 'aria-live': 'polite' });
-  const pessoas = el('div');
-  const responsavelTexto = el('p', {}, 'Nenhum membro responsável selecionado.');
+  }, { textoSalvar: 'Inscrever' });
+  conteudo.append(el('p', { class: 'dica' }, 'Busque cada pessoa e confirme individualmente. Todos ocupam vaga, inclusive crianças. Acompanhantes sem ficha existem só nesta inscrição; não informe saúde, documentos ou data de nascimento.'));
+  const busca = el('input', { type: 'search', 'aria-label': 'Buscar pessoas', minlength: 2, maxlength: 100, placeholder: 'Nome do membro' });
+  const resultados = el('div', { class: 'lista', 'aria-live': 'polite' });
+  const pessoas = el('div', { class: 'lista' });
+  const responsavelTexto = el('p', { class: 'dica' }, 'Nenhum membro responsável selecionado.');
   function render() {
-    pessoas.replaceChildren(...selecionados.map(p => el('div', { class: 'item' }, el('strong', {}, p.nome || p.nomeAcompanhante),
-      el('label', {}, p.confirmado, ' Participação confirmada'), el('label', {}, p.crianca, ' Criança'),
-      p.membroId ? botao('Definir responsável', () => { responsavel = p.membroId; responsavelTexto.textContent = 'Responsável: ' + p.nome; }) : null,
-      botao('Remover', () => { selecionados.splice(selecionados.indexOf(p), 1); if (responsavel === p.membroId) { responsavel = ''; responsavelTexto.textContent = 'Selecione outro responsável.'; } render(); }))));
+    pessoas.replaceChildren(...(selecionados.length ? selecionados.map(p => el('div', { class: 'item encontro-linha' },
+      el('div', { class: 'conteudo' }, el('strong', {}, p.nome || p.nomeAcompanhante),
+        ...(responsavel && responsavel === p.membroId ? [' ', el('span', { class: 'etiqueta nova' }, 'Responsável')] : []),
+        el('div', { class: 'encontro-marcas' },
+          el('label', { class: 'marcar' }, p.confirmado, ' Participação confirmada'), el('label', { class: 'marcar' }, p.crianca, ' Criança'))),
+      el('div', { class: 'acoes' },
+        p.membroId && responsavel !== p.membroId ? botao('Definir responsável', () => { responsavel = p.membroId; responsavelTexto.textContent = 'Responsável: ' + p.nome; render(); }) : null,
+        botao('Remover', () => { selecionados.splice(selecionados.indexOf(p), 1); if (responsavel === p.membroId) { responsavel = ''; responsavelTexto.textContent = 'Selecione outro responsável.'; } render(); }))))
+      : [el('p', { class: 'dica' }, 'Ninguém incluído ainda.')]));
   }
   function incluir(p) {
     if (p.membroId && selecionados.some(atual => atual.membroId === p.membroId)) return;
-    selecionados.push({ ...p, confirmado: el('input', { type: 'checkbox' }), crianca: el('input', { type: 'checkbox' }) }); render();
+    selecionados.push({ ...p, confirmado: el('input', { type: 'checkbox' }), crianca: el('input', { type: 'checkbox' }) });
+    // O primeiro membro incluído vira o responsável; dá para trocar em "Definir responsável".
+    if (p.membroId && !responsavel) { responsavel = p.membroId; responsavelTexto.textContent = 'Responsável: ' + p.nome; }
+    render();
   }
-  conteudo.append(el('label', {}, 'Buscar membro (mínimo 2 letras)', busca), botao('Buscar', async () => {
+  const pesquisar = botao('Buscar', async () => {
     const termo = busca.value.trim();
     if (termo.length < 2) { mensagem(erro, 'Digite ao menos duas letras.', false); return; }
     try {
       const lista = listaEncontros(await api('GET', '/api/encontros/pessoas?busca=' + encodeURIComponent(termo)), 'pessoas').slice(0, 30);
-      resultados.replaceChildren(...lista.map(p => el('div', {}, p.nome, botao('Selecionar pessoa', () => incluir({ membroId: p.id, nome: p.nome })))), ...(!lista.length ? [el('p', {}, 'Nenhuma pessoa encontrada.')] : []));
+      resultados.replaceChildren(...lista.map(p => el('div', { class: 'item encontro-linha' }, el('div', { class: 'conteudo' }, p.nome),
+        el('div', { class: 'acoes' }, botao('Selecionar pessoa', () => incluir({ membroId: p.id, nome: p.nome }))))),
+        ...(!lista.length ? [el('p', { class: 'dica' }, 'Nenhuma pessoa encontrada.')] : []));
     } catch (e) { mensagem(erro, e.message, false); }
-  }), resultados, responsavelTexto, pessoas);
-  const convidado = campoEncontro(conteudo, 'Nome de acompanhante sem ficha', '', { limite: 160 });
-  conteudo.append(botao('Incluir acompanhante', () => {
-    if (!convidado.value.trim()) { mensagem(erro, 'Informe o nome do acompanhante.', false); return; }
-    incluir({ nomeAcompanhante: convidado.value.trim() }); convidado.value = '';
-  }));
+  });
+  const convidado = el('input', { maxlength: 160, 'aria-label': 'Nome de acompanhante sem ficha', placeholder: 'Nome do acompanhante' });
+  conteudo.append(el('h3', {}, 'Buscar membro'),
+    el('div', { class: 'campo-com-botao' }, busca, pesquisar), resultados,
+    el('h3', {}, 'Acompanhante sem ficha'),
+    el('div', { class: 'campo-com-botao' }, convidado, botao('Incluir acompanhante', () => {
+      if (!convidado.value.trim()) { mensagem(erro, 'Informe o nome do acompanhante.', false); return; }
+      incluir({ nomeAcompanhante: convidado.value.trim() }); convidado.value = '';
+    })),
+    el('h3', {}, 'Pessoas desta inscrição'), responsavelTexto, pessoas);
+  render();
 }
 
 async function formularioTarefaEncontro(encontro, atual, atualizar = carregarEncontros) {
@@ -253,10 +330,12 @@ async function formularioTarefaEncontro(encontro, atual, atualizar = carregarEnc
       prazo: campos.prazo.value || null, estado: campos.estado.value,
     }); await atualizar();
   });
-  campos.descricao = campoEncontro(conteudo, 'Descrição operacional', atual?.descricao, { tipo: 'textarea', limite: 1000, obrigatorio: true });
-  campos.prazo = campoEncontro(conteudo, 'Prazo', atual?.prazo, { tipo: 'date' });
-  campos.estado = campoEncontro(conteudo, 'Estado', atual?.estado || 'pendente', { opcoes: { pendente: 'Pendente', concluida: 'Concluída', cancelada: 'Cancelada' } });
-  campos.responsavel = campoEncontro(conteudo, 'Responsável autorizado', '', { opcoes: { '': 'Sem responsável' } });
+  const grade = el('div', { class: 'grade-form' });
+  conteudo.append(grade);
+  campos.descricao = campoEncontro(grade, 'Descrição operacional', atual?.descricao, { tipo: 'textarea', limite: 1000, obrigatorio: true, largo: true });
+  campos.prazo = campoEncontro(grade, 'Prazo', atual?.prazo, { tipo: 'date' });
+  campos.estado = campoEncontro(grade, 'Situação', atual?.estado || 'pendente', { opcoes: estadosTarefaEncontro });
+  campos.responsavel = campoEncontro(grade, 'Responsável autorizado', '', { opcoes: { '': 'Sem responsável' }, largo: true });
   campos.responsavel.disabled = true;
   try {
     const usuarios = listaEncontros(await api('GET', '/api/encontros/responsaveis'), 'responsaveis');

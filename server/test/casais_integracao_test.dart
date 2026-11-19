@@ -169,6 +169,19 @@ void main() {
       corpo: {'descricao': 'Recepção', 'responsavelUsuarioId': 'admin', 'prazo': '2026-11-17'});
     expect(tarefa.$1, 201, reason: '${tarefa.$2}');
     expect((await chamar('GET', '/api/encontros/$id/tarefas', token: consulta)).$2.single['responsavelNome'], 'Administrador');
+    // Resumo da área: pendentes de todos os encontros numa só consulta, com o encontro de cada uma.
+    final pendentes = await chamar('GET', '/api/encontros/tarefas', token: consulta);
+    expect(pendentes.$1, 200, reason: '${pendentes.$2}');
+    expect(pendentes.$2.single['encontroId'], id);
+    expect(pendentes.$2.single['responsavelNome'], 'Administrador');
+    expect((await chamar('GET', '/api/encontros/tarefas', token: midia)).$1, 403);
+    // Registro inexistente no caminho é 404; membro inexistente no corpo é dado inválido (400).
+    expect((await chamar('GET', '/api/encontros/nao-existe', token: consulta)).$1, 404);
+    expect((await chamar('GET', '/api/encontros/nao-existe/inscricoes', token: consulta)).$1, 404);
+    expect((await chamar('POST', '/api/casais/contatos/nao-existe/anular', token: lider)).$1, 404);
+    expect((await chamar('POST', '/api/encontros/$id/inscricoes', token: lider, corpo: {
+      'responsavelMembroId': 'fantasma', 'participantes': [{'membroId': 'fantasma'}],
+    })).$1, 400);
     final material = await chamar('POST', '/api/casais/materiais', token: lider, corpo: {
       'titulo': 'Escuta', 'publico': 'ambos', 'duracaoMinutos': 20, 'passos': 'Conversar com gratidão.',
     });

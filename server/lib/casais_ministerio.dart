@@ -408,7 +408,7 @@ class MinisterioCasais {
         _exigir(conta, Permissao.casaisGerenciar);
         final anterior = store.buscar('casaisContatos', id);
         if (anterior == null)
-          throw const FormatException('Contato não encontrado.');
+          throw const NaoEncontrado('Contato não encontrado.');
         if (anterior['anuladoEm'] != null) return _copia(anterior);
         final doc = {
           ...anterior,
