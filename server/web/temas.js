@@ -23,6 +23,7 @@ const DiakoTemas = (() => {
     { id: 'qr-oracao', nome: 'QR · Pedidos de oração', titulo: 'Podemos orar por você?', chamada: 'Aponte a câmera do celular e envie seu pedido.', qr: 'oracao' },
     { id: 'qr-mensagens', nome: 'QR · Caixa de mensagens', titulo: 'Quer falar com a gente?', chamada: 'Envie suas dúvidas, sugestões e mensagens.', qr: 'mensagens' },
     { id: 'qr-pix', nome: 'QR · PIX das ofertas', titulo: 'Dízimos e ofertas', chamada: 'Aponte a câmera do celular para contribuir.', qr: 'pix' },
+    { id: 'qr-devocional', nome: 'QR · Devocionais', titulo: 'Devocionais', chamada: 'Aponte a câmera do celular para ler e assinar.', qr: 'devocional' },
   ]);
 
   function planoArte(opcoes) {

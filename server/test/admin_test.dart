@@ -291,6 +291,29 @@ void main() {
       expect([projetada.width, projetada.height], [1440, 1080]);
     });
 
+    test('QR dos devocionais aceita arte e o /qr-devocional.png mostra o que vai ao telão', () async {
+      final arte = img.Image(width: 1920, height: 1080);
+      img.fill(arte, color: img.ColorRgb8(60, 30, 20));
+      Future<img.Image> qrDevocional() async =>
+          img.decodePng(Uint8List.fromList(await (await req('GET', '/qr-devocional.png')).read().expand((b) => b).toList()))!;
+      bool fundoDaArte(img.Image i) => i.getPixel(5, 5).r == 60 && i.getPixel(5, 5).g == 30;
+      expect(fundoDaArte(await qrDevocional()), isFalse, reason: 'sem arte: o QR em fundo branco');
+      // O editor do /admin grava posição, tamanho e layout antes de enviar a imagem.
+      expect((await req('PUT', '/api/admin/configuracoes', json: {
+        'arteQrDevocionalPosicao': 'centro-baixo', 'arteQrDevocionalTamanho': 'P', 'arteQrDevocionalLayout': '{}',
+      })).statusCode, 200);
+      expect((await req('POST', '/api/admin/arte-qr?qr=devocional&modo=arte&posicao=direita-meio&tamanho=M',
+          bytes: img.encodePng(arte))).statusCode, 200);
+      expect(cfg.arteQr('devocional').modo, 'arte');
+      final comArte = await qrDevocional();
+      expect([comArte.width, comArte.height], [1920, 1080]);
+      expect(fundoDaArte(comArte), isTrue);
+      expect((await req('GET', '/api/admin/arte-qr/previa?qr=devocional')).statusCode, 200);
+      expect((await req('DELETE', '/api/admin/arte-qr?qr=devocional')).statusCode, 200);
+      expect(cfg.arteQr('devocional').modo, 'padrao');
+      expect(fundoDaArte(await qrDevocional()), isFalse);
+    });
+
     test('arte dos QR: envio, posição, troca, volta ao padrão e backup', () async {
       final arte = img.Image(width: 1280, height: 720); // outra proporção de 16:9: vira 1920x1080
       img.fill(arte, color: img.ColorRgb8(20, 40, 90));

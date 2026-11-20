@@ -298,8 +298,13 @@ class Servidor {
       ..get('/agente/backups/<nome>', _agenteBaixarBackup)
       ..get('/qr-oracao.png', (Request _) => _arquivo(File(p.join(cartazes.pasta, arquivoQr))))
       ..get('/qr-mensagens.png', (Request _) => _arquivo(File(p.join(cartazes.pasta, arquivoQrMensagens))))
-      ..get('/qr-devocional.png', (Request _) => Response.ok(gerarPngQr('$_urlBase/devocional', rotulo: 'DEVOCIONAIS'),
-          headers: {'content-type': 'image/png', 'cache-control': 'no-cache'}))
+      // O mesmo que vai ao telão (com a arte escolhida em Administração); sem o arquivo, o QR simples.
+      ..get('/qr-devocional.png', (Request _) {
+        final projetado = File(p.join(cartazes.pasta, arquivoQrDevocional));
+        if (projetado.existsSync()) return _arquivo(projetado);
+        return Response.ok(gerarPngQr('$_urlBase/devocional', rotulo: 'DEVOCIONAIS'),
+            headers: {'content-type': 'image/png', 'cache-control': 'no-cache'});
+      })
       ..get('/cartazes/<nome>', (Request _, String nome) => _arquivo(cartazes.arquivo(nome)))
       ..get('/galeria/<arquivo>', _fotoGaleria)
       ..get('/fundo-tv/<arquivo>', _imagemFundoTv)
@@ -5096,16 +5101,17 @@ class Servidor {
     'mensagens': arquivoQrMensagens,
     'pix': arquivoQrPix,
     'visitante': arquivoQrVisitante,
+    'devocional': arquivoQrDevocional,
   };
 
-  /// POST /api/admin/arte-qr?qr=oracao|mensagens|pix|visitante&modo=automatico|arte — corpo: bytes da imagem
+  /// POST /api/admin/arte-qr?qr=oracao|mensagens|pix|visitante|devocional&modo=automatico|arte — corpo: bytes da imagem
   /// (sem o QR). Troca a arte, apaga a anterior e refaz o QR projetado.
   Future<Response> _enviarArteQr(Request req) async {
     final c = cfg;
     if (c == null) return _erro(501, 'Configurações indisponíveis.');
     final qr = req.url.queryParameters['qr'] ?? '';
     final modo = req.url.queryParameters['modo'] ?? '';
-    if (!qrsComArte.contains(qr)) return _erro(400, 'Escolha o QR: oracao, mensagens, pix ou visitante.');
+    if (!qrsComArte.contains(qr)) return _erro(400, 'Escolha o QR: oracao, mensagens, pix, visitante ou devocional.');
     if (modo != 'automatico' && modo != 'arte') return _erro(400, 'Modo inválido: automatico ou arte.');
     // A biblioteca envia fundo e geometria juntos. Clientes antigos continuam usando só o PNG.
     final posicao = req.url.queryParameters['posicao'];
@@ -5144,7 +5150,7 @@ class Servidor {
     final c = cfg;
     if (c == null) return _erro(501, 'Configurações indisponíveis.');
     final qr = req.url.queryParameters['qr'] ?? '';
-    if (!qrsComArte.contains(qr)) return _erro(400, 'Escolha o QR: oracao, mensagens, pix ou visitante.');
+    if (!qrsComArte.contains(qr)) return _erro(400, 'Escolha o QR: oracao, mensagens, pix, visitante ou devocional.');
     final anterior = c.arteQr(qr).fundo;
     final foto = c.fotoArteQr(qr);
     await c.definirArteQr(qr, modo: 'padrao', fundo: '');
@@ -5174,7 +5180,7 @@ class Servidor {
     final c = cfg;
     if (c == null) return _erro(501, 'Configurações indisponíveis.');
     final qr = req.url.queryParameters['qr'] ?? '';
-    if (!qrsComArte.contains(qr)) return _erro(400, 'Escolha o QR: oracao, mensagens, pix ou visitante.');
+    if (!qrsComArte.contains(qr)) return _erro(400, 'Escolha o QR: oracao, mensagens, pix, visitante ou devocional.');
     final bytes = await _lerBytes(req, Galeria.tamanhoMaximo);
     if (bytes == null) return _erro(413, 'Imagem maior que 15 MB.');
     final String nome;
@@ -5194,7 +5200,7 @@ class Servidor {
     final c = cfg;
     if (c == null) return _erro(501, 'Configurações indisponíveis.');
     final qr = req.url.queryParameters['qr'] ?? '';
-    if (!qrsComArte.contains(qr)) return _erro(400, 'Escolha o QR: oracao, mensagens, pix ou visitante.');
+    if (!qrsComArte.contains(qr)) return _erro(400, 'Escolha o QR: oracao, mensagens, pix, visitante ou devocional.');
     final anterior = c.fotoArteQr(qr);
     await c.definirFotoArteQr(qr, '');
     if (anterior.isNotEmpty) await artesQr.excluir(anterior);

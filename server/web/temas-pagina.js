@@ -121,7 +121,7 @@ async function enviarCartazTema(opcoes) {
 async function aplicarQrTema(opcoes) {
   const p = DiakoTemas.planoArte(opcoes);
   const q = p.qr;
-  if (!window.confirm(`Substituir a arte atual do QR de ${q.id === 'pix' ? 'PIX' : q.id === 'oracao' ? 'oração' : 'mensagens'} por ${p.colecao.nome}, no formato ${DiakoTemas.FORMATOS[opcoes.formato].nome}?`)) return;
+  if (!window.confirm(`Substituir a arte atual do QR de ${{ pix: 'PIX', oracao: 'oração', mensagens: 'mensagens', devocional: 'devocionais' }[q.id] || q.id} por ${p.colecao.nome}, no formato ${DiakoTemas.FORMATOS[opcoes.formato].nome}?`)) return;
   const cfgAtual = await api('GET', '/api/admin/configuracoes');
   if (q.id === 'pix' && !(cfgAtual.sitePixChave && cfgAtual.sitePixNome && cfgAtual.sitePixCidade)) throw new Error('Configure a chave PIX, o nome e a cidade na Administração antes de aplicar esta arte.');
   const png = await pngDoTema(opcoes);

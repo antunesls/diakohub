@@ -143,6 +143,12 @@ function preencher() {
   preencherFundos();
   preencherArtesQr();
   $('link-visitante-admin').textContent = base + '/visitante';
+  // Atalhos de outras telas (ex.: Devocionais › "Personalizar a imagem do QR" → /admin#qr-telao): o
+  // conteúdo só aparece depois do login, então a rolagem do navegador na carga não chega lá.
+  if (!preencher.rolou && location.hash.length > 1) {
+    preencher.rolou = true;
+    document.getElementById(location.hash.slice(1))?.scrollIntoView({ block: 'start' });
+  }
 
   // Holyrics
   const agente = cfg.modo === 'agente';

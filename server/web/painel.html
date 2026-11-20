@@ -987,7 +987,11 @@
           <div><h2 style="font-size:18px">Página pública e QR</h2>
             <p class="dica">O QR abre a página de devocionais: o devocional em destaque, a lista por trilha e a assinatura por e-mail. O devocional mais recente também aparece na página inicial do site.</p>
             <p><a href="/devocional" target="_blank" rel="noopener">Abrir a página de devocionais</a></p>
-            <button class="botao secundario" type="button" id="dev-projetar-qr" data-permissao="projetar">Projetar QR no telão</button>
+            <div class="acoes" style="display:flex;flex-wrap:wrap;gap:8px">
+              <button class="botao secundario" type="button" id="dev-projetar-qr" data-permissao="projetar">Projetar QR no telão</button>
+              <a class="botao secundario" href="/admin#qr-telao" data-permissao="admin">Personalizar a imagem do QR</a>
+            </div>
+            <p class="dica" data-permissao="admin">Fundo, título, chamada, foto ou arte própria (Canva), igual aos QR de oração, mensagens e visitante. A imagem ao lado é a que vai ao telão.</p>
             <p id="dev-qr-resultado" role="status"></p></div>
           <a href="/qr-devocional.png" download="qr-devocionais.png"><img class="qr" src="/qr-devocional.png" alt="QR code da página de devocionais" loading="lazy"></a>
         </div>

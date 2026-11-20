@@ -1,6 +1,6 @@
 'use strict';
 // /admin › Telão › QR codes: a imagem que vai ao telão com cada QR (pedidos de oração, mensagens, PIX
-// e cadastro de visitante).
+// cadastro de visitante e devocionais).
 // Automático: este editor desenha a arte (fundo, logo, título, chamada) num canvas 1920x1080 e envia
 // o PNG sem o QR. Arte própria: a imagem pronta é enviada como está. Nos dois, o servidor encaixa o
 // QR num cartão branco (server/lib/qr_oracao.dart › comporQr).
@@ -97,6 +97,8 @@ const QRS_ARTE = [
   { id: 'pix', nome: 'PIX das ofertas', titulo: 'Dízimos e ofertas', chamada: '', caminho: null },
   { id: 'visitante', nome: 'Cadastro de visitante', titulo: 'Seja bem-vindo!',
     chamada: 'Aponte a câmera do celular e faça seu cadastro', caminho: '/visitante' },
+  { id: 'devocional', nome: 'Devocionais', titulo: 'Devocionais',
+    chamada: 'Aponte a câmera do celular para ler e assinar', caminho: '/devocional' },
 ];
 
 const POSICOES_QR = [
