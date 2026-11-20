@@ -11,9 +11,17 @@ class FuncaoEscalaPdf {
 }
 
 class MusicaEscalaPdf {
-  const MusicaEscalaPdf(this.titulo, this.tom);
+  const MusicaEscalaPdf(this.titulo, this.tom, [this.primeiraNota = '']);
   final String titulo;
   final String tom;
+  /// Nota em que a voz entra, já no tom do culto.
+  final String primeiraNota;
+
+  /// "Santo (G · 1ª nota D)": o que o louvor precisa para começar.
+  String get texto {
+    final extra = [if (tom.isNotEmpty) tom, if (primeiraNota.isNotEmpty) '1ª nota $primeiraNota'].join(' · ');
+    return extra.isEmpty ? titulo : '$titulo ($extra)';
+  }
 }
 
 class CultoEscalaPdf {
@@ -98,7 +106,7 @@ Future<Uint8List> gerarEscalaPdf({
             FuncaoEscalaPdf(textoLatin1(f.nome), [for (final nome in f.pessoas) textoLatin1(nome)]),
         ],
         musicas: [
-          for (final m in c.musicas) MusicaEscalaPdf(textoLatin1(m.titulo), textoLatin1(m.tom)),
+          for (final m in c.musicas) MusicaEscalaPdf(textoLatin1(m.titulo), textoLatin1(m.tom), textoLatin1(m.primeiraNota)),
         ],
       ),
   ];
@@ -229,7 +237,7 @@ pw.Widget _celulaMusicas(CultoEscalaPdf c, {required bool alternada}) => pw.Cont
               crossAxisAlignment: pw.CrossAxisAlignment.start,
               children: [
                 for (final (i, m) in c.musicas.indexed)
-                  pw.Text('${i + 1}. ${m.titulo}${m.tom.isEmpty ? '' : ' (${m.tom})'}',
+                  pw.Text('${i + 1}. ${m.texto}',
                       style: const pw.TextStyle(fontSize: 8.5)),
               ],
             ),
@@ -294,7 +302,7 @@ pw.Widget _cartao(CultoEscalaPdf c, {required bool comMusicas}) {
             pw.Text('Músicas',
                 style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold, color: _verdeEscuro)),
             for (final (i, m) in c.musicas.indexed)
-              pw.Text('${i + 1}. ${m.titulo}${m.tom.isEmpty ? '' : ' (${m.tom})'}',
+              pw.Text('${i + 1}. ${m.texto}',
                   style: const pw.TextStyle(fontSize: 10)),
           ]),
         ),

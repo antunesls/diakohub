@@ -50,6 +50,22 @@ void main() {
     expect(musica('F#\nComeça com D#m').tomPadrao, 'F#');
   });
 
+  test('primeira nota é gravada como nota e transposta para o tom do culto', () {
+    final m = RepertorioMusica.fromJson({'titulo': 'Canção', 'cantor': 'Banda', 'tomSelecionado': 'G', 'primeiraNota': 'Eb'});
+    expect(m.primeiraNota, 'D#');
+    expect(RepertorioMusica.fromJson(m.toJson()).primeiraNota, 'D#');
+    expect(RepertorioMusica.fromJson({'titulo': 'X', 'cantor': 'Y'}).toJson().containsKey('primeiraNota'), isFalse);
+    expect(() => RepertorioMusica.fromJson({'titulo': 'X', 'cantor': 'Y', 'primeiraNota': 'Dm'}), throwsFormatException);
+    expect(primeiraNotaNoTom('D', 'G', 'G'), 'D');
+    expect(primeiraNotaNoTom('D', 'G', 'A'), 'E');
+    expect(primeiraNotaNoTom('D', 'G', 'Bb'), 'F');
+    expect(primeiraNotaNoTom('G', 'C', 'Eb'), 'Bb');
+    expect(primeiraNotaNoTom('B', 'Em', 'F#m'), 'C#');
+    expect(primeiraNotaNoTom('D', '', 'A'), 'D');
+    expect(primeiraNotaNoTom('D', 'G', ''), 'D');
+    expect(primeiraNotaNoTom('', 'G', 'A'), '');
+  });
+
   test('rejeita cabeçalho inválido e CSV incompleto', () {
     expect(() => lerRepertorioCsv('Nome,Cantor\nTeste,Ana'), throwsFormatException);
     expect(() => lerRepertorioCsv('Louvor,Cantor\n"Teste,Ana'), throwsFormatException);

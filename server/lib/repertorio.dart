@@ -31,6 +31,7 @@ class RepertorioMusica {
     this.tomDiakonia = '',
     this.tomSelecionado,
     this.bpm = '',
+    this.primeiraNota = '',
     this.biografiaCantor = '',
     this.biografiaCompositor = '',
     this.ativo = true,
@@ -38,6 +39,8 @@ class RepertorioMusica {
 
   final String id, titulo, cantor, compositor, ano, referencia, solicitadoPor, observacoes;
   final String status, tomOriginal, tomDiakonia, bpm, biografiaCantor, biografiaCompositor;
+  /// Nota em que a voz entra, cadastrada no Tom Diakonia ([tomPadrao]); vazio enquanto ninguém preencheu.
+  final String primeiraNota;
   /// Nulo em cadastros antigos; vazio significa "Não definido" explicitamente.
   final String? tomSelecionado;
   final bool ativo;
@@ -53,6 +56,7 @@ class RepertorioMusica {
         'referencia': referencia, 'solicitadoPor': solicitadoPor, 'observacoes': observacoes,
         'status': status, 'tomOriginal': tomOriginal, 'tomDiakonia': tomDiakonia, 'bpm': bpm,
         if (tomSelecionado != null) 'tomSelecionado': tomSelecionado,
+        if (primeiraNota.isNotEmpty) 'primeiraNota': primeiraNota,
         'biografiaCantor': biografiaCantor, 'biografiaCompositor': biografiaCompositor, 'ativo': ativo,
       };
 
@@ -74,16 +78,51 @@ class RepertorioMusica {
         !notas.any((nota) => tomSelecionado == nota || tomSelecionado == '${nota}m')) {
       throw const FormatException('Escolha um tom válido.');
     }
+    final notaInformada = campo('primeiraNota', 3);
+    final primeiraNota = notaInformada.isEmpty ? '' : notaCanonica(notaInformada);
+    if (primeiraNota == null) throw const FormatException('Escolha uma primeira nota válida.');
     return RepertorioMusica(
       id: id, titulo: titulo, cantor: cantor, compositor: campo('compositor', 400),
       ano: campo('ano', 40), referencia: campo('referencia', 500),
       solicitadoPor: campo('solicitadoPor', 120), observacoes: campo('observacoes', 4000),
        status: campo('status', 80), tomOriginal: campo('tomOriginal', 120),
        tomDiakonia: campo('tomDiakonia', 500), tomSelecionado: tomSelecionado, bpm: campo('bpm', 40),
+      primeiraNota: primeiraNota,
       biografiaCantor: campo('biografiaCantor', 10000),
       biografiaCompositor: campo('biografiaCompositor', 10000), ativo: j['ativo'] as bool? ?? true,
     );
   }
+}
+
+const notasCromaticas = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+const _notasBemol = ['C', 'Db', 'D', 'Eb', 'E', 'F', 'Gb', 'G', 'Ab', 'A', 'Bb', 'B'];
+
+/// Posição (0 a 11) da nota que abre o texto: "Bb", "F#m", "D♭ (Intro…)". Nulo se não começa com nota.
+int? semitomDaNota(String texto) {
+  final m = RegExp(r'^\s*([A-Ga-g])([#b♯♭]?)').firstMatch(texto);
+  if (m == null) return null;
+  final base = notasCromaticas.indexOf(m.group(1)!.toUpperCase());
+  final acidente = switch (m.group(2)) { '#' || '♯' => 1, 'b' || '♭' => -1, _ => 0 };
+  return (base + acidente) % 12;
+}
+
+/// "Db" → "C#": só a nota, sem "m" nem anotação. Nulo quando o texto não é uma nota.
+String? notaCanonica(String texto) {
+  final t = texto.trim();
+  if (!RegExp(r'^[A-Ga-g][#b♯♭]?$').hasMatch(t)) return null;
+  return notasCromaticas[semitomDaNota(t)!];
+}
+
+/// A [primeiraNota] cadastrada no [tomBase] (Tom Diakonia) levada para o [tomCulto], que a escala
+/// pode ter mudado. Sem um dos dois tons a nota fica como foi cadastrada. Tom com bemol ("Bb")
+/// escreve a nota com bemol, como o músico lê na cifra.
+String primeiraNotaNoTom(String primeiraNota, String tomBase, String tomCulto) {
+  final nota = semitomDaNota(primeiraNota);
+  if (nota == null) return '';
+  final base = semitomDaNota(tomBase), culto = semitomDaNota(tomCulto);
+  final alvo = base == null || culto == null ? nota : (nota + culto - base) % 12;
+  final bemol = RegExp(r'^\s*[A-Ga-g][b♭]').hasMatch(culto == null ? tomBase : tomCulto);
+  return (bemol ? _notasBemol : notasCromaticas)[alvo];
 }
 
 String chaveRepertorio(String titulo, String cantor) {

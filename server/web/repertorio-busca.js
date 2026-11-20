@@ -37,6 +37,38 @@ function tomDaMusica(m) {
   return tomCanonico(encontrado?.[1]);
 }
 
+const NOTAS_BEMOL = ['C', 'Db', 'D', 'Eb', 'E', 'F', 'Gb', 'G', 'Ab', 'A', 'Bb', 'B'];
+
+/** Posição (0 a 11) da nota que abre o texto ("Bb", "F#m"); null se não começa com nota. */
+function semitomDaNota(texto) {
+  const m = /^\s*([A-G])([#b♯♭]?)/i.exec(String(texto || ''));
+  if (!m) return null;
+  const base = NOTAS_REPERTORIO.findIndex(([nota]) => nota === m[1].toUpperCase());
+  return (base + ({ '#': 1, '♯': 1, b: -1, '♭': -1 }[m[2]] || 0) + 12) % 12;
+}
+
+/** Igual a primeiraNotaNoTom do servidor: a nota cadastrada no Tom Diakonia levada ao tom do culto. */
+function primeiraNotaNoTom(primeiraNota, tomBase, tomCulto) {
+  const nota = semitomDaNota(primeiraNota);
+  if (nota === null) return '';
+  const base = semitomDaNota(tomBase), culto = semitomDaNota(tomCulto);
+  const alvo = base === null || culto === null ? nota : (nota + culto - base + 12) % 12;
+  const bemol = /^\s*[A-G][b♭]/i.test(culto === null ? String(tomBase || '') : String(tomCulto || ''));
+  return bemol ? NOTAS_BEMOL[alvo] : NOTAS_REPERTORIO[alvo][0];
+}
+
+/** "72", "72 bpm", "120-124" → 72 / 120; null sem número. */
+function numeroBpm(bpm) {
+  const n = parseInt(String(bpm || '').match(/\d+/)?.[0], 10);
+  return Number.isFinite(n) && n > 0 ? n : null;
+}
+
+/** Faixas do filtro de andamento: até 84 BPM lenta, até 120 média, acima rápida. */
+function andamentoBpm(bpm) {
+  const n = numeroBpm(bpm);
+  return n === null ? '' : n < 85 ? 'Lenta' : n <= 120 ? 'Média' : 'Rápida';
+}
+
 function distanciaAteDuas(a, b) {
   if (Math.abs(a.length - b.length) > 2) return 3;
   let anterior = Array.from({ length: b.length + 1 }, (_, i) => i);
@@ -73,5 +105,6 @@ function buscarRepertorio(musicas, { busca = '', status = '', tom = '' } = {}) {
 }
 
 if (typeof module !== 'undefined' && module.exports) {
-  module.exports = { buscarRepertorio, statusParaFiltro, tomCanonico, tomDaMusica, TONS_REPERTORIO };
+  module.exports = { buscarRepertorio, statusParaFiltro, tomCanonico, tomDaMusica, TONS_REPERTORIO, NOTAS_REPERTORIO,
+    semitomDaNota, primeiraNotaNoTom, numeroBpm, andamentoBpm };
 }

@@ -107,7 +107,7 @@ class Auditoria {
       'titulo': 'título', 'cantor': 'cantor', 'compositor': 'compositor', 'ano': 'ano',
       'referencia': 'link', 'solicitadoPor': 'solicitado por', 'observacoes': 'observações',
       'status': 'status', 'tomOriginal': 'tom original', 'tomDiakonia': 'tom Diakonia',
-      'tomSelecionado': 'tom selecionado', 'bpm': 'bpm',
+      'tomSelecionado': 'tom selecionado', 'bpm': 'bpm', 'primeiraNota': 'primeira nota',
       'biografiaCantor': 'biografia do cantor', 'biografiaCompositor': 'biografia do compositor',
     };
     String valor(Object? v) {

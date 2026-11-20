@@ -372,7 +372,9 @@ String nomeCurto(String nome) {
 }
 
 /// Texto da escala do mês para o grupo do WhatsApp (o envio é feito pela pessoa).
-String textoEscalaWhatsapp(List<CultoEscala> cultos, TipoEscala tipo, int mes, String Function(String membroId) nomeDe) {
+/// [primeiraNota] devolve a nota em que a voz entra (já no tom do culto) ou '' quando não há.
+String textoEscalaWhatsapp(List<CultoEscala> cultos, TipoEscala tipo, int mes, String Function(String membroId) nomeDe,
+    {String Function(Musica m)? primeiraNota}) {
   final linhas = <String>['*Escala ${tipo == TipoEscala.pastoral ? 'pastoral' : 'do louvor'} — ${nomesMeses[mes - 1]}*'];
   for (final c in cultos) {
     if (!c.participa(tipo)) continue;
@@ -387,7 +389,13 @@ String textoEscalaWhatsapp(List<CultoEscala> cultos, TipoEscala tipo, int mes, S
     if (partes.isNotEmpty) linhas.add(partes.join(' · '));
     if (tipo == TipoEscala.pastoral && c.tema.isNotEmpty) linhas.add('Tema: ${c.tema}');
     if (tipo == TipoEscala.louvor && c.musicas.isNotEmpty) {
-      linhas.add('Músicas: ${[for (final m in c.musicas) m.tom.isEmpty ? m.titulo : '${m.titulo} (${m.tom})'].join('; ')}');
+      String musica(Musica m) {
+        final nota = primeiraNota?.call(m) ?? '';
+        final extra = [if (m.tom.isNotEmpty) m.tom, if (nota.isNotEmpty) '1ª nota $nota'].join(' · ');
+        return extra.isEmpty ? m.titulo : '${m.titulo} ($extra)';
+      }
+
+      linhas.add('Músicas: ${[for (final m in c.musicas) musica(m)].join('; ')}');
     }
   }
   return linhas.join('\n');

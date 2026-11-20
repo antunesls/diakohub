@@ -531,6 +531,7 @@ class Servidor {
       ..delete('/api/palavras/<id>', _excluirPalavra)
       // Escalas dos pastores e do louvor (rotas fixas antes das com <id>)
       ..get('/api/repertorio', _listarRepertorio)
+      ..get('/api/repertorio/uso', _listarUsoRepertorio)
       ..post('/api/repertorio/importar/previa', _previaRepertorio)
       ..post('/api/repertorio/importar', _importarRepertorio)
       ..post('/api/repertorio', _criarMusicaRepertorio)
@@ -3849,6 +3850,56 @@ class Servidor {
     for (final m in store.listar('repertorio')) m,
   ]);
 
+  /// Repertório por id; um registro que não abre mais (editado à mão) só fica de fora.
+  Map<String, RepertorioMusica> _repertorioPorId() => {
+        for (final d in store.listar('repertorio'))
+          if (_musicaOuNulo(d) case final m?) m.id: m,
+      };
+
+  static RepertorioMusica? _musicaOuNulo(Map<String, dynamic> d) {
+    try {
+      return RepertorioMusica.fromJson(d);
+    } on FormatException {
+      return null;
+    }
+  }
+
+  /// Primeira nota da música no tom em que o culto vai cantar ('' se ninguém cadastrou).
+  static String _primeiraNota(Musica m, Map<String, RepertorioMusica> repertorio) {
+    final r = repertorio[m.repertorioId];
+    return r == null ? '' : primeiraNotaNoTom(r.primeiraNota, r.tomPadrao, m.tom);
+  }
+
+  static List<Map<String, dynamic>> _musicasParaTela(List<Musica> musicas, Map<String, RepertorioMusica> repertorio) => [
+        for (final m in musicas)
+          {...m.toJson(), if (_primeiraNota(m, repertorio) case final nota when nota.isNotEmpty) 'primeiraNota': nota},
+      ];
+
+  /// Uso de cada música em cultos até hoje: a data mais recente e quantas vezes nos últimos 12 meses.
+  /// Com [ministroId], conta só os cultos em que essa pessoa foi ministro.
+  Map<String, ({String ultima, int vezes})> _usoDoRepertorio({String? ministroId}) {
+    final hoje = diaEscala(_agora());
+    final umAno = diaEscala(_agora().subtract(const Duration(days: 365)));
+    final uso = <String, ({String ultima, int vezes})>{};
+    for (final c in _cultosVisiveis()) {
+      if (!c.escalaLouvor || c.data.compareTo(hoje) > 0) continue;
+      if (ministroId != null && !(c.da(TipoEscala.louvor)['Ministro'] ?? const <String>[]).contains(ministroId)) continue;
+      for (final id in {for (final m in c.musicas) if (m.repertorioId.isNotEmpty) m.repertorioId}) {
+        final atual = uso[id];
+        uso[id] = (
+          ultima: atual == null || c.data.compareTo(atual.ultima) > 0 ? c.data : atual.ultima,
+          vezes: (atual?.vezes ?? 0) + (c.data.compareTo(umAno) >= 0 ? 1 : 0),
+        );
+      }
+    }
+    return uso;
+  }
+
+  /// GET /api/repertorio/uso — {id: {ultima, vezes}} para o seletor de músicas da escala.
+  Response _listarUsoRepertorio(Request _) => _json({
+        for (final e in _usoDoRepertorio().entries) e.key: {'ultima': e.value.ultima, 'vezes': e.value.vezes},
+      });
+
   Map<String, dynamic> _statusEditadoRepertorio(Map<String, dynamic> corpo, {Map<String, dynamic>? anterior}) {
     if (!corpo.containsKey('status')) return corpo;
     final status = corpo['status'];
@@ -4017,9 +4068,11 @@ class Servidor {
   static String _prefixoMes(int ano, int mes) => '$ano-${mes.toString().padLeft(2, '0')}';
 
   /// Culto como o painel e o tablet mostram: nomes e avisos já resolvidos por função.
-  Map<String, dynamic> _cultoParaTela(CultoEscala c, Map<String, Membro> membros, List<Indisponibilidade> ind) => {
+  Map<String, dynamic> _cultoParaTela(CultoEscala c, Map<String, Membro> membros, List<Indisponibilidade> ind,
+          [Map<String, RepertorioMusica>? repertorio]) =>
+      {
         ...c.toJson(),
-        if (!c.escalaLouvor) 'musicas': [],
+        'musicas': c.escalaLouvor ? _musicasParaTela(c.musicas, repertorio ?? _repertorioPorId()) : [],
         'rotulo': rotuloDia(c.data),
         'horaTexto': horaCurtaEscala(c.hora),
         'funcoes': {for (final t in TipoEscala.values) t.name: c.funcoes(t)},
@@ -4046,6 +4099,7 @@ class Servidor {
     final ind = _indisponibilidades();
     final nome = _nomeDe(membros);
     final cultos = _cultosVisiveis().where((c) => c.data.startsWith(prefixo)).toList();
+    final repertorio = _repertorioPorId();
     final editor = _podeAlgumaEscala(req);
     return _json({
       'mes': prefixo,
@@ -4053,12 +4107,15 @@ class Servidor {
       'horariosConfigurados': horariosDosCultos(cfg?.siteCultos ?? '').isNotEmpty,
       // Controle do DiakoPlayer: o painel mostra "Abrir no DiakoPlayer" nas músicas do louvor.
       if ((cfg?.diakoPlayerUrl ?? '').isNotEmpty) 'diakoPlayerUrl': cfg!.diakoPlayerUrl,
-      'cultos': [for (final c in cultos) _cultoParaTela(c, membros, ind)],
+      'cultos': [for (final c in cultos) _cultoParaTela(c, membros, ind, repertorio)],
       'avisos': {
         for (final t in TipoEscala.values)
           t.name: [for (final a in avisosDoMes(cultos, t, nome, ind)) {'tipo': a.tipo, 'titulo': a.titulo, 'texto': a.texto}],
       },
-      'whatsapp': {for (final t in TipoEscala.values) t.name: textoEscalaWhatsapp(cultos, t, mes.mes, nome)},
+      'whatsapp': {
+        for (final t in TipoEscala.values)
+          t.name: textoEscalaWhatsapp(cultos, t, mes.mes, nome, primeiraNota: (m) => _primeiraNota(m, repertorio)),
+      },
       // Nomes de quem pode ser escalado: só para quem monta escala.
       'pessoas': editor
           ? ([
@@ -4126,6 +4183,7 @@ class Servidor {
     }
     final prefixo = _prefixoMes(mes.ano, mes.mes);
     final membros = _membrosPorId();
+    final repertorio = _repertorioPorId();
     final cultos = _cultosVisiveis()
         .where((c) =>
             c.data.startsWith(prefixo) &&
@@ -4148,7 +4206,7 @@ class Servidor {
                   for (final id in c.da(tipo)[f] ?? const <String>[]) membros[id]?.nome ?? '(pessoa removida)',
                 ]),
             ],
-            musicas: [for (final m in c.musicas) MusicaEscalaPdf(m.titulo, m.tom)],
+            musicas: [for (final m in c.musicas) MusicaEscalaPdf(m.titulo, m.tom, _primeiraNota(m, repertorio))],
           ),
       ],
       tipo: tipo.name,
@@ -4452,14 +4510,32 @@ class Servidor {
     final hoje = diaEscala(_agora());
     final limite = diaEscala(_agora().add(const Duration(days: 60)));
     final membro = Membro.fromJson(store.buscar('membros', id)!);
-    final referencias = {for (final m in store.listar('repertorio')) m['id']: m['referencia']};
+    final repertorio = _repertorioPorId();
+    String? youtube(String repertorioId) => switch (idVideoYoutube(repertorio[repertorioId]?.referencia ?? '')) {
+          final video? => 'https://www.youtube.com/watch?v=$video',
+          null => null,
+        };
+    final ministro = _podeNaConta(req, Permissao.musicasMinistro);
+    final uso = ministro ? _usoDoRepertorio() : const <String, ({String ultima, int vezes})>{};
+    final meuUso = ministro ? _usoDoRepertorio(ministroId: id) : const <String, ({String ultima, int vezes})>{};
     return _json({
       'igreja': _termo.igreja,
       'nome': membro.nome.split(' ').first,
       'podeAvisarIndisponibilidade': _podeNaConta(req, Permissao.indisponibilidade),
-      if (_podeNaConta(req, Permissao.musicasMinistro))
-        'repertorio': [for (final m in store.listar('repertorio')) if (m['ativo'] == true)
-          {'id': m['id'], 'titulo': m['titulo'], 'cantor': m['cantor'], 'tomDiakonia': m['tomDiakonia']}],
+      // Para o seletor de músicas do ministro: tom e primeira nota padrão, andamento e histórico.
+      if (ministro)
+        'repertorio': [
+          for (final m in repertorio.values)
+            if (m.ativo)
+              {
+                'id': m.id, 'titulo': m.titulo, 'cantor': m.cantor, 'tom': m.tomPadrao, 'bpm': m.bpm,
+                if (m.primeiraNota.isNotEmpty) 'primeiraNota': m.primeiraNota,
+                if (uso[m.id] case final u?) 'ultima': u.ultima,
+                'vezes': uso[m.id]?.vezes ?? 0,
+                if (meuUso[m.id] case final u?) 'minhaUltima': u.ultima,
+                if (youtube(m.id) case final link?) 'youtube': link,
+              },
+        ],
       'cultos': [
         for (final c in _cultosVisiveis())
           if (c.data.compareTo(hoje) >= 0 && c.data.compareTo(limite) <= 0 && c.servindo.any((s) => s.membroId == id))
@@ -4478,8 +4554,8 @@ class Servidor {
                 for (final m in c.escalaLouvor ? c.musicas : <Musica>[])
                   {
                     ...m.toJson(),
-                    if (idVideoYoutube(referencias[m.repertorioId] is String ? referencias[m.repertorioId] as String : '') case final video?)
-                      'youtube': 'https://www.youtube.com/watch?v=$video',
+                    if (_primeiraNota(m, repertorio) case final nota when nota.isNotEmpty) 'primeiraNota': nota,
+                    if (youtube(m.repertorioId) case final link?) 'youtube': link,
                   },
               ],
             },

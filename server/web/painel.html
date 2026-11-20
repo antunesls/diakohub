@@ -371,14 +371,42 @@
   .musicas-lista { display: flex; flex-direction: column; gap: 8px; }
   .musicas-lista .musica { display: grid; grid-template-columns: 28px minmax(0, 1fr) 90px 40px; gap: 8px; align-items: center; }
   .musicas-lista .musica .ordem { font-weight: 600; color: var(--suave); text-align: center; }
-  #dlg-selecionar-musica { width: min(780px, calc(100vw - 32px)); max-height: 90dvh; overflow-y: auto; }
-  .seletor-musica-lista { display: flex; flex-direction: column; gap: 10px; max-height: 60dvh; overflow-y: auto; margin: 12px 0; }
-  .seletor-musica-cartao { display: flex; align-items: center; gap: 14px; padding: 12px; border: 1px solid var(--linha); border-radius: 14px; }
-  .seletor-musica-cartao img { flex: 0 0 130px; width: 130px; aspect-ratio: 16 / 9; object-fit: cover; border-radius: 8px; }
-  .seletor-musica-cartao .info { flex: 1; min-width: 0; overflow-wrap: anywhere; }
-  .seletor-musica-cartao .acoes { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+  #dlg-selecionar-musica { width: min(960px, calc(100vw - 32px)); max-height: 92dvh; overflow-y: auto; }
+  #dlg-selecionar-musica h2 { margin-bottom: 12px; }
+  #dlg-selecionar-musica .campo { margin-bottom: 10px; }
+  .seletor-filtros { display: flex; flex-wrap: wrap; gap: 8px 22px; align-items: center; margin-bottom: 4px; }
+  .seletor-filtros > div { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+  .seletor-filtros .rotulo { font-size: 13px; color: var(--suave); margin-right: 2px; }
+  .seletor-filtros .chips { gap: 6px; }
+  .seletor-filtros .chips label { min-height: 32px; padding: 0 11px; font-size: 13px; }
+  .seletor-corpo { display: grid; grid-template-columns: minmax(0, 1fr) 250px; gap: 14px; align-items: start; }
+  .seletor-tabela { max-height: min(52dvh, 440px); overflow-y: auto; border: 1px solid var(--linha); border-radius: 12px; }
+  .seletor-tabela:focus-visible { outline: 3px solid var(--primaria-suave); }
+  .seletor-tabela table { width: 100%; border-collapse: collapse; font-size: 14px; font-variant-numeric: tabular-nums; }
+  .seletor-tabela th { position: sticky; top: 0; z-index: 1; background: var(--neutro); text-align: left; padding: 0; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: .04em; color: var(--suave); }
+  .seletor-tabela th button { all: unset; display: block; padding: 8px 10px; cursor: pointer; }
+  .seletor-tabela th button:focus-visible { outline: 2px solid var(--primaria); }
+  .seletor-tabela td { padding: 6px 10px; border-top: 1px solid var(--linha); vertical-align: middle; }
+  .seletor-tabela td small { display: block; color: var(--suave); font-size: 12.5px; }
+  .seletor-tabela .num { text-align: right; }
+  .seletor-tabela tbody tr { cursor: pointer; }
+  .seletor-tabela tbody tr:hover { background: var(--campo); }
+  .seletor-tabela tbody tr[aria-selected="true"] { background: var(--primaria-suave); }
+  .tom-musica { display: inline-block; min-width: 30px; text-align: center; padding: 1px 6px; border-radius: 6px; background: var(--primaria-suave); color: var(--primaria-escura); font-size: 12.5px; font-weight: 700; }
+  tr[aria-selected="true"] .tom-musica { background: var(--superficie); }
+  .seletor-previa { border: 1px solid var(--linha); border-radius: 12px; padding: 12px; display: flex; flex-direction: column; gap: 6px; min-width: 0; overflow-wrap: anywhere; }
+  .seletor-previa img { width: 100%; aspect-ratio: 16 / 9; object-fit: cover; border-radius: 8px; }
+  .seletor-previa .titulo { font-size: 17px; }
+  .seletor-previa dl { display: grid; grid-template-columns: auto 1fr; gap: 3px 10px; margin: 4px 0; font-size: 13.5px; }
+  .seletor-previa dt { color: var(--suave); }
+  .seletor-previa dd { margin: 0; font-weight: 600; }
+  .seletor-previa .botao { margin-top: 4px; }
+  #dlg-selecionar-musica .atalhos { margin-right: auto; align-self: center; }
+  #dlg-selecionar-musica kbd { font: 600 11px var(--fonte); border: 1px solid var(--borda); border-bottom-width: 2px; border-radius: 5px; padding: 1px 5px; background: var(--neutro); }
   .musica-resumo { min-width: 0; overflow-wrap: anywhere; }
   .musica-resumo strong { display: block; }
+  .musica-resumo .primeira-nota { display: block; font-size: 13px; font-weight: 600; color: var(--primaria-escura); }
+  .musica-resumo .primeira-nota:empty { display: none; }
   #dlg-lista-indisponibilidades { width: min(740px, calc(100vw - 32px)); max-height: 90dvh; overflow-y: auto; }
   #lista-indisponibilidades { display: flex; flex-direction: column; gap: 10px; margin: 14px 0; }
   .aviso-indisponibilidade { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; padding: 14px; border: 1px solid var(--linha); border-radius: 12px; }
@@ -394,8 +422,12 @@
     .musicas-lista .musica { grid-template-columns: 25px minmax(0, 1fr) 42px; }
     .musicas-lista .musica input { grid-column: 2; grid-row: 2; width: 100%; }
     .musicas-lista .musica > button:last-child { grid-column: 3; grid-row: 1; }
-    .seletor-musica-cartao { flex-wrap: wrap; }
-    .seletor-musica-cartao img { flex: 0 0 100px; width: 100px; }
+  }
+  @media (max-width: 760px) {
+    .seletor-corpo { grid-template-columns: minmax(0, 1fr); }
+    .seletor-previa { order: -1; flex-direction: row; flex-wrap: wrap; align-items: center; }
+    .seletor-previa img, .seletor-previa dl { display: none; }
+    #dlg-selecionar-musica .atalhos { display: none; }
   }
   @media print {
     body { background: #fff; }
@@ -1182,9 +1214,18 @@
 <dialog id="dlg-selecionar-musica" aria-labelledby="seletor-musica-titulo">
   <h2 id="seletor-musica-titulo">Escolher música do repertório</h2>
   <div class="campo"><label for="seletor-musica-busca">Pesquisar por título, cantor ou compositor</label><input id="seletor-musica-busca" type="search" autocomplete="off" placeholder="Ex.: santo, intérprete ou compositor"></div>
+  <div class="seletor-filtros">
+    <div><span class="rotulo" id="seletor-musica-tons-rotulo">Tom</span><div class="chips" id="seletor-musica-tons" role="radiogroup" aria-labelledby="seletor-musica-tons-rotulo"></div></div>
+    <div><span class="rotulo" id="seletor-musica-andamento-rotulo">Andamento</span><div class="chips" id="seletor-musica-andamento" role="radiogroup" aria-labelledby="seletor-musica-andamento-rotulo"></div></div>
+  </div>
   <p class="dica" id="seletor-musica-contagem" role="status"></p>
-  <div id="seletor-musica-lista" class="seletor-musica-lista"></div>
-  <div class="dialogo-acoes"><button type="button" class="botao secundario" id="seletor-musica-fechar">Voltar à escala</button></div>
+  <div class="seletor-corpo">
+    <div class="seletor-tabela" id="seletor-musica-tabela" tabindex="0" aria-label="Músicas do repertório. Setas para navegar, Enter para escolher.">
+      <table><thead id="seletor-musica-cabecalho"></thead><tbody id="seletor-musica-lista"></tbody></table>
+    </div>
+    <aside class="seletor-previa" id="seletor-musica-previa" aria-live="polite"></aside>
+  </div>
+  <div class="dialogo-acoes"><span class="dica atalhos"><kbd>↑</kbd> <kbd>↓</kbd> navegar · <kbd>Enter</kbd> ou duplo clique escolhe · <kbd>Esc</kbd> volta</span><button type="button" class="botao secundario" id="seletor-musica-fechar">Voltar à escala</button></div>
 </dialog>
 
 <dialog id="dlg-repertorio">
@@ -1200,6 +1241,10 @@
     <div class="grade2">
       <div class="campo"><label for="rep-tomOriginal">Tom original <span class="dica">(como consta na fonte)</span></label><input id="rep-tomOriginal" maxlength="120"></div>
       <div class="campo"><label for="rep-tomSelecionado">Tom Diakonia para a escala</label><select id="rep-tomSelecionado"></select></div>
+    </div>
+    <div class="grade2">
+      <div class="campo"><label for="rep-primeiraNota">Primeira nota <span class="dica">(em que a voz entra, no Tom Diakonia)</span></label><select id="rep-primeiraNota"></select></div>
+      <p class="dica" style="align-self:end;margin:0 0 14px">Se a escala mudar o tom, a nota é transposta junto.</p>
     </div>
     <div class="campo"><label for="rep-tomDiakonia">Anotações antigas do tom <span class="dica">(preservadas; não mudam o tom selecionado)</span></label><textarea id="rep-tomDiakonia" maxlength="500"></textarea></div>
     <div class="campo"><label for="rep-referencia">Referência / link da versão</label><input id="rep-referencia" maxlength="500"></div>
@@ -1615,9 +1660,9 @@
 <script src="/certificado.js?v=1"></script>
 <script src="/acessos-escala.js?v=4"></script>
 <script src="/ministerios.js?v=1"></script>
-<script src="/repertorio-busca.js?v=1"></script>
+<script src="/repertorio-busca.js?v=2"></script>
 <script src="/musica-youtube.js?v=1"></script>
-<script src="/repertorio.js?v=3"></script>
+<script src="/repertorio.js?v=4"></script>
 <script src="/roteiros.js?v=1"></script>
 <script src="/palavras-pdf.js?v=1"></script>
 <script src="/palavras-ensaio.js?v=1"></script>
@@ -1625,6 +1670,6 @@
 <script src="/palavras-ensaio-tela.js?v=1"></script>
 <script src="/escala-impressao.js?v=3"></script>
 <script src="/horarios-escalas.js?v=1"></script>
-<script src="/escalas.js?v=13"></script>
+<script src="/escalas.js?v=14"></script>
 </body>
 </html>

@@ -229,37 +229,151 @@ $('escalar-todos').addEventListener('change', () => escalarAtual && desenharEsca
 
 // ---------- Músicas ----------
 
+// Seletor: tabela ordenável (com filtros de tom e andamento) e, ao lado, a prévia da música em foco.
 let aoSelecionarMusica = null;
+let usoRepertorio = {}; // GET /api/repertorio/uso → {id: {ultima, vezes}}
+const seletor = { foco: null, chave: null, crescente: true, tom: '', andamento: '' };
 
-function desenharSeletorMusica() {
+const COLUNAS_SELETOR = [
+  ['titulo', 'Música'], ['tom', 'Tom'], ['bpm', 'BPM', 'num'], ['ultima', 'Última vez'], ['vezes', '12 meses', 'num'],
+];
+const valorSeletor = {
+  titulo: (r) => r.titulo,
+  tom: (r) => tomDaMusica(r),
+  bpm: (r) => numeroBpm(r.bpm) ?? -1,
+  ultima: (r) => usoRepertorio[r.id]?.ultima || '',
+  vezes: (r) => usoRepertorio[r.id]?.vezes || 0,
+};
+const ddmmaa = (iso) => `${iso.slice(8, 10)}/${iso.slice(5, 7)}/${iso.slice(2, 4)}`;
+
+function musicasDoSeletor() {
   const musicas = buscarRepertorio(repertorioMusicas.filter((r) => r.ativo), {
-    busca: $('seletor-musica-busca').value,
+    busca: $('seletor-musica-busca').value, tom: seletor.tom,
+  }).filter((r) => !seletor.andamento || andamentoBpm(r.bpm) === seletor.andamento);
+  // Sem coluna escolhida vale a ordem da busca (mais parecida primeiro, depois título).
+  if (!seletor.chave) return musicas;
+  const valor = valorSeletor[seletor.chave];
+  return musicas.sort((a, b) => {
+    const x = valor(a), y = valor(b);
+    const c = typeof x === 'number' ? x - y : String(x).localeCompare(String(y), 'pt-BR');
+    return (seletor.crescente ? c : -c) || a.titulo.localeCompare(b.titulo, 'pt-BR');
   });
-  $('seletor-musica-contagem').textContent = `${musicas.length} ${musicas.length === 1 ? 'música disponível' : 'músicas disponíveis'}.`;
-  $('seletor-musica-lista').replaceChildren(...(musicas.length ? musicas.map((r) => {
-    const thumb = miniaturaYoutube(r.referencia);
-    const link = linkYoutube(r.referencia);
-    return el('div', { class: 'seletor-musica-cartao' },
-      thumb ? el('img', { src: thumb, alt: '', loading: 'lazy', referrerpolicy: 'no-referrer' }) : null,
-      el('div', { class: 'info' }, el('strong', {}, r.titulo),
-        el('div', { class: 'dica' }, [r.cantor, r.compositor && `Compositor: ${r.compositor}`,
-          tomDaMusica(r) && `Tom: ${tomDaMusica(r)}`, r.bpm && `${r.bpm} BPM`].filter(Boolean).join(' · ')),
-        el('div', { class: 'acoes' },
-          botao('Escolher', () => { aoSelecionarMusica?.(r); $('dlg-selecionar-musica').close(); }),
-          link ? el('a', { class: 'botao secundario pequeno', href: link, target: '_blank', rel: 'noopener noreferrer' }, 'Ver no YouTube') : null)));
-  }) : [el('p', { class: 'dica' }, 'Nenhuma música disponível encontrada. Tente outra busca ou confira o status no Repertório.') ]));
 }
 
-function abrirSeletorMusica(selecionar) {
+function filtroChips(caixa, nome, opcoes, atual, mudar) {
+  caixa.replaceChildren(...opcoes.map(([valor, texto]) => {
+    const radio = el('input', { type: 'radio', name: nome, value: valor });
+    radio.checked = valor === atual;
+    radio.addEventListener('change', () => mudar(valor));
+    return el('label', {}, radio, texto);
+  }));
+}
+
+function escolherDoSeletor(r) {
+  aoSelecionarMusica?.(r);
+  $('dlg-selecionar-musica').close();
+}
+
+function desenharSeletorMusica() {
+  const ativas = repertorioMusicas.filter((r) => r.ativo);
+  const tons = [...new Set(ativas.map(tomDaMusica).filter(Boolean))]
+    .sort((a, b) => (semitomDaNota(a) - semitomDaNota(b)) || a.localeCompare(b));
+  filtroChips($('seletor-musica-tons'), 'seletor-tom', [['', 'Todos'], ...tons.map((t) => [t, t])], seletor.tom,
+    (v) => { seletor.tom = v; desenharSeletorMusica(); });
+  filtroChips($('seletor-musica-andamento'), 'seletor-andamento',
+    [['', 'Todos'], ['Lenta', 'Lenta'], ['Média', 'Média'], ['Rápida', 'Rápida']], seletor.andamento,
+    (v) => { seletor.andamento = v; desenharSeletorMusica(); });
+
+  $('seletor-musica-cabecalho').replaceChildren(el('tr', {}, ...COLUNAS_SELETOR.map(([chave, nome, classe]) => {
+    const ativa = seletor.chave === chave;
+    return el('th', { class: classe || null, 'aria-sort': ativa ? (seletor.crescente ? 'ascending' : 'descending') : 'none' },
+      el('button', { type: 'button', onclick: () => {
+        // Última vez e 12 meses abrem do maior para o menor; as outras em ordem alfabética.
+        seletor.crescente = ativa ? !seletor.crescente : !['ultima', 'vezes'].includes(chave);
+        seletor.chave = chave;
+        desenharSeletorMusica();
+      } }, nome + (ativa ? (seletor.crescente ? ' ↑' : ' ↓') : '')));
+  })));
+
+  const musicas = musicasDoSeletor();
+  if (!musicas.some((r) => r.id === seletor.foco)) seletor.foco = musicas[0]?.id ?? null;
+  $('seletor-musica-contagem').textContent = `${musicas.length} de ${ativas.length} ${ativas.length === 1 ? 'música disponível' : 'músicas disponíveis'}.`;
+  $('seletor-musica-lista').replaceChildren(...(musicas.length ? musicas.map((r) => {
+    const uso = usoRepertorio[r.id];
+    const linha = el('tr', { 'aria-selected': String(r.id === seletor.foco), 'data-id': r.id },
+      el('td', {}, el('strong', {}, r.titulo), el('small', {}, r.cantor)),
+      el('td', {}, tomDaMusica(r) ? el('span', { class: 'tom-musica' }, tomDaMusica(r)) : '—'),
+      el('td', { class: 'num' }, numeroBpm(r.bpm) ?? '—'),
+      el('td', {}, uso ? ddmmaa(uso.ultima) : 'Nunca'),
+      el('td', { class: 'num' }, uso?.vezes || 0));
+    linha.addEventListener('click', () => { seletor.foco = r.id; desenharSeletorMusica(); });
+    linha.addEventListener('dblclick', () => escolherDoSeletor(r));
+    return linha;
+  }) : [el('tr', {}, el('td', { colspan: '5', class: 'dica' }, 'Nenhuma música disponível com essa busca ou filtro. Confira o status no Repertório.'))]));
+  $('seletor-musica-lista').querySelector('[aria-selected="true"]')?.scrollIntoView({ block: 'nearest' });
+  desenharPreviaMusica(musicas.find((r) => r.id === seletor.foco));
+}
+
+function desenharPreviaMusica(r) {
+  if (!r) {
+    $('seletor-musica-previa').replaceChildren(el('p', { class: 'dica' }, 'Escolha uma música na lista para ver os detalhes.'));
+    return;
+  }
+  const thumb = miniaturaYoutube(r.referencia);
+  const link = linkYoutube(r.referencia);
+  const uso = usoRepertorio[r.id];
+  const tom = tomDaMusica(r);
+  const dados = [
+    ['Tom Diakonia', tom || 'Não definido'],
+    ['1ª nota', r.primeiraNota || 'Não cadastrada'],
+    ['Andamento', numeroBpm(r.bpm) ? `${numeroBpm(r.bpm)} BPM · ${andamentoBpm(r.bpm)}` : 'Sem BPM'],
+    ['Última vez', uso ? ddmmaa(uso.ultima) : 'Nunca tocada'],
+    ['12 meses', `${uso?.vezes || 0} ${uso?.vezes === 1 ? 'culto' : 'cultos'}`],
+  ];
+  $('seletor-musica-previa').replaceChildren(...[
+    thumb ? el('img', { src: thumb, alt: '', loading: 'lazy', referrerpolicy: 'no-referrer' }) : null,
+    el('strong', { class: 'titulo' }, r.titulo),
+    el('span', { class: 'dica' }, [r.cantor, r.compositor].filter(Boolean).join(' · ')),
+    el('dl', {}, ...dados.flatMap(([rotulo, valor]) => [el('dt', {}, rotulo), el('dd', {}, valor)])),
+    link ? el('a', { href: link, target: '_blank', rel: 'noopener noreferrer' }, 'Ouvir no YouTube ↗') : null,
+    botao(tom ? `Usar no culto · tom ${tom}` : 'Usar no culto', () => escolherDoSeletor(r)),
+  ].filter(Boolean));
+}
+
+function abrirSeletorMusica(selecionar, atualId = '') {
   aoSelecionarMusica = selecionar;
   $('seletor-musica-busca').value = '';
+  Object.assign(seletor, { foco: atualId || null, tom: '', andamento: '' });
   desenharSeletorMusica();
   $('dlg-selecionar-musica').showModal();
+  // Só dá para rolar até a música atual com o diálogo já aberto.
+  $('seletor-musica-lista').querySelector('[aria-selected="true"]')?.scrollIntoView({ block: 'center' });
   $('seletor-musica-busca').focus();
 }
 $('seletor-musica-busca').addEventListener('input', desenharSeletorMusica);
+// Setas andam pela lista mesmo com o foco na busca; Enter escolhe a música em foco.
+function teclasSeletor(e) {
+  const musicas = musicasDoSeletor();
+  const i = musicas.findIndex((r) => r.id === seletor.foco);
+  if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+    e.preventDefault();
+    const proxima = musicas[Math.min(musicas.length - 1, Math.max(0, i + (e.key === 'ArrowDown' ? 1 : -1)))];
+    if (proxima) { seletor.foco = proxima.id; desenharSeletorMusica(); }
+  } else if (e.key === 'Enter' && musicas[i]) {
+    e.preventDefault();
+    escolherDoSeletor(musicas[i]);
+  }
+}
+$('seletor-musica-busca').addEventListener('keydown', teclasSeletor);
+$('seletor-musica-tabela').addEventListener('keydown', teclasSeletor);
 $('seletor-musica-fechar').addEventListener('click', () => $('dlg-selecionar-musica').close());
 $('dlg-selecionar-musica').addEventListener('close', () => { aoSelecionarMusica = null; });
+
+/** "1ª nota D" da música [r] cantada no [tom] (vazio se ninguém cadastrou a nota). */
+function textoPrimeiraNota(r, tom) {
+  const nota = r?.primeiraNota ? primeiraNotaNoTom(r.primeiraNota, tomDaMusica(r), tom) : '';
+  return nota ? `1ª nota ${nota}` : '';
+}
 
 function linhaMusica(m = { titulo: '', tom: '' }, editavel = true) {
   const escolha = el('select', { 'aria-label': 'Música do repertório' });
@@ -278,17 +392,24 @@ function linhaMusica(m = { titulo: '', tom: '' }, editavel = true) {
   escolha.disabled = tom.disabled = !editavel;
   let primeiroVinculo = !!escolha.dataset.tituloAntigo;
   const resumo = el('div', { class: 'musica-resumo' });
+  const nota = el('span', { class: 'primeira-nota' });
+  const atualizarNota = () => {
+    nota.textContent = textoPrimeiraNota(repertorioMusicas.find((x) => x.id === escolha.value), tom.value.trim());
+  };
+  tom.addEventListener('input', atualizarNota);
   function atualizarResumo() {
     const r = repertorioMusicas.find((x) => x.id === escolha.value);
     const link = linkYoutube(r?.referencia);
+    atualizarNota();
     resumo.replaceChildren(...[el('strong', {}, r?.titulo || m.titulo || 'Nenhuma música selecionada'),
       r ? el('span', { class: 'dica' }, `${r.cantor}${r.compositor ? ' · ' + r.compositor : ''}`) : null,
+      nota,
       link ? el('a', { href: link, target: '_blank', rel: 'noopener noreferrer', style: 'display:block' }, 'Ver no YouTube ↗') : null,
       editavel ? botao(r ? 'Trocar música' : 'Escolher música', () => abrirSeletorMusica((selecionada) => {
         if (escolha.value === selecionada.id) return;
         escolha.value = selecionada.id;
         escolha.dispatchEvent(new Event('change'));
-      })) : null].filter(Boolean));
+      }, escolha.value)) : null].filter(Boolean));
   }
   escolha.addEventListener('change', () => {
     const r = repertorioMusicas.find((x) => x.id === escolha.value);
@@ -312,7 +433,7 @@ function numerarMusicas() {
 
 async function abrirMusicas(c, editavel) {
   try {
-    repertorioMusicas = await api('GET', '/api/repertorio');
+    [repertorioMusicas, usoRepertorio] = await Promise.all([api('GET', '/api/repertorio'), api('GET', '/api/repertorio/uso')]);
   } catch (err) {
     mensagem($('resultado-escala'), err.message, false);
     return;

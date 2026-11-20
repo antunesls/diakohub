@@ -290,6 +290,22 @@ void main() {
       expect(nov['whatsapp']['pastoral'], contains('*Dom 01/11 · 19h* (Santa Ceia)\nPregação: Pr. Souza\nTema: Graça'));
       expect(nov['whatsapp']['louvor'], contains('Músicas: Abertura (G)'));
 
+      // Primeira nota: cadastrada no Tom Diakonia (G) e transposta para o tom do culto.
+      expect((await chamar('PUT', '/api/repertorio/$abertura', token: admin, json: {'primeiraNota': 'H'})).$1, 400);
+      expect((await chamar('PUT', '/api/repertorio/$abertura', token: admin, json: {'primeiraNota': 'D'})).$1, 200);
+      expect(culto(await mes('2026-11'), '2026-11-01')['musicas'].single['primeiraNota'], 'D');
+      await chamar('PUT', '/api/escalas/${dom1['id']}', token: admin, json: {'musicas': [{'repertorioId': abertura, 'tom': 'A'}]});
+      nov = await mes('2026-11');
+      expect(culto(nov, '2026-11-01')['musicas'].single, {'repertorioId': abertura, 'titulo': 'Abertura', 'tom': 'A', 'primeiraNota': 'E'});
+      expect(nov['whatsapp']['louvor'], contains('Músicas: Abertura (A · 1ª nota E)'));
+
+      // Uso no seletor: só conta culto que já aconteceu.
+      expect((await chamar('GET', '/api/repertorio/uso', token: admin)).$2, isEmpty);
+      agora = DateTime(2026, 11, 5, 10);
+      expect((await chamar('GET', '/api/repertorio/uso', token: admin)).$2, {abertura: {'ultima': '2026-11-01', 'vezes': 1}});
+      agora = DateTime(2026, 10, 28, 10);
+      await chamar('PUT', '/api/escalas/${dom1['id']}', token: admin, json: {'musicas': [{'repertorioId': abertura, 'tom': 'G'}]});
+
       // Indisponibilidade aparece como aviso na pessoa.
       final (stInd, ind) = await chamar('POST', '/api/escalas/indisponibilidades', token: admin,
           json: {'membroId': bruno, 'de': '2026-11-07', 'ate': '2026-11-09', 'motivo': 'viagem'});

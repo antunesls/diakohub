@@ -7,6 +7,8 @@ const opcoesTomRepertorio = (select, incluirTodos) => select.replaceChildren(
   ...TONS_REPERTORIO.map(([valor, descricao]) => new Option(descricao, incluirTodos && !valor ? '_sem_tom' : valor)));
 opcoesTomRepertorio($('repertorio-filtro-tom'), true);
 opcoesTomRepertorio($('rep-tomSelecionado'), false);
+$('rep-primeiraNota').replaceChildren(new Option('Não cadastrada', ''),
+  ...NOTAS_REPERTORIO.map(([valor, descricao]) => new Option(descricao, valor)));
 
 async function carregarRepertorio() {
   try {
@@ -29,7 +31,7 @@ function desenharRepertorio() {
   $('repertorio-lista').replaceChildren(...(musicas.length ? musicas.map((m) =>
     el('div', { class: 'cartao', style: 'margin-bottom:10px;display:flex;align-items:center;gap:16px' },
       el('div', { style: 'flex:1' }, el('strong', {}, m.titulo),
-        el('div', { class: 'dica' }, `${m.cantor} · ${statusParaFiltro(m)}${tomDaMusica(m) ? ' · Tom Diakonia: ' + tomDaMusica(m) : ''}`)),
+        el('div', { class: 'dica' }, `${m.cantor} · ${statusParaFiltro(m)}${tomDaMusica(m) ? ' · Tom Diakonia: ' + tomDaMusica(m) : ''}${m.primeiraNota ? ' · 1ª nota: ' + m.primeiraNota : ''}`)),
       pode('escalaLouvor') ? botao('Editar', () => abrirRepertorio(m)) : null))
     : [el('p', { class: 'dica' }, 'Nenhuma música encontrada.')]));
 }
@@ -51,10 +53,12 @@ function abrirRepertorio(m = null) {
   $('repertorio-dialogo-titulo').textContent = m ? 'Editar música' : 'Nova música';
   for (const campo of camposRepertorio) $('rep-' + campo).value = m?.[campo] || '';
   $('rep-tomSelecionado').value = m ? tomDaMusica(m) : '';
+  $('rep-primeiraNota').value = m?.primeiraNota || '';
   $('rep-status').value = m ? statusParaFiltro(m) : 'OK';
   abrirDialogo($('dlg-repertorio'), $('rep-erro'), async () => {
     const j = Object.fromEntries(camposRepertorio.map((campo) => [campo, $('rep-' + campo).value.trim()]));
     j.tomSelecionado = $('rep-tomSelecionado').value;
+    j.primeiraNota = $('rep-primeiraNota').value;
     j.status = $('rep-status').value;
     if (!j.titulo || !j.cantor) throw new Error('Informe o título e o cantor.');
     await api(m ? 'PUT' : 'POST', m ? '/api/repertorio/' + m.id : '/api/repertorio', j);
