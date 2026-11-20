@@ -40,6 +40,17 @@ function situacaoDevocional(d) {
   return SITUACOES_DEVOCIONAL[d.status] || d.status || 'Rascunho';
 }
 
+/** Situação do e-mail na lista: "✓ Enviado a 36", "36 enviados · 1 falha" ou "Não enviado" (só publicados). */
+function seloEnvioDevocional(d) {
+  const e = d.envio || {};
+  if (e.enviados || e.falhas || e.incertos) {
+    const extra = [e.falhas ? `${e.falhas} falha${e.falhas === 1 ? '' : 's'}` : '', e.incertos ? `${e.incertos} a conferir` : ''].filter(Boolean).join(' · ');
+    const texto = !e.enviados && e.falhas ? `Envio falhou: ${e.falhas} não receberam` : extra ? `${e.enviados || 0} enviados · ${extra}` : `✓ Enviado a ${e.enviados}`;
+    return el('span', { class: 'selo-envio ' + (extra ? 'atencao' : 'ok') }, texto);
+  }
+  return d.status === 'publicado' ? el('span', { class: 'selo-envio nao' }, 'E-mail não enviado') : null;
+}
+
 function serieDevocional(d) {
   return d.serie ? `Série ${d.serie}${d.serieParte ? ' · parte ' + d.serieParte : ''}` : '';
 }
@@ -89,8 +100,7 @@ function desenharListaDevocionais() {
   $('devocionais-lista').replaceChildren(...lista.map((d) => el('article', { class: 'item' },
     el('div', { class: 'conteudo' }, el('strong', {}, d.titulo),
       el('p', { class: 'sub' }, [dataDevocional(d.data), (d.trilhasNomes || []).join(', '), serieDevocional(d)].filter(Boolean).join(' · ')),
-      el('p', { class: 'sub' }, el('span', { class: 'selo-dev ' + (d.status || 'rascunho') }, situacaoDevocional(d)),
-        d.envioAutomatico ? ` · envio automático: ${d.envioAutomatico.enviados} enviado(s)${d.envioAutomatico.falhas ? ', ' + d.envioAutomatico.falhas + ' falha(s)' : ''}` : '')),
+      el('p', { class: 'sub' }, el('span', { class: 'selo-dev ' + (d.status || 'rascunho') }, situacaoDevocional(d)), ' ', seloEnvioDevocional(d))),
     botao('Editar', async () => {
       if (!confirmarSaidaDevocional()) return;
       try { abrirEditorDevocional(await api('GET', `/api/devocionais/${encodeURIComponent(d.id)}`), true); }
@@ -189,6 +199,34 @@ function renderizarDevocional(d) {
 }
 
 // ---------- Editor ----------
+// Texto à esquerda; à direita, o painel "Publicação": situação, quando, trilhas, envio aos assinantes
+// (com a quantidade), um botão principal que muda conforme a escolha, teste para mim, histórico e divulgação.
+
+/** "2026-11-20T09:51:00.000" (ISO do servidor) -> "20/11 às 09:51". */
+function quandoEnvio(iso) {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '';
+  const p = (n) => String(n).padStart(2, '0');
+  return `${p(d.getDate())}/${p(d.getMonth() + 1)} às ${p(d.getHours())}:${p(d.getMinutes())}`;
+}
+
+/** Uma linha da linha do tempo de envios: "Enviado a 36 assinantes · 1 falha". */
+function textoHistoricoEnvio(h) {
+  const falhas = h.falhas ? ` · ${h.falhas} falha${h.falhas === 1 ? '' : 's'}` : '';
+  const incertos = h.incertos ? ` · ${h.incertos} a conferir` : '';
+  if (h.tipo === 'teste') return 'Teste enviado';
+  if (!h.enviados && h.falhas) return `Envio falhou: ${h.falhas} não receberam${h.tipo === 'automatico' ? ' (automático)' : ''}`;
+  if (h.tipo === 'automatico') return `Envio automático: ${h.enviados || 0} enviado${h.enviados === 1 ? '' : 's'}${falhas}${incertos}`;
+  const quem = h.assinantes ? 'assinantes' : 'pessoas';
+  return `Enviado a ${h.enviados || 0} ${quem}${falhas}${incertos}`;
+}
+
+/** Texto curto para colar no Canal do WhatsApp: título, referência, começo da reflexão e o link. */
+function textoCanalDevocional(d, link) {
+  const reflexao = String(d.texto || '').replace(/^#{1,3}\s+.*$/gm, '').trim().split(/\n\s*\n/)[0] || '';
+  const trecho = reflexao.length > 280 ? reflexao.slice(0, 277).replace(/\s+\S*$/, '') + '…' : reflexao;
+  return [`*${d.titulo}*`, d.referencia, trecho, `Leia o devocional completo: ${link}`].filter(Boolean).join('\n\n');
+}
 
 function abrirEditorDevocional(d = {}, saidaConfirmada = false) {
   if (!pode('devocionais') || (!saidaConfirmada && !confirmarSaidaDevocional())) return;
@@ -199,10 +237,9 @@ function abrirEditorDevocional(d = {}, saidaConfirmada = false) {
   const campos = {};
   const status = el('p', { role: 'status' });
   const previa = el('section', { class: 'devocional-previa', 'aria-label': 'Prévia do devocional', hidden: true });
-  const compartilhamento = el('div', { class: 'devocional-acoes' });
   const email = el('section');
+  const painel = el('aside', { class: 'dev-publicacao', 'aria-label': 'Publicação' });
   const controles = [];
-  let previaRevisada = false;
   const form = el('form');
   const hoje = new Date();
   const data = `${hoje.getFullYear()}-${String(hoje.getMonth() + 1).padStart(2, '0')}-${String(hoje.getDate()).padStart(2, '0')}`;
@@ -225,81 +262,265 @@ function abrirEditorDevocional(d = {}, saidaConfirmada = false) {
     controles.push(input);
     return el('label', { class: 'marcar' }, input, t.nome + (t.ativa ? '' : ' (desativada)'));
   });
+  const trilhasMarcadas = () => caixasTrilha.map((l) => l.children[0]).filter((i) => i.checked).map((i) => i.value);
   const trilhasCampo = el('fieldset', { class: 'campo largo dev-trilhas', id: 'devocional-trilhas' },
     el('legend', {}, 'Trilhas'), el('p', { class: 'dica' }, 'Quem assina qualquer uma delas recebe o e-mail (uma vez só).'), ...caixasTrilha);
-
-  const enviarAoPublicar = el('input', { type: 'checkbox', id: 'devocional-enviarAoPublicar' });
-  enviarAoPublicar.checked = d.enviarAoPublicar === true;
-  controles.push(enviarAoPublicar);
-  const agenda = el('fieldset', { class: 'campo largo dev-agenda' }, el('legend', {}, 'Agendar publicação (opcional)'),
-    campo('publicarEm', 'Publicar em', 'datetime-local'),
-    el('label', { class: 'marcar' }, enviarAoPublicar, 'Enviar por e-mail aos assinantes das trilhas quando publicar'),
-    el('p', { class: 'dica' }, 'No horário marcado o devocional entra no ar sozinho. Sem esta opção, ninguém recebe e-mail.'));
 
   const grade = el('div', { class: 'devocional-grade' }, campo('titulo', 'Título'), campo('autorNome', 'Autor', 'text', eu?.nome || ''), campo('data', 'Data', 'date', data),
     campo('referencia', 'Referência bíblica'), trilhasCampo,
     campo('serie', 'Série (opcional)', 'text', '', { maxlength: 120, placeholder: 'ex.: Frutos do Espírito' }),
     campo('serieParte', 'Parte da série', 'number', '', { min: 1, max: 365 }),
-    campo('texto', 'Reflexão', 'textarea'), campo('aplicacao', 'Aplicação', 'textarea'), campo('oracao', 'Oração', 'textarea'), agenda);
+    campo('texto', 'Reflexão', 'textarea'), campo('aplicacao', 'Aplicação', 'textarea'), campo('oracao', 'Oração', 'textarea'));
+
+  // Controles do painel (fora do <form>, mas contam como alteração do devocional).
+  const agendado = d.status === 'agendado';
+  const quandoAgora = el('input', { type: 'radio', name: 'devocional-quando', id: 'devocional-quando-agora', value: 'agora' });
+  const quandoAgendar = el('input', { type: 'radio', name: 'devocional-quando', id: 'devocional-quando-agendar', value: 'agendar' });
+  quandoAgendar.checked = agendado;
+  quandoAgora.checked = !agendado;
+  const publicarEm = el('input', { type: 'datetime-local', id: 'devocional-publicarEm', 'aria-label': 'Data e hora da publicação' });
+  publicarEm.value = d.publicarEm || '';
+  campos.publicarEm = publicarEm;
+  // Enviar aos assinantes: ligado por padrão (é o que quase sempre se quer); agendado guarda a escolha feita.
+  const enviarAoPublicar = el('input', { type: 'checkbox', id: 'devocional-enviarAoPublicar', class: 'interruptor' });
+  enviarAoPublicar.checked = agendado ? d.enviarAoPublicar === true : true;
+  controles.push(quandoAgora, quandoAgendar, publicarEm, enviarAoPublicar);
+
+  let assinantes = { total: null, porTrilha: {} }; // quantos receberiam com as trilhas marcadas
+  let pendentes = null; // publicado: quantos ainda não receberam (novos assinantes e falhas)
+  let confirmando = false, enviando = false, resultadoEnvio = null, testeAberto = false;
 
   const ler = () => {
     const parte = campos.serieParte.value.trim();
+    const agendar = quandoAgendar.checked;
     return {
       ...Object.fromEntries(['titulo', 'autorNome', 'data', 'referencia', 'texto', 'aplicacao', 'oracao', 'serie'].map((k) => [k, campos[k].value.trim()])),
-      trilhas: caixasTrilha.map((l) => l.children[0]).filter((i) => i.checked).map((i) => i.value),
+      trilhas: trilhasMarcadas(),
       serieParte: parte ? Number(parte) : null,
-      publicarEm: campos.publicarEm.value || null,
-      enviarAoPublicar: enviarAoPublicar.checked,
+      publicarEm: agendar ? publicarEm.value || null : null,
+      // Publicar agora envia na hora (pelo botão); o servidor só envia sozinho no agendamento.
+      enviarAoPublicar: agendar && enviarAoPublicar.checked,
     };
   };
+
+  let recontagem = null;
+  async function contarAssinantes() {
+    const ids = trilhasMarcadas();
+    try {
+      const r = ids.length ? await api('GET', '/api/devocionais/assinantes/contagem?trilhas=' + encodeURIComponent(ids.join(','))) : { total: 0, porTrilha: {} };
+      assinantes = { total: Number.isFinite(r?.total) ? r.total : null, porTrilha: r?.porTrilha || {} };
+    } catch { assinantes = { total: null, porTrilha: {} }; }
+    desenharPainel();
+  }
+  async function contarPendentes() {
+    pendentes = null;
+    if (devocionalEdicao.status !== 'publicado' || devocionalAlterado || !devocionalEdicao.id) return desenharPainel();
+    try {
+      const r = await api('POST', `/api/devocionais/${encodeURIComponent(devocionalEdicao.id)}/previa-email`, { membrosIds: [], incluirAssinantes: true });
+      pendentes = Number.isFinite(r?.aEnviar) ? r.aEnviar : null;
+    } catch { pendentes = null; }
+    desenharPainel();
+  }
+
   function alterou() {
     devocionalAlterado = true;
-    previaRevisada = false;
-    publicar.textContent = 'Publicar agora';
-    compartilhamento.replaceChildren(); email.replaceChildren(); previa.hidden = true;
-    mensagem(status, 'Alterações não salvas. Salve antes de compartilhar o link ou enviar e-mail.');
+    confirmando = false;
+    resultadoEnvio = null;
+    email.replaceChildren(); previa.hidden = true;
+    mensagem(status, 'Alterações não salvas.');
+    desenharPainel();
   }
   form.addEventListener('input', alterou);
   form.addEventListener('change', alterou);
+  for (const c of [quandoAgora, quandoAgendar, publicarEm, enviarAoPublicar]) c.addEventListener('change', alterou);
+  for (const l of caixasTrilha) l.children[0].addEventListener('change', () => { clearTimeout(recontagem); recontagem = setTimeout(contarAssinantes, 250); });
+
   async function operacao(fn) {
     if (devocionalOcupado) return;
     devocionalOcupado = true;
     controles.forEach((c) => { c.disabled = true; });
     try { await fn(); }
     catch (e) { mensagem(status, e.message, false); }
-    finally { devocionalOcupado = false; controles.forEach((c) => { c.disabled = false; }); }
+    finally { devocionalOcupado = false; controles.forEach((c) => { c.disabled = false; }); desenharPainel(); }
+  }
+
+  /** Grava com [novoStatus]; devolve true se gravou. Não envia e-mail (o envio é outra chamada). */
+  async function gravar(novoStatus) {
+    if (!form.reportValidity()) return false;
+    const corpo = { ...ler(), status: novoStatus };
+    if (!corpo.trilhas.length) { mensagem(status, 'Marque pelo menos uma trilha.', false); return false; }
+    if (corpo.serie === '') corpo.serie = null;
+    if (novoStatus === 'agendado' && !corpo.publicarEm) { mensagem(status, 'Escolha a data e a hora de publicação para agendar.', false); return false; }
+    const id = devocionalEdicao.id;
+    const salvo = await api(id ? 'PUT' : 'POST', '/api/devocionais' + (id ? '/' + encodeURIComponent(id) : ''), corpo);
+    devocionalEdicao = { ...devocionalEdicao, ...corpo, ...salvo };
+    if (!devocionalEdicao.id) throw new Error('O servidor não retornou o identificador. Recarregue a lista antes de continuar.');
+    devocionalAlterado = false;
+    return true;
   }
   async function salvar(novoStatus) {
-    if (!form.reportValidity()) return;
-    const corpo = { ...ler(), status: novoStatus };
-    if (!corpo.trilhas.length) return mensagem(status, 'Marque pelo menos uma trilha.', false);
-    if (corpo.serie === '') corpo.serie = null;
-    if (novoStatus === 'agendado' && !corpo.publicarEm) return mensagem(status, 'Escolha a data e a hora de publicação para agendar.', false);
     await operacao(async () => {
-      const id = devocionalEdicao.id;
-      const salvo = await api(id ? 'PUT' : 'POST', '/api/devocionais' + (id ? '/' + encodeURIComponent(id) : ''), corpo);
-      devocionalEdicao = { ...devocionalEdicao, ...corpo, ...salvo };
-      if (!devocionalEdicao.id) throw new Error('O servidor não retornou o identificador. Recarregue a lista antes de continuar.');
-      devocionalAlterado = false;
+      if (!await gravar(novoStatus)) return;
       mensagem(status, {
-        publicado: 'Publicado. Nenhum e-mail foi enviado.',
-        agendado: `Agendado para ${dataDevocional(salvo.publicarEm)}. ${salvo.enviarAoPublicar ? 'Na hora, sai o e-mail para os assinantes das trilhas.' : 'Nenhum e-mail será enviado.'}`,
+        publicado: 'Salvo. Está publicado.',
+        agendado: `Agendado para ${dataDevocional(devocionalEdicao.publicarEm)}. ${devocionalEdicao.enviarAoPublicar ? 'Na hora, sai o e-mail para os assinantes das trilhas.' : 'Nenhum e-mail será enviado.'}`,
       }[novoStatus] || 'Rascunho salvo. Não está disponível pelo link público.');
-      atualizarCompartilhamento(); email.replaceChildren();
       await listarDevocionais();
+      await contarPendentes();
     });
   }
-  function acao(texto, fn, classe) { const b = botao(texto, fn, classe); controles.push(b); return b; }
-  function atualizarCompartilhamento() {
-    const link = linkDevocional(devocionalEdicao);
-    compartilhamento.replaceChildren();
-    if (!link || devocionalAlterado) return;
-    compartilhamento.append(el('a', { class: 'botao secundario pequeno', href: link, target: '_blank', rel: 'noopener' }, 'Abrir página pública'),
-      el('a', { class: 'botao secundario pequeno', target: '_blank', rel: 'noopener', href: 'https://wa.me/?text=' + encodeURIComponent(`${devocionalEdicao.titulo}\nUm devocional para você. Leia: ${link}`) }, 'Compartilhar link no WhatsApp'),
-      acao('Preparar e-mail', async () => {
-        await operacao(async () => { await prepararEmailDevocional(devocionalEdicao, email, () => devocionalAlterado); });
-      }));
+
+  /** Envia aos assinantes das trilhas do devocional publicado (quem já recebeu é pulado no servidor). */
+  async function enviarAosAssinantes() {
+    enviando = true; desenharPainel();
+    const id = devocionalEdicao.id;
+    try {
+      const r = await api('POST', `/api/devocionais/${encodeURIComponent(id)}/email`, { membrosIds: [], incluirAssinantes: true, confirmar: true });
+      resultadoEnvio = r;
+      try { devocionalEdicao = { ...devocionalEdicao, ...await api('GET', `/api/devocionais/${encodeURIComponent(id)}`) }; } catch { /* o recibo da resposta basta */ }
+    } catch (e) {
+      resultadoEnvio = { erro: e.message };
+    } finally {
+      enviando = false;
+    }
+    await listarDevocionais();
+    await contarPendentes();
   }
+
+  function principal() {
+    const st = devocionalEdicao.status || 'rascunho';
+    const n = assinantes.total;
+    const qtd = n === null ? 'aos assinantes' : `a ${n} assinante${n === 1 ? '' : 's'}`;
+    if (st === 'publicado' && !devocionalAlterado) {
+      if (!pendentes) return null;
+      const jaFoi = (devocionalEdicao.envio?.enviados || 0) > 0;
+      return { texto: jaFoi ? `Enviar aos ${pendentes} que faltam` : `Enviar aos ${pendentes} assinante${pendentes === 1 ? '' : 's'}`,
+        pergunta: `Enviar "${devocionalEdicao.titulo}" para ${pendentes} pessoa${pendentes === 1 ? '' : 's'} agora? Cada uma recebe uma vez; não dá para desfazer.`,
+        sim: 'Sim, enviar', acao: () => operacao(enviarAosAssinantes) };
+    }
+    if (st === 'publicado') return { texto: 'Salvar alterações', acao: () => salvar('publicado') };
+    if (quandoAgendar.checked) {
+      return { texto: enviarAoPublicar.checked ? `Agendar e enviar ${qtd}` : 'Agendar', acao: () => salvar('agendado') };
+    }
+    if (!enviarAoPublicar.checked) {
+      return { texto: 'Publicar agora', pergunta: 'Publicar agora? Fica aberto a qualquer pessoa com o link. Ninguém recebe e-mail.',
+        sim: 'Sim, publicar', acao: () => salvar('publicado') };
+    }
+    return { texto: `Publicar e enviar ${qtd}`,
+      pergunta: `Publicar agora e enviar ${qtd}? Depois de enviado, não dá para desfazer.`, sim: 'Sim, publicar e enviar',
+      acao: () => operacao(async () => {
+        if (!await gravar('publicado')) return;
+        mensagem(status, 'Publicado.');
+        await enviarAosAssinantes();
+      }) };
+  }
+
+  function recibo() {
+    const env = devocionalEdicao.envio || { enviados: 0, falhas: 0, incertos: 0 };
+    if (resultadoEnvio?.erro) return el('div', { class: 'dev-recibo erro', role: 'status' }, el('strong', {}, 'O envio não foi concluído'), el('span', {}, resultadoEnvio.erro));
+    if (resultadoEnvio?.aviso) return el('div', { class: 'dev-recibo erro', role: 'status' }, el('strong', {}, 'Nenhum e-mail saiu'), el('span', {}, resultadoEnvio.aviso));
+    if (!env.enviados && !env.falhas && !env.incertos) return null;
+    const ultimo = (devocionalEdicao.historicoEnvios || []).find((x) => x.tipo !== 'teste');
+    return el('div', { class: 'dev-recibo', role: 'status' },
+      el('strong', {}, `✓ Enviado a ${env.enviados} pessoa${env.enviados === 1 ? '' : 's'}`),
+      el('span', {}, [ultimo ? quandoEnvio(ultimo.em) + (ultimo.por ? ' · por ' + ultimo.por : ultimo.tipo === 'automatico' ? ' · automático' : '') : '',
+        env.falhas ? `${env.falhas} falha${env.falhas === 1 ? '' : 's'} (o botão abaixo tenta de novo)` : '',
+        env.incertos ? `${env.incertos} a conferir (não são reenviados sozinhos)` : ''].filter(Boolean).join(' · ')));
+  }
+
+  function desenharPainel() {
+    const st = devocionalEdicao.status || 'rascunho';
+    const publicado = st === 'publicado';
+    const p = principal();
+    const linha = (rotulo, ...valor) => el('div', { class: 'dev-linha' }, el('span', {}, rotulo), el('span', {}, ...valor));
+    const nomes = trilhasMarcadas().map(nomeTrilhaDevocional);
+    const porTrilha = trilhasMarcadas().map((t) => assinantes.porTrilha[t] !== undefined ? `${nomeTrilhaDevocional(t)} (${assinantes.porTrilha[t]})` : nomeTrilhaDevocional(t)).join(', ');
+    const n = assinantes.total;
+
+    const blocoQuando = publicado ? null : el('fieldset', { class: 'dev-quando' }, el('legend', {}, 'Quando'),
+      el('label', { class: 'marcar' }, quandoAgora, 'Agora'),
+      el('label', { class: 'marcar' }, quandoAgendar, 'Agendar'),
+      quandoAgendar.checked ? publicarEm : null);
+    const blocoEnvio = publicado ? null : el('label', { class: 'dev-interruptor' }, enviarAoPublicar,
+      el('span', {}, 'Enviar por e-mail aos assinantes',
+        el('small', {}, n === null ? 'Assinantes das trilhas marcadas.' : n === 0 ? 'Ninguém assina essas trilhas ainda.'
+          : `${n} pessoa${n === 1 ? '' : 's'}: ${porTrilha}. Quem assina mais de uma recebe um só.`)));
+
+    let acaoPrincipal = null;
+    if (enviando) {
+      acaoPrincipal = el('div', { class: 'dev-confirmar', role: 'status' }, el('strong', {}, 'Enviando…'), el('span', { class: 'dica' }, 'Pode levar alguns minutos. Não feche esta página.'));
+    } else if (p && confirmando && p.pergunta) {
+      acaoPrincipal = el('div', { class: 'dev-confirmar' }, el('p', {}, p.pergunta),
+        el('div', { class: 'devocional-acoes' }, botao(p.sim, () => { confirmando = false; return p.acao(); }, 'pequeno'), botao('Cancelar', () => { confirmando = false; desenharPainel(); })));
+    } else if (p) {
+      const b = botao(p.texto, () => { if (!p.pergunta) return p.acao(); confirmando = true; desenharPainel(); }, 'dev-principal');
+      b.disabled = devocionalOcupado;
+      acaoPrincipal = b;
+    } else if (publicado) {
+      const env = devocionalEdicao.envio?.enviados || 0;
+      acaoPrincipal = el('p', { class: 'dica' }, pendentes === null ? 'Conferindo os assinantes…' : env ? 'Todos os assinantes das trilhas já receberam.' : 'Ninguém assina essas trilhas ainda.');
+    }
+
+    // Teste para mim: o e-mail fica guardado neste navegador para a próxima vez.
+    let teste = null;
+    if (testeAberto) {
+      let lembrado = '';
+      try { lembrado = localStorage.getItem('diako_email_teste_devocional') || ''; } catch { /* sem armazenamento */ }
+      const emailTeste = el('input', { type: 'email', id: 'devocional-email-teste', placeholder: 'seu@email.com', 'aria-label': 'E-mail para o teste' });
+      emailTeste.value = lembrado;
+      teste = el('div', { class: 'dev-teste' }, emailTeste, botao('Enviar teste', () => operacao(async () => {
+        const destino = emailTeste.value.trim();
+        if (!destino) throw new Error('Informe o e-mail para o teste.');
+        if (!devocionalEdicao.id || devocionalAlterado) {
+          if (!await gravar(devocionalEdicao.status || 'rascunho')) return;
+          await listarDevocionais();
+        }
+        await api('POST', `/api/devocionais/${encodeURIComponent(devocionalEdicao.id)}/teste`, { email: destino });
+        try { localStorage.setItem('diako_email_teste_devocional', destino); } catch { /* sem armazenamento */ }
+        try { devocionalEdicao = { ...devocionalEdicao, ...await api('GET', `/api/devocionais/${encodeURIComponent(devocionalEdicao.id)}`) }; } catch { /* segue */ }
+        testeAberto = false;
+        mensagem(status, `Teste enviado para ${destino}. Confira a caixa de entrada (e o spam).`);
+      }), 'pequeno'));
+    }
+
+    const historico = devocionalEdicao.historicoEnvios || [];
+    const link = linkDevocional(devocionalEdicao);
+    const copiar = (texto, ok) => async () => {
+      try { await navigator.clipboard.writeText(texto()); mensagem(status, ok); }
+      catch { mensagem(status, 'Não foi possível copiar. Use a prévia para selecionar e copiar o texto.', false); }
+    };
+
+    painel.replaceChildren(...[
+      el('div', { class: 'cartao dev-cartao' }, el('h4', {}, 'Publicação'),
+        linha('Situação', el('span', { class: 'selo-dev ' + st }, publicado ? 'Publicado' : agendadoTexto(st))),
+        publicado && devocionalEdicao.publicadoEm ? linha('No ar desde', quandoEnvio(devocionalEdicao.publicadoEm)) : null,
+        linha('Trilhas', nomes.join(', ') || '—'),
+        blocoQuando, blocoEnvio, recibo(), acaoPrincipal,
+        el('div', { class: 'dev-secundarias' },
+          testeAberto ? null : botao('Enviar um teste para mim', () => { testeAberto = true; desenharPainel(); }),
+          publicado && !devocionalAlterado ? botao('Enviar para pessoas específicas…', () => operacao(async () => {
+            await prepararEmailDevocional(devocionalEdicao, email, () => devocionalAlterado);
+            if (email.scrollIntoView) email.scrollIntoView({ block: 'start' });
+          })) : null),
+        teste),
+      el('div', { class: 'cartao dev-cartao' }, el('h4', {}, 'Histórico de envios'),
+        historico.length ? el('ul', { class: 'dev-historico' }, ...historico.slice(0, 10).map((h) =>
+          el('li', { class: h.falhas ? 'falha' : h.tipo === 'teste' ? 'teste' : 'ok' }, el('span', {}, textoHistoricoEnvio(h)),
+            el('small', {}, [quandoEnvio(h.em), h.por ? 'por ' + h.por : h.tipo === 'automatico' ? 'agendamento' : ''].filter(Boolean).join(' · ')))))
+          : el('p', { class: 'dica' }, (devocionalEdicao.envio?.enviados || 0) ? `${devocionalEdicao.envio.enviados} e-mails enviados antes do histórico existir.` : 'Os envios e testes aparecem aqui, com data e quem fez.')),
+      link && !devocionalAlterado ? el('div', { class: 'cartao dev-cartao' }, el('h4', {}, 'Divulgar'),
+        el('div', { class: 'dev-secundarias' },
+          el('a', { class: 'botao secundario pequeno', href: link, target: '_blank', rel: 'noopener' }, 'Abrir página pública'),
+          botao('Copiar link', copiar(() => link, 'Link copiado.')),
+          botao('Copiar para o Canal', copiar(() => textoCanalDevocional(devocionalEdicao, link), 'Texto para o Canal do WhatsApp copiado. Cole no Canal da igreja.')),
+          el('a', { class: 'botao secundario pequeno', target: '_blank', rel: 'noopener', href: 'https://wa.me/?text=' + encodeURIComponent(`${devocionalEdicao.titulo}\nUm devocional para você. Leia: ${link}`) }, 'Compartilhar no WhatsApp'))) : null,
+    ].filter(Boolean));
+  }
+  function agendadoTexto(st) {
+    return st === 'agendado' ? `Agendado · ${dataDevocional(devocionalEdicao.publicarEm)}` : 'Rascunho';
+  }
+
+  function acao(texto, fn, classe) { const b = botao(texto, fn, classe); controles.push(b); return b; }
   const arquivo = el('input', { type: 'file', id: 'devocional-importar', accept: '.docx,.txt,.md' }); controles.push(arquivo);
   arquivo.addEventListener('change', async () => {
     const f = arquivo.files?.[0]; if (!f) return;
@@ -310,36 +531,31 @@ function abrirEditorDevocional(d = {}, saidaConfirmada = false) {
     });
     arquivo.value = '';
   });
-  const publicar = acao('Publicar agora', async () => {
-    previa.replaceChildren(renderizarDevocional(ler())); previa.hidden = false;
-    if (!previaRevisada) {
-      previaRevisada = true; publicar.textContent = 'Confirmar publicação';
-      mensagem(status, 'Confira a prévia abaixo. Depois clique em Confirmar publicação. Nenhum e-mail será enviado.');
-      return;
-    }
-    if (confirm('Publicar este conteúdo para qualquer pessoa com o link? Nenhum e-mail será enviado.')) await salvar('publicado');
-  });
+  const publicadoAntes = d.status === 'publicado';
   const acoes = el('div', { class: 'devocional-acoes' },
-    acao('Salvar', () => salvar(devocionalEdicao.status || 'rascunho'), 'pequeno'),
-    acao('Salvar como rascunho / retirar do ar', () => salvar('rascunho')),
-    acao('Agendar', () => salvar('agendado')),
-    acao('Ver prévia', () => { previa.replaceChildren(renderizarDevocional(ler())); previa.hidden = false; }),
-    publicar,
+    acao(publicadoAntes ? 'Salvar' : 'Salvar rascunho', () => salvar(devocionalEdicao.status === 'publicado' ? 'publicado' : devocionalEdicao.status === 'agendado' ? 'agendado' : 'rascunho'), 'pequeno'),
+    acao('Ver prévia', () => { previa.replaceChildren(renderizarDevocional(ler())); previa.hidden = false; if (previa.scrollIntoView) previa.scrollIntoView({ block: 'start' }); }),
     acao('Copiar texto integral', async () => {
       try { await navigator.clipboard.writeText(textoDevocional(ler())); mensagem(status, 'Texto integral copiado. Cole na conversa desejada.'); }
       catch { mensagem(status, 'Não foi possível copiar. Use a prévia para selecionar e copiar o texto.', false); }
     }),
     acao('Fechar edição', () => { if (confirmarSaidaDevocional()) { devocionalAlterado = false; caixa.hidden = true; } }),
+    publicadoAntes ? acao('Retirar do ar', async () => {
+      if (!confirm('Retirar do ar? O link deixa de funcionar até publicar de novo. Quem já recebeu o e-mail não é afetado.')) return;
+      await salvar('rascunho');
+    }) : null,
     d.id ? acao('Excluir', async () => {
       if (!confirm('Excluir este devocional? O link deixará de funcionar e alterações não salvas serão descartadas.')) return;
       await operacao(async () => { await api('DELETE', `/api/devocionais/${encodeURIComponent(devocionalEdicao.id)}`); devocionalAlterado = false; caixa.hidden = true; await listarDevocionais(); });
     }, 'perigo pequeno') : null);
   form.addEventListener('submit', (e) => { e.preventDefault(); salvar(devocionalEdicao.status || 'rascunho'); });
   form.append(grade, el('div', { class: 'campo' }, el('label', { for: 'devocional-importar' }, 'Importar reflexão (.docx, .txt ou .md)'), arquivo), acoes, status);
-  const situacao = d.id ? el('p', { class: 'dica' }, situacaoDevocional(d),
-    d.envioAutomatico ? ` · envio automático em ${dataDevocional(String(d.envioAutomatico.em || '').slice(0, 16))}: ${d.envioAutomatico.enviados} enviado(s)` : '') : null;
-  caixa.replaceChildren(...[el('h3', {}, d.id ? 'Editar devocional' : 'Novo devocional'), situacao, form, previa, compartilhamento, email].filter(Boolean));
-  atualizarCompartilhamento(); campos.titulo.focus();
+  caixa.replaceChildren(el('h3', {}, d.id ? 'Editar devocional' : 'Novo devocional'),
+    el('div', { class: 'dev-editor-layout' }, el('div', { class: 'dev-editor-texto' }, form, previa, email), painel));
+  desenharPainel();
+  contarAssinantes();
+  contarPendentes();
+  campos.titulo.focus();
   if (caixa.scrollIntoView) caixa.scrollIntoView({ block: 'start' });
 }
 

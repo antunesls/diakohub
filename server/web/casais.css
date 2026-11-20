@@ -142,3 +142,48 @@ body.devocional-publico main { max-width: 800px; padding: 30px 20px 60px; }
 .encontro-link .barra { margin: 8px 0 0; }
 .encontro-qr { width: 140px; height: 140px; border: 1px solid var(--linha); border-radius: 12px; background: #fff; flex-shrink: 0; }
 .encontro-bloco > .sub a { overflow-wrap: anywhere; }
+
+/* Editor de devocional: texto à esquerda, painel "Publicação" à direita. */
+.dev-editor-layout { display: grid; grid-template-columns: minmax(0, 1fr) 300px; gap: 22px; align-items: start; }
+.dev-editor-texto { min-width: 0; }
+.dev-publicacao { position: sticky; top: 12px; display: grid; gap: 12px; min-width: 0; }
+.dev-cartao { padding: 14px 16px; display: grid; gap: 10px; margin: 0; }
+.dev-cartao h4 { margin: 0; font-size: 12px; font-weight: 700; letter-spacing: .07em; text-transform: uppercase; color: var(--suave); }
+.dev-linha { display: flex; justify-content: space-between; gap: 10px; font-size: 14px; }
+.dev-linha > span:first-child { color: var(--suave); }
+.dev-linha > span:last-child { text-align: right; overflow-wrap: anywhere; }
+.dev-quando { border: 0; padding: 0; margin: 0; display: flex; flex-wrap: wrap; gap: 4px 16px; align-items: center; }
+.dev-quando legend { font-size: 14px; color: var(--suave); padding: 0; margin-bottom: 4px; float: left; width: 100%; }
+.dev-quando .marcar { margin: 0; }
+.dev-quando input[type="datetime-local"] { flex: 1 1 100%; }
+.dev-interruptor { display: flex; gap: 10px; align-items: flex-start; cursor: pointer; font-weight: 600; font-size: 14px; }
+.dev-interruptor small { display: block; font-weight: 400; color: var(--suave); font-size: 13px; margin-top: 2px; }
+input.interruptor { appearance: none; width: 40px; height: 24px; border-radius: 24px; background: var(--borda); position: relative; flex: none; cursor: pointer; margin: 0; transition: background .15s; }
+input.interruptor::after { content: ""; position: absolute; top: 3px; left: 3px; width: 18px; height: 18px; border-radius: 50%; background: #fff; transition: transform .15s; }
+input.interruptor:checked { background: var(--primaria); }
+input.interruptor:checked::after { transform: translateX(16px); }
+input.interruptor:focus-visible { outline: 3px solid var(--primaria-suave); outline-offset: 2px; }
+.botao.dev-principal { width: 100%; min-height: 48px; font-size: 15px; }
+.dev-confirmar { border: 2px solid var(--primaria); border-radius: 12px; padding: 12px; display: grid; gap: 8px; background: var(--superficie); }
+.dev-confirmar p { margin: 0; font-weight: 600; }
+.dev-confirmar .devocional-acoes { margin: 0; }
+.dev-recibo { border-radius: 12px; padding: 10px 12px; background: #e3f2e8; color: #1f5a37; display: grid; gap: 2px; font-size: 13.5px; }
+.dev-recibo strong { font-size: 15px; }
+.dev-recibo.erro { background: #fbe3e1; color: var(--perigo); }
+.dev-secundarias { display: flex; flex-wrap: wrap; gap: 8px; }
+.dev-teste { display: flex; gap: 8px; flex-wrap: wrap; }
+.dev-teste input { flex: 1 1 160px; min-width: 0; }
+.dev-historico { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; font-size: 13.5px; }
+.dev-historico li { display: grid; grid-template-columns: 8px 1fr; column-gap: 8px; }
+.dev-historico li::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: #2e7d4f; margin-top: 6px; grid-row: span 2; }
+.dev-historico li.teste::before { background: var(--borda); }
+.dev-historico li.falha::before { background: var(--perigo); }
+.dev-historico small { color: var(--suave); font-size: 12.5px; }
+.selo-envio { display: inline-block; padding: 1px 9px; border-radius: 10px; font-size: 12px; font-weight: 600; }
+.selo-envio.ok { background: #e3f2e8; color: #1f5a37; }
+.selo-envio.atencao { background: #fbe3e1; color: var(--perigo); }
+.selo-envio.nao { background: var(--neutro); color: var(--suave); }
+@media (max-width: 900px) {
+  .dev-editor-layout { grid-template-columns: minmax(0, 1fr); }
+  .dev-publicacao { position: static; }
+}

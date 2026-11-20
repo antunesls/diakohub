@@ -25,6 +25,7 @@ class Devocionais {
     _ipInscricao = LimiteTaxa(maximo: 10, janela: const Duration(minutes: 15), relogio: _agora);
     _emailInscricao = LimiteTaxa(maximo: 1, janela: const Duration(hours: 1), relogio: _agora);
     _tokens = LimiteTaxa(maximo: 30, janela: const Duration(minutes: 1), relogio: _agora);
+    _testes = LimiteTaxa(maximo: 10, janela: const Duration(minutes: 15), relogio: _agora);
   }
 
   final Store store;
@@ -33,7 +34,7 @@ class Devocionais {
   final String Function(Request) _ip;
   final Future<void> Function(EmailDevocional) _enviar;
   late final _Estado _estado;
-  late final LimiteTaxa _ipInscricao, _emailInscricao, _tokens;
+  late final LimiteTaxa _ipInscricao, _emailInscricao, _tokens, _testes;
   static final _estados = Expando<_Estado>();
   Timer? _agendador;
 
@@ -88,7 +89,11 @@ class Devocionais {
       });
     }
     // Rotas fixas antes das com <id>: o Router atende a primeira que casar.
-    rota('GET', '/api/devocionais', (_) => _json([for (final d in _ordenados(store.listar('devocionais'))) _exibir(d)]));
+    rota('GET', '/api/devocionais', (_) {
+      final envios = _resumoEnvios();
+      return _json([for (final d in _ordenados(store.listar('devocionais'))) _exibir(d, envios: envios)]);
+    });
+    rota('GET', '/api/devocionais/assinantes/contagem', _contagemAssinantes);
     rota('POST', '/api/devocionais', _criar);
     rota('GET', '/api/devocionais/trilhas', (_) => _json(_trilhasComUso()));
     rota('GET', '/api/devocionais/assinantes', (_) => _json(_resumoAssinantes()));
@@ -96,6 +101,7 @@ class Devocionais {
     rota('POST', '/api/devocionais/importar', _importar);
     rota('POST', '/api/devocionais/<id>/previa-email', _previa);
     rota('POST', '/api/devocionais/<id>/email', _disparar);
+    rota('POST', '/api/devocionais/<id>/teste', _teste);
     rota('GET', '/api/devocionais/<id>/envios', (req) => _json(_envios(req.params['id']!)));
     rota('GET', '/api/devocionais/<id>', (req) => _json(_exibir(_buscar(req.params['id']!))));
     rota('PUT', '/api/devocionais/<id>', _editar);
@@ -248,8 +254,10 @@ class Devocionais {
 
   String get _hoje => _agoraLocal.substring(0, 10);
 
-  Map<String, dynamic> _exibir(Map<String, dynamic> d) {
+  /// [envios]: resumo já calculado para a lista inteira (senão, conta só os recibos deste).
+  Map<String, dynamic> _exibir(Map<String, dynamic> d, {Map<String, Map<String, int>>? envios}) {
     final trilhas = _trilhasDe(d);
+    final envio = (envios ?? _resumoEnvios(id: d['id'] as String))[d['id']];
     return {
       'id': d['id'],
       for (final k in _chavesTexto) k: d[k],
@@ -262,14 +270,85 @@ class Devocionais {
       'enviarAoPublicar': d['enviarAoPublicar'] == true,
       if (d['publicadoEm'] != null) 'publicadoEm': d['publicadoEm'],
       if (d['envioAutomatico'] != null) 'envioAutomatico': d['envioAutomatico'],
+      // Recibos (números) e a linha do tempo de envios e testes, para o painel confirmar o que saiu.
+      'envio': envio ?? const {'enviados': 0, 'falhas': 0, 'incertos': 0},
+      'historicoEnvios': d['historicoEnvios'] is List ? d['historicoEnvios'] : const [],
       'urlPublica': _url(d['id'] as String),
     };
   }
 
+  /// Recibos por devocional: {id: {enviados, falhas, incertos}}. Com [id], só os daquele.
+  Map<String, Map<String, int>> _resumoEnvios({String? id}) {
+    final r = <String, Map<String, int>>{};
+    for (final recibo in store.listar('enviosDevocionais')) {
+      final dev = recibo['devocionalId'];
+      if (dev is! String || (id != null && dev != id)) continue;
+      final c = r.putIfAbsent(dev, () => {'enviados': 0, 'falhas': 0, 'incertos': 0});
+      switch (recibo['status']) {
+        case 'enviado': c['enviados'] = c['enviados']! + 1;
+        case 'falhou': c['falhas'] = c['falhas']! + 1;
+        default: c['incertos'] = c['incertos']! + 1;
+      }
+    }
+    return r;
+  }
+
+  /// Quantos itens a linha do tempo de envios guarda por devocional (os mais novos primeiro).
+  static const maximoHistorico = 30;
+
+  /// Acrescenta um evento (envio, teste, automático) à linha do tempo do devocional [id].
+  Future<void> _registrar(String id, Map<String, dynamic> evento) => _estado.executar(() async {
+        final atual = store.buscar('devocionais', id);
+        if (atual == null) return;
+        final lista = [{'em': _agora().toIso8601String(), ...evento}, ...(atual['historicoEnvios'] as List? ?? const [])];
+        await store.salvar('devocionais', {...atual,
+          'historicoEnvios': lista.length > maximoHistorico ? lista.sublist(0, maximoHistorico) : lista});
+      });
+
+  /// GET /api/devocionais/assinantes/contagem?trilhas=casais,familia — quantas pessoas receberiam
+  /// (cada uma uma vez), para o botão "Publicar e enviar a N" antes mesmo de salvar.
+  Response _contagemAssinantes(Request req) {
+    final trilhas = (req.url.queryParameters['trilhas'] ?? '').split(',').where((t) => t.isNotEmpty).take(maximoTrilhasPorDevocional).toList();
+    final ficticio = {'trilhas': trilhas};
+    final cancelados = _cancelados;
+    final emails = <String>{};
+    final porTrilha = {for (final t in trilhas) t: 0};
+    for (final a in store.listar('assinaturasDevocionais')) {
+      if (!_assinanteAtivo(a, ficticio) || cancelados.contains(_email(a['email'] as String))) continue;
+      emails.add(_email(a['email'] as String));
+      for (final t in trilhas) {
+        if ((a['temas'] as List? ?? const []).contains(t)) porTrilha[t] = porTrilha[t]! + 1;
+      }
+    }
+    return _json({'total': emails.length, 'porTrilha': porTrilha});
+  }
+
+  /// POST /api/devocionais/<id>/teste {email} — o e-mail como os assinantes recebem, só para quem
+  /// está revisando. Não conta como envio (sem recibo) e vale para rascunho e agendado também.
+  Future<Response> _teste(Request req) async {
+    final j = await _corpo(req);
+    final email = j['email'];
+    if (!_emailValido(email)) throw const FormatException('Informe um e-mail válido para o teste.');
+    final conta = Auth.contaDa(req);
+    if (!_testes.permitir(conta?.id ?? '')) throw const _HttpErro(429, 'Muitos testes seguidos. Espere alguns minutos.');
+    final d = _buscar(req.params['id']!);
+    final e = _montar(d, destinatario: _email(email as String));
+    try {
+      await _enviar(EmailDevocional(destinatario: e.destinatario, assunto: '[Teste] ${e.assunto}', texto: e.texto,
+          html: e.html, htmlSemLogo: e.htmlSemLogo)).timeout(const Duration(seconds: 45));
+    } on StateError catch (erro) {
+      throw _HttpErro(400, erro.message);
+    } catch (_) {
+      throw const _HttpErro(502, 'O servidor de e-mail não aceitou o teste. Confira o SMTP em Administração.');
+    }
+    await _registrar(d['id'] as String, {'tipo': 'teste', 'por': conta?.nome ?? ''});
+    return _json({'ok': true});
+  }
+
   /// O que a página pública mostra: o conteúdo, sem situação, agendamento nem envios.
   Map<String, dynamic> _exibirPublico(Map<String, dynamic> d) {
-    final e = _exibir(d);
-    for (final k in ['status', 'publicarEm', 'enviarAoPublicar', 'publicadoEm', 'envioAutomatico']) {
+    final e = _exibir(d, envios: const {}); // a página pública não precisa dos recibos
+    for (final k in ['status', 'publicarEm', 'enviarAoPublicar', 'publicadoEm', 'envioAutomatico', 'envio', 'historicoEnvios']) {
       e.remove(k);
     }
     final serie = d['serie'];
@@ -475,6 +554,7 @@ class Devocionais {
           await store.salvar('devocionais', {...atual, 'envioAutomatico': {...r, 'em': _agora().toIso8601String()}});
         }
       });
+      await _registrar(id, {'tipo': 'automatico', ..._numerosDoLote(r)});
     }
     return vencidos.length;
   }
@@ -656,8 +736,16 @@ class Devocionais {
     final j = await _corpo(req);
     if (j['confirmar'] != true) throw const FormatException('Confirme explicitamente o envio.');
     _publicado(req.params['id']!);
-    return _json(await _lote(req.params['id']!, j));
+    final r = await _lote(req.params['id']!, j);
+    final membros = j['membrosIds'] is List ? (j['membrosIds'] as List).length : 0;
+    await _registrar(req.params['id']!, {'tipo': 'manual', 'por': Auth.contaDa(req)?.nome ?? '',
+      'assinantes': j['incluirAssinantes'] == true, 'membros': membros, ..._numerosDoLote(r)});
+    return _json(r);
   }
+
+  /// Só os números do lote vão para a linha do tempo (nunca e-mails).
+  static Map<String, int> _numerosDoLote(Map<String, dynamic> r) =>
+      {for (final k in ['enviados', 'falhas', 'incertos', 'ignorados']) k: (r[k] as int?) ?? 0};
 
   /// Envia o devocional publicado [id] aos destinatários de [j]; cada um no máximo uma vez.
   Future<Map<String, dynamic>> _lote(String id, Map<String, dynamic> j) async {
@@ -705,6 +793,9 @@ class Devocionais {
         await _enviar(_montar(d, destinatario: email, urlCancelar: reserva.urlCancelar)).timeout(const Duration(seconds: 45));
         status = 'enviado';
       } on FalhaEmailDevocional {
+        status = 'falhou';
+      } on StateError {
+        // SMTP não configurado: o envio nem começou, então é falha certa (pode tentar de novo).
         status = 'falhou';
       } catch (_) {
         status = 'incerto';

@@ -168,6 +168,58 @@ void main() {
     expect((await chamar('POST', '/api/public/devocionais/assinar', publico: true,
         dados: {...payload, 'autorizo': false})).$1, 400);
   });
+  test('painel de publicação: contagem por trilha, teste para mim, recibo e histórico', () async {
+    await confirmar(await assinar('ana@exemplo.test'));
+    await confirmar(await assinar('duas@exemplo.test', temas: ['casais', 'familia']));
+    await confirmar(await assinar('familia@exemplo.test', temas: ['familia']));
+    await assinar('pendente@exemplo.test'); // sem confirmar: não conta
+    final contagem = (await chamar('GET', '/api/devocionais/assinantes/contagem?trilhas=casais,familia')).$2;
+    expect(contagem['total'], 3, reason: 'quem assina as duas conta uma vez');
+    expect(contagem['porTrilha'], {'casais': 2, 'familia': 2});
+    expect((await chamar('GET', '/api/devocionais/assinantes/contagem?trilhas=')).$2['total'], 0);
+
+    // Teste vale para rascunho, não deixa recibo e entra no histórico.
+    final id = await criar('rascunho');
+    emails.clear();
+    expect((await chamar('POST', '/api/devocionais/$id/teste', dados: {'email': 'nao-e-email'})).$1, 400);
+    expect((await chamar('POST', '/api/devocionais/$id/teste', dados: {'email': 'Eu@Igreja.test'})).$1, 200);
+    expect(emails.single.destinatario, 'eu@igreja.test');
+    expect(emails.single.assunto, startsWith('[Teste] '));
+    expect(store.listar('enviosDevocionais'), isEmpty);
+    var d = (await chamar('GET', '/api/devocionais/$id')).$2;
+    expect(d['historicoEnvios'].single['tipo'], 'teste');
+    expect(d['envio'], {'enviados': 0, 'falhas': 0, 'incertos': 0});
+
+    // Envio aos assinantes: recibo nos números e uma linha no histórico (sem e-mails).
+    expect((await chamar('PUT', '/api/devocionais/$id', dados: dados('publicado'))).$1, 200);
+    emails.clear();
+    final r = (await chamar('POST', '/api/devocionais/$id/email', dados: selecao())).$2;
+    expect(r['enviados'], 2, reason: 'o devocional é da trilha casais');
+    d = (await chamar('GET', '/api/devocionais/$id')).$2;
+    expect(d['envio'], {'enviados': 2, 'falhas': 0, 'incertos': 0});
+    final ultimo = d['historicoEnvios'].first as Map;
+    expect(ultimo['tipo'], 'manual');
+    expect(ultimo['enviados'], 2);
+    expect(ultimo['assinantes'], true);
+    expect(ultimo.toString(), isNot(contains('@')), reason: 'o histórico guarda só números');
+    final lista = (await chamar('GET', '/api/devocionais')).$2 as List;
+    expect(lista.firstWhere((x) => x['id'] == id)['envio']['enviados'], 2);
+    // A página pública não mostra recibos nem histórico.
+    final publico = (await chamar('GET', '/api/public/devocionais/$id', publico: true)).$2 as Map;
+    expect(publico.containsKey('envio') || publico.containsKey('historicoEnvios'), isFalse);
+    // Quem assinar depois é o que falta: um novo envio vai só para essa pessoa.
+    await confirmar(await assinar('nova@exemplo.test'));
+    expect((await chamar('POST', '/api/devocionais/$id/previa-email', dados: selecao())).$2['aEnviar'], 1);
+
+    // SMTP não configurado: é falha certa (não "incerto"), e o próximo envio tenta de novo.
+    transporte = (_) async => throw StateError('Configure o SMTP na administração antes de enviar devocionais.');
+    final semSmtp = (await chamar('POST', '/api/devocionais/$id/email', dados: selecao())).$2;
+    expect([semSmtp['enviados'], semSmtp['falhas'], semSmtp['incertos']], [0, 1, 0]);
+    expect(semSmtp['aviso'], contains('SMTP'));
+    transporte = (e) async { emails.add(e); };
+    expect((await chamar('POST', '/api/devocionais/$id/email', dados: selecao())).$2['enviados'], 1);
+  });
+
   test('prévia segura, deduplicação, tema, confirmação manual e recibos persistentes', () async {
     final t = await assinar('ana@exemplo.test'); await confirmar(t);
     final outro = await assinar('familia@exemplo.test', temas: ['familia']); await confirmar(outro);
@@ -463,6 +515,8 @@ void main() {
       final (_, painel) = await chamar('GET', '/api/devocionais/$id');
       expect(painel['status'], 'publicado');
       expect(painel['envioAutomatico']['enviados'], 1);
+      expect(painel['historicoEnvios'].single, containsPair('tipo', 'automatico'));
+      expect(painel['historicoEnvios'].single['enviados'], 1);
       expect((await chamar('GET', '/api/devocionais/$id/envios')).$2['enviados'], 1);
       // Rodar de novo não publica nem envia outra vez.
       expect(await devocionais.processarAgendados(), 0);

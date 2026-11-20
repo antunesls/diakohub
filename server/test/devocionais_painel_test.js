@@ -28,6 +28,17 @@ test('página própria no menu de Comunicação, com abas e script antes do pain
   assert.match(html, /id="projetar-qr-devocional"/);
 });
 
+// Botão principal do painel "Publicação" (o texto muda conforme a escolha).
+function principalDevocional(editor) { return todos(editor).find((n) => n.tag === 'button' && /^(Publicar|Agendar|Enviar aos|Salvar alterações)/.test(n.children[0] || '')); }
+function campoDevocional(editor, id) { return todos(editor).find((n) => n.props.id === id); }
+function marcarAgendar(a, editor) {
+  campoDevocional(editor, 'devocional-quando-agendar').checked = true;
+  campoDevocional(editor, 'devocional-quando-agora').checked = false;
+  campoDevocional(editor, 'devocional-quando-agendar').events.change({ target: {} });
+  return a.nos.get('devocional-editor');
+}
+const textosDe = (no) => todos(no).flatMap((n) => (n.children || []).filter((c) => typeof c === 'string'));
+
 test('editor: trilhas ativas (e a desativada que o devocional já tinha), série e agendamento', () => {
   const a = devocionais();
   a.run("abrirEditorDevocional({id:'d',titulo:'T',trilhas:['antiga'],serie:'Frutos',serieParte:2,status:'rascunho'}, true)");
@@ -36,7 +47,10 @@ test('editor: trilhas ativas (e a desativada que o devocional já tinha), série
   a.run("abrirEditorDevocional({}, true)");
   // Novo: só as ativas, já com a primeira marcada.
   assert.deepEqual(caixas(a.nos.get('devocional-editor')).map((c) => [c.props.value, c.checked]), [['casais', true], ['jovens', false]]);
-  assert.ok(botaoTexto(a.nos.get('devocional-editor'), 'Agendar'));
+  // Publicar agora com envio aos assinantes é o padrão; agendar troca o botão principal.
+  assert.match(principalDevocional(a.nos.get('devocional-editor')).children[0], /^Publicar e enviar/);
+  marcarAgendar(a, a.nos.get('devocional-editor'));
+  assert.match(principalDevocional(a.nos.get('devocional-editor')).children[0], /^Agendar e enviar/);
 });
 
 test('agendar exige horário e manda trilhas, série e envio automático', async () => {
@@ -44,40 +58,83 @@ test('agendar exige horário e manda trilhas, série e envio automático', async
   const requests = [];
   a.contexto.api = async (metodo, url, corpo) => { requests.push({ metodo, url, corpo }); return metodo === 'POST' ? { id: 'novo', ...corpo } : []; };
   a.run("abrirEditorDevocional({titulo:'Amor',texto:'Refletir',aplicacao:'Praticar',oracao:'Orar'})");
-  const editor = a.nos.get('devocional-editor');
-  await botaoTexto(editor, 'Agendar').props.onclick();
+  const editor = marcarAgendar(a, a.nos.get('devocional-editor'));
+  await principalDevocional(editor).props.onclick();
   assert.ok(!requests.some((r) => r.metodo === 'POST'), 'sem horário não agenda');
-  const campo = (id) => todos(editor).find((n) => n.props.id === id);
-  campo('devocional-publicarEm').value = '2026-11-20T07:00';
-  campo('devocional-serie').value = 'Frutos do Espírito';
-  campo('devocional-serieParte').value = '3';
-  campo('devocional-enviarAoPublicar').checked = true;
+  campoDevocional(editor, 'devocional-publicarEm').value = '2026-11-20T07:00';
+  campoDevocional(editor, 'devocional-serie').value = 'Frutos do Espírito';
+  campoDevocional(editor, 'devocional-serieParte').value = '3';
+  campoDevocional(editor, 'devocional-enviarAoPublicar').checked = true;
   caixas(editor).find((c) => c.props.value === 'jovens').checked = true;
-  await botaoTexto(editor, 'Agendar').props.onclick();
-  const corpo = requests.find((r) => r.metodo === 'POST').corpo;
+  await principalDevocional(a.nos.get('devocional-editor')).props.onclick();
+  const corpo = requests.find((r) => r.metodo === 'POST' && r.url === '/api/devocionais').corpo;
   assert.equal(corpo.status, 'agendado');
   assert.equal(corpo.publicarEm, '2026-11-20T07:00');
   assert.equal(corpo.enviarAoPublicar, true);
   assert.equal(JSON.stringify(corpo.trilhas), JSON.stringify(['casais', 'jovens']));
   assert.equal(corpo.serie, 'Frutos do Espírito');
   assert.equal(corpo.serieParte, 3);
+  assert.ok(!requests.some((r) => r.url.endsWith('/email')), 'agendar não envia na hora');
 });
 
-test('publicação primeiro apresenta prévia, depois salva todos os campos sem enviar email', async () => {
+test('publicar e enviar pede confirmação na tela, grava, envia aos assinantes e mostra o recibo', async () => {
   const a = devocionais();
   const requests = [];
-  a.contexto.api = async (metodo, url, corpo) => { requests.push({ metodo, url, corpo }); return metodo === 'POST' ? { id: 'novo' } : []; };
+  a.contexto.api = async (metodo, url, corpo) => {
+    requests.push({ metodo, url, corpo });
+    if (url.startsWith('/api/devocionais/assinantes/contagem')) return { total: 37, porTrilha: { casais: 37 } };
+    if (metodo === 'POST' && url === '/api/devocionais') return { id: 'novo', ...corpo };
+    if (url.endsWith('/email')) return { enviados: 36, falhas: 1, incertos: 0, ignorados: 0 };
+    if (url === '/api/devocionais/novo') return { id: 'novo', status: 'publicado', envio: { enviados: 36, falhas: 1, incertos: 0 },
+      historicoEnvios: [{ tipo: 'manual', em: '2026-11-20T09:51:00', por: 'Líder', enviados: 36, falhas: 1, assinantes: true }] };
+    if (url.endsWith('/previa-email')) return { aEnviar: 1, total: 37 };
+    return [];
+  };
   a.run("abrirEditorDevocional({titulo:'Amor',texto:'Refletir',aplicacao:'Praticar',oracao:'Orar'})");
-  const editor = a.nos.get('devocional-editor');
-  await botaoTexto(editor, 'Publicar agora').props.onclick();
-  assert.equal(requests.length, 0, 'prévia deve ser visível antes da decisão de publicar');
-  await botaoTexto(editor, 'Confirmar publicação').props.onclick();
-  const gravacao = requests.find((r) => r.metodo === 'POST');
-  assert.equal(gravacao.corpo.texto, 'Refletir');
-  assert.equal(gravacao.corpo.aplicacao, 'Praticar');
-  assert.equal(gravacao.corpo.oracao, 'Orar');
+  await new Promise((r) => setTimeout(r, 0));
+  assert.equal(principalDevocional(a.nos.get('devocional-editor')).children[0], 'Publicar e enviar a 37 assinantes');
+  await principalDevocional(a.nos.get('devocional-editor')).props.onclick();
+  assert.equal(requests.filter((r) => r.metodo !== 'GET').length, 0, 'primeiro a pergunta na tela, sem gravar nada');
+  await botaoTexto(a.nos.get('devocional-editor'), 'Sim, publicar e enviar').props.onclick();
+  await new Promise((r) => setTimeout(r, 0));
+  const gravacao = requests.find((r) => r.metodo === 'POST' && r.url === '/api/devocionais');
   assert.equal(gravacao.corpo.status, 'publicado');
-  assert.ok(!requests.some((r) => r.url.includes('email')));
+  assert.equal(gravacao.corpo.texto, 'Refletir');
+  assert.equal(gravacao.corpo.enviarAoPublicar, false, 'o envio é feito agora, não pelo agendador');
+  const envio = requests.find((r) => r.url === '/api/devocionais/novo/email');
+  assert.deepEqual(JSON.parse(JSON.stringify(envio.corpo)), { membrosIds: [], incluirAssinantes: true, confirmar: true });
+  const editor = a.nos.get('devocional-editor');
+  assert.ok(textosDe(editor).includes('✓ Enviado a 36 pessoas'), 'recibo do envio');
+  assert.ok(textosDe(editor).some((t) => t.startsWith('Enviado a 36 assinantes · 1 falha')), 'histórico');
+  assert.equal(principalDevocional(editor).children[0], 'Enviar aos 1 que faltam', 'a falha pode ser reenviada');
+});
+
+test('publicar sem enviar não chama o envio de e-mail', async () => {
+  const a = devocionais();
+  const requests = [];
+  a.contexto.api = async (metodo, url, corpo) => { requests.push({ metodo, url, corpo }); return metodo === 'POST' && url === '/api/devocionais' ? { id: 'novo', ...corpo } : []; };
+  a.run("abrirEditorDevocional({titulo:'Amor',texto:'Refletir',aplicacao:'Praticar',oracao:'Orar'})");
+  const interruptor = campoDevocional(a.nos.get('devocional-editor'), 'devocional-enviarAoPublicar');
+  interruptor.checked = false;
+  interruptor.events.change({ target: {} });
+  assert.equal(principalDevocional(a.nos.get('devocional-editor')).children[0], 'Publicar agora');
+  await principalDevocional(a.nos.get('devocional-editor')).props.onclick();
+  await botaoTexto(a.nos.get('devocional-editor'), 'Sim, publicar').props.onclick();
+  assert.equal(requests.find((r) => r.metodo === 'POST' && r.url === '/api/devocionais').corpo.status, 'publicado');
+  assert.ok(!requests.some((r) => r.url.endsWith('/email')));
+});
+
+test('teste para mim grava o rascunho antes e chama o endpoint de teste', async () => {
+  const a = devocionais();
+  const requests = [];
+  a.contexto.api = async (metodo, url, corpo) => { requests.push({ metodo, url, corpo }); return metodo === 'GET' ? [] : url === '/api/devocionais' ? { id: 'novo', ...corpo } : { ok: true }; };
+  a.run("abrirEditorDevocional({titulo:'Amor',texto:'Refletir',aplicacao:'Praticar',oracao:'Orar'})");
+  await botaoTexto(a.nos.get('devocional-editor'), 'Enviar um teste para mim').props.onclick();
+  const editor = a.nos.get('devocional-editor');
+  campoDevocional(editor, 'devocional-email-teste').value = 'eu@igreja.test';
+  await botaoTexto(editor, 'Enviar teste').props.onclick();
+  assert.equal(requests.find((r) => r.url === '/api/devocionais').corpo.status, 'rascunho');
+  assert.deepEqual(JSON.parse(JSON.stringify(requests.find((r) => r.url.endsWith('/teste')).corpo)), { email: 'eu@igreja.test' });
 });
 
 test('edição não salva pede confirmação antes de fechar e rascunho não compartilha link', () => {
