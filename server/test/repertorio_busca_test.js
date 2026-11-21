@@ -29,15 +29,12 @@ test('filtros por disponibilidade e tom tratam dados anteriores e tons equivalen
   assert.deepEqual(buscarRepertorio(musicas, { status: 'OK', tom: 'A#m' }).map((m) => m.titulo), ['Santo Pra Sempre']);
 });
 
-test('painel oferece busca, filtros e edição de tom e status sem checkbox conflitante', () => {
+test('painel monta o repertório por script, com o CSS próprio e a busca antes', () => {
   const html = fs.readFileSync(path.join(__dirname, '../web/painel.html'), 'utf8');
-  assert.match(html, /id="repertorio-filtro-status"/);
-  assert.match(html, /id="repertorio-filtro-tom"/);
-  assert.match(html, /id="repertorio-contagem"/);
-  assert.match(html, /id="repertorio-limpar"/);
-  assert.match(html, /<select id="rep-tomSelecionado"/);
-  assert.match(html, /<select id="rep-status"/);
-  assert.doesNotMatch(html, /id="rep-ativo"/);
+  assert.match(html, /id="repertorio-tela"/);
+  assert.match(html, /\/repertorio\.css\?v=\d+/);
+  assert.doesNotMatch(html, /id="dlg-repertorio"/, 'a janela antiga de edição saiu');
+  assert.match(html, /id="dlg-importar-repertorio"/);
   const busca = html.indexOf('/repertorio-busca.js?v=2');
   const repertorio = html.match(/\/repertorio\.js\?v=(\d+)/);
   assert.ok(busca >= 0 && repertorio && Number(repertorio[1]) >= 2 && busca < html.indexOf(repertorio[0]));

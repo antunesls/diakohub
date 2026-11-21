@@ -79,7 +79,7 @@ test('seletor do painel tem tabela ordenável com prévia e Minha escala tem a b
   const html = fs.readFileSync(path.join(__dirname, '../web/painel.html'), 'utf8');
   const script = fs.readFileSync(path.join(__dirname, '../web/escalas.js'), 'utf8');
   const minha = fs.readFileSync(path.join(__dirname, '../web/minha-escala.html'), 'utf8');
-  for (const id of ['seletor-musica-tabela', 'seletor-musica-cabecalho', 'seletor-musica-previa', 'seletor-musica-tons', 'seletor-musica-andamento', 'rep-primeiraNota']) {
+  for (const id of ['seletor-musica-tabela', 'seletor-musica-cabecalho', 'seletor-musica-previa', 'seletor-musica-tons', 'seletor-musica-andamento']) {
     assert.ok(html.includes(`id="${id}"`), id);
   }
   assert.match(script, /\/api\/repertorio\/uso/);

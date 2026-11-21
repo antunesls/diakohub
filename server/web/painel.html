@@ -7,6 +7,7 @@
 <link rel="icon" href="/logo.png" type="image/png">
 <link rel="stylesheet" href="/estilo.css?v=5">
 <link rel="stylesheet" href="/casais.css?v=8">
+<link rel="stylesheet" href="/repertorio.css?v=1">
 <style>
   .topo {
     display: flex; flex-wrap: wrap; align-items: center; gap: 16px;
@@ -54,7 +55,6 @@
   .status-linha { display: flex; justify-content: space-between; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--linha); }
   .ponto { display: inline-block; width: 10px; height: 10px; border-radius: 5px; margin-right: 6px; }
   dialog { border: 0; border-radius: 16px; padding: 24px; width: min(560px, calc(100vw - 32px)); }
-  #dlg-repertorio { width: min(720px, calc(100vw - 32px)); max-height: 90dvh; overflow-y: auto; }
   .repertorio-filtros { display: grid; grid-template-columns: minmax(240px, 2fr) repeat(2, minmax(140px, 1fr)); gap: 12px; align-items: end; margin-bottom: 10px; }
   @media (max-width: 740px) { .repertorio-filtros { grid-template-columns: repeat(2, minmax(0, 1fr)); } .repertorio-filtros .campo:first-child { grid-column: 1 / -1; } }
   dialog::backdrop { background: rgba(0,0,0,.45); }
@@ -610,21 +610,8 @@
     </section>
 
     <section data-painel="repertorio" hidden>
-      <div class="barra">
-        <h1>Repertório</h1><span class="espaco"></span>
-        <button type="button" class="botao secundario pequeno" id="repertorio-importar" data-permissao="escalaLouvor">Importar CSV</button>
-        <button type="button" class="botao pequeno" id="repertorio-novo" data-permissao="escalaLouvor">+ Música</button>
-      </div>
-      <p class="dica">As músicas ativas podem ser escolhidas na escala. A planilha serve para a importação; depois, mantenha o repertório aqui.</p>
-      <div class="repertorio-filtros">
-        <div class="campo"><label for="repertorio-busca">Buscar música</label><input id="repertorio-busca" type="search" placeholder="Título, cantor ou compositor; aceita pequenos erros" autocomplete="off"></div>
-        <div class="campo"><label for="repertorio-filtro-status">Status</label><select id="repertorio-filtro-status"><option value="">Todos</option><option value="OK">OK · disponível</option><option value="Em análise">Em análise</option><option value="Inativo">Inativo</option></select></div>
-        <div class="campo"><label for="repertorio-filtro-tom">Tom Diakonia</label><select id="repertorio-filtro-tom"></select></div>
-      </div>
-      <button type="button" class="botao secundario pequeno" id="repertorio-limpar">Limpar busca e filtros</button>
-      <p id="repertorio-contagem" class="dica" role="status"></p>
-      <p id="repertorio-resultado" role="status"></p>
-      <div id="repertorio-lista"></div>
+      <!-- Planilha, ficha da música e "Completar cadastro" são montados por repertorio.js. -->
+      <div id="repertorio-tela"></div>
     </section>
 
     <section data-painel="roteiros" hidden>
@@ -1232,36 +1219,6 @@
   <div class="dialogo-acoes"><span class="dica atalhos"><kbd>↑</kbd> <kbd>↓</kbd> navegar · <kbd>Enter</kbd> ou duplo clique escolhe · <kbd>Esc</kbd> volta</span><button type="button" class="botao secundario" id="seletor-musica-fechar">Voltar à escala</button></div>
 </dialog>
 
-<dialog id="dlg-repertorio">
-  <form method="dialog">
-    <h2 id="repertorio-dialogo-titulo">Música do repertório</h2>
-    <div class="campo"><label for="rep-titulo">Louvor</label><input id="rep-titulo" maxlength="120" required></div>
-    <div class="campo"><label for="rep-cantor">Cantor / intérprete</label><input id="rep-cantor" maxlength="120" required></div>
-    <div class="campo"><label for="rep-compositor">Compositor</label><input id="rep-compositor" maxlength="400"></div>
-    <div class="grade2">
-      <div class="campo"><label for="rep-ano">Ano</label><input id="rep-ano" maxlength="40"></div>
-      <div class="campo"><label for="rep-bpm">BPM</label><input id="rep-bpm" maxlength="40"></div>
-    </div>
-    <div class="grade2">
-      <div class="campo"><label for="rep-tomOriginal">Tom original <span class="dica">(como consta na fonte)</span></label><input id="rep-tomOriginal" maxlength="120"></div>
-      <div class="campo"><label for="rep-tomSelecionado">Tom Diakonia para a escala</label><select id="rep-tomSelecionado"></select></div>
-    </div>
-    <div class="grade2">
-      <div class="campo"><label for="rep-primeiraNota">Primeira nota <span class="dica">(em que a voz entra, no Tom Diakonia)</span></label><select id="rep-primeiraNota"></select></div>
-      <p class="dica" style="align-self:end;margin:0 0 14px">Se a escala mudar o tom, a nota é transposta junto.</p>
-    </div>
-    <div class="campo"><label for="rep-tomDiakonia">Anotações antigas do tom <span class="dica">(preservadas; não mudam o tom selecionado)</span></label><textarea id="rep-tomDiakonia" maxlength="500"></textarea></div>
-    <div class="campo"><label for="rep-referencia">Referência / link da versão</label><input id="rep-referencia" maxlength="500"></div>
-    <div class="campo"><label for="rep-solicitadoPor">Solicitado por</label><input id="rep-solicitadoPor" maxlength="120"></div>
-    <div class="campo"><label for="rep-observacoes">Observações</label><textarea id="rep-observacoes" maxlength="4000"></textarea></div>
-    <div class="campo"><label for="rep-status">Status</label><select id="rep-status"><option value="OK">OK · disponível para novas escalas</option><option value="Em análise">Em análise · indisponível</option><option value="Inativo">Inativo · indisponível</option></select></div>
-    <div class="campo"><label for="rep-biografiaCantor">Biografia cantor</label><textarea id="rep-biografiaCantor" maxlength="10000"></textarea></div>
-    <div class="campo"><label for="rep-biografiaCompositor">Biografia compositor</label><textarea id="rep-biografiaCompositor" maxlength="10000"></textarea></div>
-    <p class="erro" id="rep-erro" hidden></p>
-    <div class="dialogo-acoes"><button class="botao secundario" value="cancelar" formnovalidate>Cancelar</button><button class="botao" value="salvar">Salvar</button></div>
-  </form>
-</dialog>
-
 <dialog id="dlg-importar-repertorio">
   <form method="dialog">
     <h2>Importar repertório</h2>
@@ -1666,7 +1623,7 @@
 <script src="/ministerios.js?v=1"></script>
 <script src="/repertorio-busca.js?v=2"></script>
 <script src="/musica-youtube.js?v=1"></script>
-<script src="/repertorio.js?v=4"></script>
+<script src="/repertorio.js?v=5"></script>
 <script src="/roteiros.js?v=1"></script>
 <script src="/palavras-pdf.js?v=1"></script>
 <script src="/palavras-ensaio.js?v=1"></script>
