@@ -54,6 +54,10 @@ test('busca exige mínimo de dois caracteres e seleciona sem inscrição automá
 });
 
 const todos = no => [no, ...(no.children || []).filter(v => v && typeof v === 'object').flatMap(todos)];
+// Abre o detalhe de todas as inscrições da aba Inscritos (cada clique redesenha a lista).
+function abrirDetalhes(a) {
+  for (let b; (b = todos(a.raiz).find(n => n.tag === 'button' && n.children.includes('Detalhes')));) b.props.onclick();
+}
 test('consulta, resumo e busca nunca passam null a replaceChildren', async () => {
   const consulta = ambiente(false);
   await consulta.run('carregarEncontros()');
@@ -68,7 +72,11 @@ test('consulta, resumo e busca nunca passam null a replaceChildren', async () =>
     ? [{ id: 'i', estado: 'confirmada', participantes: [{ id: 'p', nome: 'Ana', confirmado: false }] }]
     : url.endsWith('/tarefas') ? [] : { id: 'e', estado: 'aberto', titulo: 'Jantar' });
   await detalhes.run('detalheEncontro("e")');
-  assert.ok(todos(detalhes.body).every(n => !n.children.includes(null)), 'participante sem confirmação não pode escrever null');
+  todos(detalhes.raiz).find(n => n.tag === 'button' && n.children.includes('Detalhes')).props.onclick();
+  for (const aba of ['inscritos', 'checkin', 'divulgar', 'tarefas', 'roteiro']) {
+    await detalhes.run(`detalheEncontro("e", "${aba}")`);
+    assert.ok(todos(detalhes.raiz).every(n => !n.children.includes(null)), `aba ${aba} não pode escrever null`);
+  }
 });
 test('inscrição envia confirmação individual explícita e responsável selecionado', async () => {
   const a = ambiente(true, (metodo, url) => url.includes('pessoas?') ? [{id: 'a', nome: '<Ana>'}] : []);
@@ -89,20 +97,75 @@ test('inscrição envia confirmação individual explícita e responsável selec
   assert.equal(envio.corpo.participantes[0].confirmado, true);
   assert.equal(envio.corpo.participantes[0].crianca, false);
 });
-test('detalhes carregam inscrições/tarefas e presença chama caminho por IDs', async () => {
+test('encontro abre como página no lugar da lista e "Encontros" volta para a lista', async () => {
   const a = ambiente(true, (_, url) => {
-    if (url.endsWith('/inscricoes')) return [{id:'i', estado:'confirmada', participantes:[{id:'p', membroId:'a', nome:'Ana', confirmado:true}]}];
-    if (url.endsWith('/tarefas')) return [];
-    return {id:'e', titulo:'Jantar', estado:'aberto'};
+    if (url.endsWith('/inscricoes') || url.endsWith('/tarefas')) return [];
+    if (url === '/api/encontros/e') return { id: 'e', titulo: 'Jantar', estado: 'aberto', vagasOcupadas: 3, emEspera: 2, capacidade: 10, vagasDisponiveis: 7 };
+    return [];
   });
   await a.run('detalheEncontro("e")');
-  const dlg = a.body.children[0];
-  todos(dlg).find(n => n.tag === 'button' && n.children.includes('Registrar presença')).props.onclick();
-  const confirmacao = a.body.children[1];
-  await todos(confirmacao).find(n => n.tag === 'form').events.submit({preventDefault() {}});
-  const envio = a.chamadas.find(c => c.metodo === 'PUT');
-  assert.equal(envio.url, '/api/inscricoes/i/participantes/p/presenca');
-  assert.equal(envio.corpo.presente, true);
+  assert.equal(a.body.children.length, 0, 'não abre janela');
+  const textos = todos(a.raiz).flatMap(n => n.children.filter(f => typeof f === 'string')).join(' ');
+  assert.match(textos, /3 de 10/);
+  assert.match(textos, /7 vagas disponíveis/);
+  assert.match(textos, /2 na espera/);
+  for (const aba of ['Inscritos', 'Check-in', 'Divulgar', 'Tarefas', 'Roteiro'])
+    assert.ok(todos(a.raiz).some(n => n.props?.role === 'tab' && n.children.includes(aba)), aba);
+  await todos(a.raiz).find(n => n.tag === 'button' && n.children.includes('‹ Encontros')).props.onclick();
+  assert.ok(a.chamadas.some(c => c.url === '/api/encontros'), 'recarrega a lista');
+  assert.equal(a.run('encontroAberto'), null);
+});
+test('check-in marca chegada direto (confirmando quem faltava) e desfaz', async () => {
+  const a = ambiente(true, (_, url) => {
+    if (url.endsWith('/inscricoes')) return [
+      { id: 'i', estado: 'confirmada', responsavelMembroId: 'a', participantes: [{ id: 'p', membroId: 'a', nome: 'Ana', confirmado: true }, { id: 'q', nomeAcompanhante: 'Bruno', confirmado: false }] },
+      { id: 'w', estado: 'espera', participantes: [{ id: 'r', nomeAcompanhante: 'Esperando', confirmado: true }] },
+    ];
+    if (url.endsWith('/tarefas')) return [];
+    return { id: 'e', titulo: 'Jantar', estado: 'aberto' };
+  });
+  await a.run('detalheEncontro("e", "checkin")');
+  const pessoa = nome => todos(a.raiz).find(n => n.tag === 'button' && n.props?.['aria-pressed'] != null && todos(n).some(f => f.children.includes(nome)));
+  assert.equal(pessoa('Esperando'), undefined, 'lista de espera não aparece no check-in');
+  await pessoa('Ana').props.onclick();
+  assert.deepEqual(JSON.parse(JSON.stringify(a.chamadas.at(-1))), { metodo: 'PUT', url: '/api/inscricoes/i/participantes/p/presenca', corpo: { presente: true } });
+  assert.equal(a.body.children.length, 0, 'sem janela de confirmação');
+  await pessoa('Bruno').props.onclick();
+  assert.deepEqual(JSON.parse(JSON.stringify(a.chamadas.at(-1).corpo)), { confirmado: true, presente: true });
+  assert.equal(pessoa('Ana').props['aria-pressed'], 'true');
+  const textos = todos(a.raiz).flatMap(n => [n.textContent || '', ...n.children.filter(f => typeof f === 'string')]).join(' ');
+  assert.match(textos, /2 de 2 chegaram/);
+  await pessoa('Ana').props.onclick();
+  assert.deepEqual(JSON.parse(JSON.stringify(a.chamadas.at(-1).corpo)), { presente: false });
+});
+test('aba Inscritos busca sem acento e filtra pela lista de espera', async () => {
+  const a = ambiente(true, (_, url) => {
+    if (url.endsWith('/inscricoes')) return [
+      { id: 'c', estado: 'confirmada', responsavelNome: 'João', criadoEm: '1', participantes: [{ id: 'p', nomeAcompanhante: 'João', titular: true }] },
+      { id: 'w', estado: 'espera', origem: 'link', responsavelNome: 'Paula', whatsapp: '5511988887777', criadoEm: '2', participantes: [{ id: 'q', nomeAcompanhante: 'Paula', titular: true }] },
+    ];
+    if (url.endsWith('/tarefas')) return [];
+    return { id: 'e', titulo: 'Retiro', estado: 'aberto' };
+  });
+  await a.run('detalheEncontro("e")');
+  const titulos = () => todos(a.raiz).flatMap(n => n.children.filter(f => typeof f === 'string' && f.startsWith('Inscrição de ')));
+  const busca = todos(a.raiz).find(n => n.props?.['aria-label'] === 'Buscar inscrição');
+  busca.value = 'joao'; busca.events.input();
+  assert.deepEqual(titulos(), ['Inscrição de João']);
+  busca.value = '98888'; busca.events.input();
+  assert.deepEqual(titulos(), ['Inscrição de Paula'], 'acha pelo WhatsApp');
+  busca.value = ''; busca.events.input();
+  todos(a.raiz).find(n => n.tag === 'button' && n.children.includes('Lista de espera')).props.onclick();
+  assert.deepEqual(titulos(), ['Inscrição de Paula']);
+  await a.run('detalheEncontro("e")');
+  assert.deepEqual(titulos(), ['Inscrição de Paula'], 'filtro continua depois de recarregar');
+});
+test('tarefa pendente conclui com um clique', async () => {
+  const a = ambiente(true, (_, url) => url.endsWith('/tarefas') ? [{ id: 't', descricao: 'Comprar pão', estado: 'pendente' }]
+    : url.endsWith('/inscricoes') ? [] : { id: 'e', titulo: 'Jantar', estado: 'aberto' });
+  await a.run('detalheEncontro("e", "tarefas")');
+  await todos(a.raiz).find(n => n.tag === 'button' && n.children.includes('Concluir')).props.onclick();
+  assert.ok(a.chamadas.some(c => c.metodo === 'PUT' && c.url === '/api/encontros/tarefas/t' && c.corpo.estado === 'concluida'));
 });
 test('tarefa busca somente responsáveis limitados e envia campos operacionais', async () => {
   const a = ambiente(true, (_, url) => url.endsWith('/responsaveis') ? [{id:'l', nome:'Líder'}] : []);
@@ -174,8 +237,8 @@ test('roteiro exibe e copia snapshots em ordem sem expor inscritos', async () =>
   });
   // Helper aparece depois do script de encontros, como no painel real.
   a.run('function textoMaterial(m) { return m.titulo + "\\n" + m.objetivo; }');
-  await a.run('detalheEncontro("e")');
-  const dlg = a.body.children[0];
+  await a.run('detalheEncontro("e", "roteiro")');
+  const dlg = a.raiz;
   const copiar = todos(dlg).find(n => n.tag === 'button' && n.children.includes('Copiar roteiro utilizado'));
   assert.ok(copiar);
   await copiar.props.onclick();
@@ -198,8 +261,8 @@ test('tarefa exibe o nome autorizado do responsável em vez de seu ID', async ()
   const a = ambiente(false, (_, url) => url.endsWith('/tarefas')
     ? [{id:'t', descricao:'Recepção', estado:'pendente', responsavelUsuarioId:'id-interno', responsavelNome:'Liderança Teste'}]
     : url.endsWith('/inscricoes') ? [] : {id:'e', titulo:'Encontro', estado:'aberto'});
-  await a.run('detalheEncontro("e")');
-  const texto = todos(a.body).flatMap(n => n.children.filter(f => typeof f === 'string')).join(' ');
+  await a.run('detalheEncontro("e", "tarefas")');
+  const texto = todos(a.raiz).flatMap(n => n.children.filter(f => typeof f === 'string')).join(' ');
   assert.match(texto, /Liderança Teste/);
   assert.doesNotMatch(texto, /id-interno/);
 });
@@ -237,10 +300,10 @@ test('excluir encontro só aparece com Administração e chama DELETE após conf
   const semAdmin = ambiente(true, responder);
   semAdmin.run("pode = p => p === 'encontros'");
   await semAdmin.run('detalheEncontro("e")');
-  assert.ok(!todos(semAdmin.body).some(n => n.tag === 'button' && n.children.includes('Excluir encontro')));
+  assert.ok(!todos(semAdmin.raiz).some(n => n.tag === 'button' && n.children.includes('Excluir encontro')));
   const comAdmin = ambiente(true, responder);
   await comAdmin.run('detalheEncontro("e")');
-  const excluir = todos(comAdmin.body).find(n => n.tag === 'button' && n.children.includes('Excluir encontro'));
+  const excluir = todos(comAdmin.raiz).find(n => n.tag === 'button' && n.children.includes('Excluir encontro'));
   assert.ok(excluir, 'aparece mesmo em encontro cancelado');
   excluir.props.onclick();
   const confirmacao = comAdmin.body.children.at(-1);
@@ -253,12 +316,12 @@ test('excluir encontro só aparece com Administração e chama DELETE após conf
 
 test('link público: desligado oferece ativar; ligado mostra endereço, QR e ações', async () => {
   const desligado = ambiente(true, (_, url) => url.endsWith('/inscricoes') || url.endsWith('/tarefas') ? [] : { id: 'e', titulo: 'Retiro', estado: 'aberto' });
-  await desligado.run('detalheEncontro("e")');
-  assert.ok(todos(desligado.body).some(n => n.tag === 'button' && n.children.includes('Ativar inscrições pelo link')));
+  await desligado.run('detalheEncontro("e", "divulgar")');
+  assert.ok(todos(desligado.raiz).some(n => n.tag === 'button' && n.children.includes('Ativar inscrições pelo link')));
   const ligado = ambiente(true, (metodo, url) => url.endsWith('/inscricoes') || url.endsWith('/tarefas') ? []
     : { id: 'e', titulo: 'Retiro', estado: 'aberto', inicio: '2026-12-10T08:00', linkInscricao: { ativo: true, codigo: 'abcdefghijkl', ate: '2026-12-01', pergunta: 'Vai de carona?' } });
-  await ligado.run('detalheEncontro("e")');
-  const nos = todos(ligado.body);
+  await ligado.run('detalheEncontro("e", "divulgar")');
+  const nos = todos(ligado.raiz);
   assert.equal(nos.find(n => n.props?.['aria-label'] === 'Endereço de inscrição').value, 'https://igreja.test/inscricao/abcdefghijkl');
   assert.ok(nos.some(n => n.tag === 'img' && n.props.src === '/inscricao/abcdefghijkl/qr.png'));
   const textos = nos.flatMap(n => n.children.filter(f => typeof f === 'string')).join(' ');
@@ -284,7 +347,8 @@ test('inscrição pelo link mostra contato e resposta; lista de espera tem "Conf
     return { id: 'e', titulo: 'Retiro', estado: 'aberto', linkInscricao: { ativo: false, pergunta: 'Vai de carona?' } };
   });
   await a.run('detalheEncontro("e")');
-  const nos = todos(a.body);
+  abrirDetalhes(a);
+  const nos = todos(a.raiz);
   const textos = nos.flatMap(n => n.children.filter(f => typeof f === 'string')).join(' ');
   assert.ok(textos.indexOf('Inscrição de Maria') < textos.indexOf('Inscrição de Pedro'), 'confirmadas antes da espera');
   assert.match(textos, /WhatsApp \(11\) 91111-1111/);
@@ -311,7 +375,8 @@ test('quem se inscreveu pelo link não aparece como acompanhante; vaga no singul
     participantes: [{ id: 't', nomeAcompanhante: 'Maria', titular: true, confirmado: true }, { id: 'f', nomeAcompanhante: 'João', crianca: true, confirmado: true }] }]
     : url.endsWith('/tarefas') ? [] : { id: 'e', titulo: 'Retiro', estado: 'aberto', vagasOcupadas: 2, vagasDisponiveis: 1 });
   await a.run('detalheEncontro("e")');
-  const textos = todos(a.body).flatMap(n => n.children.filter(f => typeof f === 'string')).join(' ');
+  abrirDetalhes(a);
+  const textos = todos(a.raiz).flatMap(n => n.children.filter(f => typeof f === 'string')).join(' ');
   assert.equal((textos.match(/Acompanhante/g) || []).length, 1, 'só o João é acompanhante');
   assert.match(textos, /1 vaga disponível/);
 });

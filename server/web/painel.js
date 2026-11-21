@@ -2538,7 +2538,9 @@ function conectarTempoReal() {
       (abaAtual === 'casais' && tipo.startsWith('casais') && !casaisEdicao && !document.querySelector('dialog[open]')) ||
       (abaAtual === 'encontros' && ['encontros', 'inscricoes', 'tarefasEncontros', 'materiais', 'tiposMaterial'].includes(tipo) &&
         !document.querySelector('dialog[open]') && !document.querySelector('#encontros-materiais form'))) {
-      carregar[abaAtual]();
+      // Com um encontro aberto, atualiza a página dele em vez de voltar para a lista.
+      if (abaAtual === 'encontros' && typeof atualizarEncontrosAoVivo === 'function') atualizarEncontrosAoVivo();
+      else carregar[abaAtual]();
     }
     if (abaAtual === 'inicio') carregarInicio();
   };

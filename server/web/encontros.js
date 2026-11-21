@@ -123,6 +123,7 @@ async function carregarEncontros() {
       if (b && b.dataset.encontrosAba !== encontrosAba) { mostrarAbaEncontros(b.dataset.encontrosAba); carregarEncontros(); }
     });
   }
+  encontroAberto = null;
   mostrarAbaEncontros(encontrosAba);
   try {
     await carregarMinisteriosEncontros();
@@ -179,7 +180,7 @@ async function tarefasPendentesEncontros(alvo, encontros) {
     el('div', { class: 'conteudo' },
       el('div', { class: 'titulo' }, t.descricao, ...(t.prazo && t.prazo < hoje ? [' ', el('span', { class: 'etiqueta alerta' }, 'Vencida')] : [])),
       el('p', { class: 'sub' }, [t.prazo ? `Prazo ${dataEncontro(t.prazo)}` : 'Sem prazo', t.encontro.titulo, t.responsavelNome].filter(Boolean).join(' · '))),
-    el('div', { class: 'acoes' }, botao('Ver tarefa no encontro', () => detalheEncontro(t.encontro.id)))))
+    el('div', { class: 'acoes' }, botao('Ver tarefa no encontro', () => detalheEncontro(t.encontro.id, 'tarefas')))))
     : [el('p', { class: 'vazio' }, 'Nenhuma tarefa pendente.')]));
 }
 
@@ -253,112 +254,319 @@ function prepararConviteEncontro(encontro) {
     }), compartilhar));
 }
 
-async function detalheEncontro(id) {
-  const janela = janelaEncontro('Detalhes do encontro');
+// Encontro aberto em página própria, no lugar da lista: id, aba atual e filtros
+// da aba Inscritos (mantidos ao salvar algo e recarregar o mesmo encontro).
+let encontroAberto = null;
+
+const abasEncontro = { inscritos: 'Inscritos', checkin: 'Check-in', divulgar: 'Divulgar', tarefas: 'Tarefas', roteiro: 'Roteiro' };
+const filtrosInscricao = {
+  todas: ['Todas', i => i.estado !== 'cancelada'],
+  confirmada: ['Confirmadas', i => i.estado === 'confirmada'],
+  espera: ['Lista de espera', i => i.estado === 'espera'],
+  link: ['Pelo link', i => i.origem === 'link' && i.estado !== 'cancelada'],
+  semcadastro: ['Sem cadastro', i => i.origem === 'link' && !i.responsavelMembroId && i.estado !== 'cancelada'],
+  cancelada: ['Canceladas', i => i.estado === 'cancelada'],
+};
+
+const nomeParticipanteEncontro = p => p.nome || p.nomeAcompanhante || 'Membro removido';
+function nomeInscricaoEncontro(i) {
+  const responsavel = (i.participantes || []).find(p => p.membroId && p.membroId === i.responsavelMembroId);
+  return responsavel?.nome || i.responsavelNome || 'pessoa removida';
+}
+/** Minúsculas sem acento, para a busca achar "joao" em "João". */
+const normalizarEncontro = texto => String(texto || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+const plural = (n, um, varios) => `${n} ${n === 1 ? um : varios}`;
+
+/** Abre o encontro como página, na aba pedida (ou na última aberta do mesmo encontro). */
+async function detalheEncontro(id, aba) {
+  const alvo = $('encontros-conteudo');
+  if (!alvo) return;
+  // Só volta ao topo ao abrir outro encontro ou trocar de aba, não ao recarregar o mesmo.
+  const rolar = encontroAberto?.id !== id || !!aba;
+  if (encontroAberto?.id !== id) encontroAberto = { id, aba: 'inscritos', filtro: 'todas', busca: '', buscaCheckin: '', abertas: new Set() };
+  if (aba && abasEncontro[aba]) encontroAberto.aba = aba;
+  mostrarAbaEncontros('encontros');
+  const voltar = el('button', { type: 'button', class: 'encontro-voltar', onclick: () => { encontroAberto = null; return carregarEncontros(); } }, '‹ Encontros');
   try {
     const [e, respostaI, respostaT] = await Promise.all([
       api('GET', caminhoEncontro(id)), api('GET', caminhoEncontro(id) + '/inscricoes'), api('GET', caminhoEncontro(id) + '/tarefas'),
     ]);
-    const gestao = pode('encontros'), ativo = e.estado !== 'cancelado';
-    const atualizar = async () => { janela.dlg.close(); await carregarEncontros(); await detalheEncontro(id); };
-    const c = janela.conteudo;
-    c.append(el('div', { class: 'titulo encontro-titulo' }, e.titulo || 'Encontro', ' ', etiquetaEncontro(e)),
-      el('p', { class: 'dica' }, `${nomeMinisterioEncontro(e.ministerioId)} · ${tiposEncontro[e.tipo] || 'Encontro'} · ${periodoEncontro(e)} · ${e.local || 'Local a definir'}`),
-      e.descricao ? el('p', { class: 'encontro-texto' }, e.descricao) : el('p', { class: 'dica' }, 'Sem descrição.'),
-      el('p', {}, vagasEncontro(e)));
-    if (gestao && ativo) c.append(el('div', { class: 'barra' },
-      e.estado === 'aberto' ? botao('Inscrever pessoas', () => formularioInscricao(e, atualizar), 'pequeno') : null,
-      botao('Editar encontro', () => formularioEncontro(e, atualizar)),
-      typeof montarRoteiroEncontro === 'function' ? botao('Montar roteiro', () => montarRoteiroEncontro(e, atualizar)) : null,
-      botao('Preparar convite', () => prepararConviteEncontro(e)),
-      botao('Cancelar encontro', () => confirmarEncontro('Cancelar encontro', 'Novas inscrições e presenças serão bloqueadas. O histórico será preservado.', async () => {
-        await api('POST', caminhoEncontro(id) + '/cancelar', {}); await atualizar();
-      }), 'perigo pequeno')));
-    if (gestao && ativo && e.estado !== 'aberto') c.append(el('p', { class: 'dica' }, 'Para receber inscrições, edite o encontro e mude a situação para "Aberto".'));
+    if (encontroAberto?.id !== id) return; // voltou para a lista enquanto carregava
+    paginaEncontro(alvo, voltar, e, listaEncontros(respostaI, 'inscricoes'), listaEncontros(respostaT, 'tarefas'));
+    if (rolar) globalThis.scrollTo?.(0, 0);
+  } catch (erro) { alvo.replaceChildren(voltar, el('p', { role: 'alert', class: 'erro' }, erro.message)); }
+}
+
+/**
+ * Tempo real: com um encontro aberto, recarrega a página dele (mesma aba, filtros e
+ * foco da busca) em vez de voltar à lista. No dia, dois tablets fazem check-in juntos.
+ */
+async function atualizarEncontrosAoVivo() {
+  if (!encontroAberto) return carregarEncontros();
+  const ativo = globalThis.document?.activeElement;
+  const rotulo = ativo?.closest?.('#encontros-conteudo') ? ativo.getAttribute('aria-label') : null;
+  const posicao = ativo?.selectionStart;
+  await detalheEncontro(encontroAberto.id);
+  if (!rotulo) return;
+  const campo = [...document.querySelectorAll('#encontros-conteudo [aria-label]')].find(n => n.getAttribute('aria-label') === rotulo);
+  campo?.focus();
+  if (posicao != null) campo?.setSelectionRange?.(posicao, posicao);
+}
+
+function paginaEncontro(alvo, voltar, e, inscricoes, tarefas) {
+  const estado = encontroAberto;
+  const gestao = pode('encontros'), ativo = e.estado !== 'cancelado';
+  const atualizar = () => detalheEncontro(e.id);
+  const ctx = { e, inscricoes, tarefas, gestao, ativo, atualizar };
+
+  // Menu "Mais": ações raras ou destrutivas, fora da vista.
+  const mais = [
+    gestao && ativo ? botao('Editar encontro', () => formularioEncontro(e, atualizar)) : null,
+    gestao && ativo ? botao('Cancelar encontro', () => confirmarEncontro('Cancelar encontro', 'Novas inscrições e presenças serão bloqueadas. O histórico será preservado.', async () => {
+      await api('POST', caminhoEncontro(e.id) + '/cancelar', {}); await atualizar();
+    }), 'perigo pequeno') : null,
     // Excluir de vez (só a Administração): para cadastros de teste ou feitos por engano.
-    // No dia a dia, prefira cancelar, que preserva o histórico.
-    if (gestao && pode('admin')) {
-      const qtdInscricoes = listaEncontros(respostaI, 'inscricoes').length, qtdTarefas = listaEncontros(respostaT, 'tarefas').length;
-      c.append(el('div', { class: 'barra' }, botao('Excluir encontro', () => confirmarEncontro('Excluir encontro',
-        `Excluir "${e.titulo || 'Encontro'}" com ${qtdInscricoes} ${qtdInscricoes === 1 ? 'inscrição' : 'inscrições'} e ${qtdTarefas} ${qtdTarefas === 1 ? 'tarefa' : 'tarefas'}? ` +
-        'Não dá para desfazer (só restaurando um backup). Para encerrar um encontro real, prefira "Cancelar encontro", que preserva o histórico.',
-        async () => {
-          await api('DELETE', caminhoEncontro(id));
-          janela.dlg.close();
-          await carregarEncontros();
-        }), 'perigo pequeno')));
-    }
+    gestao && pode('admin') ? botao('Excluir encontro', () => confirmarEncontro('Excluir encontro',
+      `Excluir "${e.titulo || 'Encontro'}" com ${plural(inscricoes.length, 'inscrição', 'inscrições')} e ${plural(tarefas.length, 'tarefa', 'tarefas')}? ` +
+      'Não dá para desfazer (só restaurando um backup). Para encerrar um encontro real, prefira "Cancelar encontro", que preserva o histórico.',
+      async () => { await api('DELETE', caminhoEncontro(e.id)); encontroAberto = null; await carregarEncontros(); }), 'perigo pequeno') : null,
+  ].filter(Boolean);
 
-    if (gestao) linkInscricaoEncontro(c, e, atualizar);
+  const ocupadas = e.vagasOcupadas || 0, espera = e.emEspera || 0;
+  const pendentes = tarefas.filter(t => t.estado === 'pendente').length;
+  const porLink = inscricoes.filter(i => i.origem === 'link' && i.estado !== 'cancelada').length;
+  const capacidade = e.capacidade ?? (e.vagasDisponiveis != null ? ocupadas + e.vagasDisponiveis : null);
+  const vagas = capacidade == null
+    ? el('div', { class: 'encontro-kpi' }, el('span', {}, 'Vagas'), el('b', {}, String(ocupadas)), el('span', {}, `${ocupadas === 1 ? 'participante' : 'participantes'} · sem limite de vagas`))
+    : el('div', { class: 'encontro-kpi largo' }, el('span', {}, 'Vagas'),
+      el('div', {}, el('b', {}, `${ocupadas} de ${capacidade}`), ' ', el('span', {}, Math.max(0, capacidade - ocupadas) === 1 ? '1 vaga disponível' : `${Math.max(0, capacidade - ocupadas)} vagas disponíveis`)),
+      el('div', { class: 'encontro-barra', 'aria-hidden': 'true' }, el('span', { style: `width:${Math.min(100, Math.round(ocupadas / Math.max(1, capacidade) * 100))}%` })));
 
-    c.append(el('h3', {}, 'Inscrições e presença'));
-    // Confirmadas primeiro, depois a lista de espera (por ordem de chegada) e as canceladas.
-    const ordemEstado = { confirmada: 0, espera: 1, cancelada: 2 };
-    const inscricoes = listaEncontros(respostaI, 'inscricoes')
-      .sort((a, b) => (ordemEstado[a.estado] ?? 3) - (ordemEstado[b.estado] ?? 3) || String(a.criadoEm).localeCompare(String(b.criadoEm)));
-    if (!inscricoes.length) c.append(el('p', { class: 'dica' }, 'Nenhuma inscrição.'));
-    for (const i of inscricoes) {
-      const participantes = i.participantes || [];
-      const responsavel = participantes.find(p => p.membroId && p.membroId === i.responsavelMembroId);
-      const editavel = gestao && ativo && i.estado === 'confirmada';
-      const pessoas = participantes.length;
-      const contato = i.origem === 'link' ? [
-        i.whatsapp ? el('a', { href: 'https://wa.me/' + encodeURIComponent(i.whatsapp), target: '_blank', rel: 'noopener noreferrer' }, 'WhatsApp ' + whatsappEncontro(i.whatsapp)) : null,
-        i.email ? el('a', { href: 'mailto:' + i.email }, i.email) : null,
-      ].filter(Boolean).flatMap((x, n) => n ? [' · ', x] : [x]) : [];
-      const bloco = el('section', { class: 'item encontro-bloco' },
-        el('div', { class: 'encontro-bloco-topo' },
-          el('div', { class: 'titulo' }, `Inscrição de ${responsavel?.nome || i.responsavelNome || 'pessoa removida'}`,
-            ...(i.origem === 'link' ? [' ', el('span', { class: 'etiqueta' }, 'Pelo link')] : []),
-            ...(i.estado === 'espera' ? [' ', el('span', { class: 'etiqueta conflito' }, `Lista de espera · ${pessoas} ${pessoas === 1 ? 'pessoa' : 'pessoas'}`)] : []),
-            ...(i.estado === 'cancelada' ? [' ', el('span', { class: 'etiqueta alerta' }, 'Cancelada')] : [])),
-          el('div', { class: 'acoes' },
-            gestao && ativo && i.estado === 'espera' ? botao('Confirmar vaga', () => confirmarEncontro('Confirmar vaga',
-              `Tirar ${i.responsavelNome || 'esta inscrição'} da lista de espera e ocupar ${pessoas} ${pessoas === 1 ? 'vaga' : 'vagas'}?` +
-              (i.email ? ' A pessoa recebe um e-mail avisando.' : ' Avise a pessoa pelo WhatsApp.'), async () => {
-                await api('POST', '/api/inscricoes/' + encodeURIComponent(i.id) + '/promover', {}); await atualizar();
-              }), 'pequeno') : null,
-            gestao && i.origem === 'link' && !i.responsavelMembroId && i.estado !== 'cancelada'
-              ? botao('Vincular ao cadastro', () => vincularInscricaoAoCadastro(i, atualizar)) : null,
-            (editavel || (gestao && ativo && i.estado === 'espera')) ? botao('Cancelar inscrição', () => confirmarEncontro('Cancelar inscrição', 'As vagas desta inscrição serão liberadas. O histórico será preservado.', async () => {
-              await api('POST', '/api/inscricoes/' + encodeURIComponent(i.id) + '/cancelar', {}); await atualizar();
-            }), 'perigo pequeno') : null)),
-        contato.length ? el('p', { class: 'sub' }, ...contato) : null,
-        i.resposta ? el('p', { class: 'sub' }, `${e.linkInscricao?.pergunta || 'Resposta'}: ${i.resposta}`) : null);
-      for (const p of participantes) {
-        const nome = p.nome || p.nomeAcompanhante || 'Membro removido';
-        const situacao = [p.confirmado ? 'Confirmado' : 'Aguardando confirmação',
-          p.presenteEm ? `Presente (registrado em ${new Date(p.presenteEm).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })} por ${p.presencaPorNome || p.presencaPor || 'responsável'})` : 'Sem presença'];
-        const acoes = el('div', { class: 'acoes' });
-        if (editavel) {
-          const alterar = corpo => confirmarEncontro('Atualizar participante', `Confirmar alteração para ${nome}?`, async () => {
-            await api('PUT', '/api/inscricoes/' + encodeURIComponent(i.id) + '/participantes/' + encodeURIComponent(p.id) + '/presenca', corpo); await atualizar();
-          });
-          acoes.append(...[botao(p.confirmado ? 'Desfazer confirmação' : 'Confirmar pessoa', () => alterar({ confirmado: !p.confirmado })),
-            p.confirmado ? botao(p.presenteEm ? 'Desfazer check-in' : 'Registrar presença', () => alterar({ presente: !p.presenteEm }), p.presenteEm ? 'secundario pequeno' : 'pequeno') : null].filter(Boolean));
-        }
-        bloco.append(el('div', { class: 'encontro-linha' },
-          el('div', { class: 'conteudo' },
-            el('strong', {}, nome), ...(p.crianca ? [' ', el('span', { class: 'etiqueta' }, 'Criança')] : []),
-            ...(p.nomeAcompanhante && !p.titular ? [' ', el('span', { class: 'etiqueta' }, 'Acompanhante')] : []),
-            el('p', { class: 'sub' }, situacao.join(' · '))),
-          acoes));
-      }
-      c.append(bloco);
-    }
+  const abas = el('div', { class: 'abas-devocionais encontro-abas', role: 'tablist', 'aria-label': 'Seções do encontro' });
+  const conteudo = el('div', { class: 'encontro-aba', role: 'tabpanel' });
+  function contagens() {
+    const chegada = participantesCheckin(inscricoes);
+    return { inscritos: inscricoes.filter(i => i.estado !== 'cancelada').length, checkin: `${chegada.filter(x => x.p.presenteEm).length}/${chegada.length}`,
+      tarefas: pendentes || null, roteiro: (e.roteiro || []).length || null };
+  }
+  function desenharAbas() {
+    const n = contagens();
+    abas.replaceChildren(...Object.entries(abasEncontro).map(([v, t]) => el('button', { type: 'button', role: 'tab', 'aria-selected': String(estado.aba === v),
+      onclick: () => { estado.aba = v; desenharAbas(); desenharConteudo(); } }, t,
+      ...(n[v] != null ? [' ', el('span', { class: 'encontro-contagem' }, String(n[v]))] : []),
+      ...(v === 'inscritos' && espera ? [' ', el('span', { class: 'encontro-contagem aviso' }, `${espera} na espera`)] : []))));
+  }
+  function desenharConteudo() {
+    conteudo.replaceChildren();
+    if (estado.aba === 'checkin') abaCheckinEncontro(conteudo, ctx, desenharAbas);
+    else if (estado.aba === 'divulgar') abaDivulgarEncontro(conteudo, ctx);
+    else if (estado.aba === 'tarefas') abaTarefasEncontro(conteudo, ctx);
+    else if (estado.aba === 'roteiro') abaRoteiroEncontro(conteudo, ctx);
+    else abaInscritosEncontro(conteudo, ctx);
+  }
 
-    c.append(el('h3', {}, 'Tarefas da equipe'));
-    if (gestao && ativo) c.append(el('div', { class: 'barra' }, botao('Criar tarefa', () => formularioTarefaEncontro(e, null, atualizar))));
-    const tarefas = listaEncontros(respostaT, 'tarefas');
-    if (!tarefas.length) c.append(el('p', { class: 'dica' }, 'Nenhuma tarefa.'));
-    for (const t of tarefas) c.append(el('article', { class: 'item' },
-      el('div', { class: 'conteudo' }, el('div', { class: 'titulo' }, t.descricao),
-        el('p', { class: 'sub' }, [estadosTarefaEncontro[t.estado] || t.estado, t.prazo ? `Prazo ${dataEncontro(t.prazo)}` : 'Sem prazo',
-          t.responsavelNome || (t.responsavelUsuarioId ? 'Responsável indisponível' : 'Sem responsável')].join(' · '))),
-      gestao ? el('div', { class: 'acoes' }, botao('Editar tarefa', () => formularioTarefaEncontro(e, t, atualizar))) : null));
+  alvo.replaceChildren(...[
+    voltar,
+    el('div', { class: 'encontro-cabecalho' },
+      el('div', { class: 'conteudo' },
+        el('div', { class: 'titulo encontro-titulo' }, e.titulo || 'Encontro', ' ', etiquetaEncontro(e),
+          ...(e.linkInscricao?.ativo && e.estado === 'aberto' ? [' ', el('span', { class: 'etiqueta' }, 'Inscrições pelo link')] : [])),
+        el('p', { class: 'sub' }, `${nomeMinisterioEncontro(e.ministerioId)} · ${tiposEncontro[e.tipo] || 'Encontro'} · ${periodoEncontro(e)} · ${e.local || 'Local a definir'}`)),
+      el('div', { class: 'acoes' }, ...[
+        gestao && e.estado === 'aberto' ? botao('+ Inscrever pessoas', () => formularioInscricao(e, atualizar), 'pequeno') : null,
+        mais.length ? el('details', { class: 'encontro-mais' }, el('summary', { class: 'botao secundario pequeno' }, 'Mais'), el('div', { class: 'encontro-mais-menu' }, ...mais)) : null,
+      ].filter(Boolean))),
+    e.descricao ? el('p', { class: 'encontro-texto' }, e.descricao) : null,
+    gestao && ativo && e.estado !== 'aberto' ? el('p', { class: 'dica' }, 'Para receber inscrições, use "Mais › Editar encontro" e mude a situação para "Aberto".') : null,
+    el('div', { class: 'encontro-kpis' }, vagas,
+      el('div', { class: 'encontro-kpi' }, el('span', {}, 'Lista de espera'), el('b', { class: espera ? 'aviso' : null }, String(espera)), el('span', {}, espera === 1 ? 'pessoa esperando' : 'pessoas esperando')),
+      el('div', { class: 'encontro-kpi' }, el('span', {}, 'Pelo link'), el('b', {}, String(porLink)), el('span', {}, porLink === 1 ? 'inscrição' : 'inscrições')),
+      el('div', { class: 'encontro-kpi' }, el('span', {}, 'Tarefas'), el('b', {}, String(pendentes)), el('span', {}, pendentes === 1 ? 'pendente' : 'pendentes'))),
+    abas, conteudo,
+  ].filter(Boolean));
+  desenharAbas();
+  desenharConteudo();
+}
 
-    roteiroUtilizadoEncontro(c, e);
-  } catch (e) { mensagem(janela.erro, e.message, false); }
+/** Aba Inscritos: busca, filtros e uma linha por inscrição; o detalhe abre na própria linha. */
+function abaInscritosEncontro(alvo, { e, inscricoes, gestao, ativo, atualizar }) {
+  const estado = encontroAberto;
+  // Confirmadas primeiro, depois a lista de espera (por ordem de chegada) e as canceladas.
+  const ordemEstado = { confirmada: 0, espera: 1, cancelada: 2 };
+  const ordenadas = [...inscricoes].sort((a, b) => (ordemEstado[a.estado] ?? 3) - (ordemEstado[b.estado] ?? 3) || String(a.criadoEm).localeCompare(String(b.criadoEm)));
+  if (!filtrosInscricao[estado.filtro]) estado.filtro = 'todas';
+  const busca = el('input', { type: 'search', 'aria-label': 'Buscar inscrição', placeholder: 'Buscar por nome, WhatsApp ou e-mail', maxlength: 100 });
+  busca.value = estado.busca;
+  const chips = el('div', { class: 'encontro-filtros', role: 'group', 'aria-label': 'Filtrar inscrições' });
+  const lista = el('div', { class: 'lista' });
+  const textoBusca = i => [nomeInscricaoEncontro(i), ...(i.participantes || []).map(nomeParticipanteEncontro), i.whatsapp, whatsappEncontro(i.whatsapp), i.email].join(' ');
+  function desenhar() {
+    chips.replaceChildren(...Object.entries(filtrosInscricao).map(([v, [t, f]]) => {
+      const n = inscricoes.filter(f).length;
+      if (!n && v !== 'todas' && v !== estado.filtro) return null;
+      return el('button', { type: 'button', 'aria-pressed': String(estado.filtro === v), onclick: () => { estado.filtro = v; desenhar(); } }, t, ' ', el('span', { class: 'encontro-contagem' }, String(n)));
+    }).filter(Boolean));
+    const termo = normalizarEncontro(estado.busca.trim());
+    const visiveis = ordenadas.filter(filtrosInscricao[estado.filtro][1]).filter(i => !termo || normalizarEncontro(textoBusca(i)).includes(termo));
+    lista.replaceChildren(...(visiveis.length ? visiveis.map(i => linhaInscricaoEncontro(i, { e, gestao, ativo, atualizar, redesenhar: desenhar }))
+      : [el('p', { class: 'vazio' }, inscricoes.length ? 'Nenhuma inscrição com essa busca ou filtro.' : 'Nenhuma inscrição.')]));
+  }
+  busca.addEventListener('input', () => { estado.busca = busca.value; desenhar(); });
+  alvo.append(el('div', { class: 'encontro-filtros-barra' }, busca, chips), lista);
+  desenhar();
+}
+
+function linhaInscricaoEncontro(i, { e, gestao, ativo, atualizar, redesenhar }) {
+  const abertas = encontroAberto.abertas;
+  const participantes = i.participantes || [];
+  const qtd = participantes.length;
+  const aberta = abertas.has(i.id);
+  const editavel = gestao && ativo && i.estado === 'confirmada';
+  const nome = nomeInscricaoEncontro(i);
+  const outros = participantes.filter(p => !(p.membroId && p.membroId === i.responsavelMembroId) && !p.titular).map(p => nomeParticipanteEncontro(p) + (p.crianca ? ' (criança)' : ''));
+  const resumo = [plural(qtd, 'pessoa', 'pessoas'), outros.length ? 'com ' + outros.join(', ') : '', i.origem === 'link' ? 'pelo link' : 'pelo painel',
+    i.criadoEm && /^\d{4}-\d{2}-\d{2}/.test(i.criadoEm) ? 'em ' + dataEncontro(i.criadoEm.slice(0, 10)).slice(0, 5) : ''].filter(Boolean).join(' · ');
+  const linha = el('article', { class: 'item encontro-bloco' + (aberta ? ' aberta' : '') },
+    el('div', { class: 'encontro-bloco-topo' },
+      el('div', { class: 'conteudo' },
+        el('div', { class: 'titulo' }, `Inscrição de ${nome}`,
+          ...(i.origem === 'link' ? [' ', el('span', { class: 'etiqueta' }, 'Pelo link')] : []),
+          ...(i.estado === 'espera' ? [' ', el('span', { class: 'etiqueta conflito' }, `Lista de espera · ${plural(qtd, 'pessoa', 'pessoas')}`)] : []),
+          ...(i.estado === 'cancelada' ? [' ', el('span', { class: 'etiqueta alerta' }, 'Cancelada')] : []),
+          ...(gestao && i.origem === 'link' && !i.responsavelMembroId && i.estado !== 'cancelada' ? [' ', el('span', { class: 'etiqueta' }, 'Sem cadastro')] : [])),
+        el('p', { class: 'sub' }, resumo)),
+      el('div', { class: 'acoes' }, ...[
+        gestao && ativo && i.estado === 'espera' ? botao('Confirmar vaga', () => confirmarEncontro('Confirmar vaga',
+          `Tirar ${nome} da lista de espera e ocupar ${plural(qtd, 'vaga', 'vagas')}?` +
+          (i.email ? ' A pessoa recebe um e-mail avisando.' : ' Avise a pessoa pelo WhatsApp.'), async () => {
+            await api('POST', '/api/inscricoes/' + encodeURIComponent(i.id) + '/promover', {}); await atualizar();
+          }), 'pequeno') : null,
+        el('button', { type: 'button', class: 'botao secundario pequeno', 'aria-expanded': String(aberta),
+          onclick: () => { if (aberta) abertas.delete(i.id); else abertas.add(i.id); redesenhar(); } }, aberta ? 'Fechar' : 'Detalhes'),
+      ].filter(Boolean))));
+  if (!aberta) return linha;
+
+  const contato = [
+    i.whatsapp ? el('a', { href: 'https://wa.me/' + encodeURIComponent(i.whatsapp), target: '_blank', rel: 'noopener noreferrer' }, 'WhatsApp ' + whatsappEncontro(i.whatsapp)) : null,
+    i.email ? el('a', { href: 'mailto:' + i.email }, i.email) : null,
+  ].filter(Boolean).flatMap((x, n) => n ? [' · ', x] : [x]);
+  if (contato.length) linha.append(el('p', { class: 'sub' }, ...contato));
+  if (i.resposta) linha.append(el('p', { class: 'sub' }, `${e.linkInscricao?.pergunta || 'Resposta'}: ${i.resposta}`));
+  const status = el('p', { role: 'status' });
+  for (const p of participantes) {
+    const nomeP = nomeParticipanteEncontro(p);
+    const situacao = [p.confirmado ? 'Participação confirmada' : 'Aguardando confirmação',
+      p.presenteEm ? `Presente (registrado em ${new Date(p.presenteEm).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })} por ${p.presencaPorNome || p.presencaPor || 'responsável'})` : ''].filter(Boolean);
+    const acoes = el('div', { class: 'acoes' });
+    // Confirmar a participação é reversível: vai direto, sem janela de confirmação.
+    if (editavel) acoes.append(botao(p.confirmado ? 'Desfazer confirmação' : 'Confirmar participação', async () => {
+      try { await api('PUT', '/api/inscricoes/' + encodeURIComponent(i.id) + '/participantes/' + encodeURIComponent(p.id) + '/presenca', { confirmado: !p.confirmado }); await atualizar(); }
+      catch (erro) { mensagem(status, erro.message, false); }
+    }));
+    linha.append(el('div', { class: 'encontro-linha' },
+      el('div', { class: 'conteudo' },
+        el('strong', {}, nomeP), ...(p.crianca ? [' ', el('span', { class: 'etiqueta' }, 'Criança')] : []),
+        ...(p.nomeAcompanhante && !p.titular ? [' ', el('span', { class: 'etiqueta' }, 'Acompanhante')] : []),
+        el('p', { class: 'sub' }, situacao.join(' · '))),
+      acoes));
+  }
+  const acoes = [
+    gestao && i.origem === 'link' && !i.responsavelMembroId && i.estado !== 'cancelada' ? botao('Vincular ao cadastro', () => vincularInscricaoAoCadastro(i, atualizar)) : null,
+    (editavel || (gestao && ativo && i.estado === 'espera')) ? botao('Cancelar inscrição', () => confirmarEncontro('Cancelar inscrição', 'As vagas desta inscrição serão liberadas. O histórico será preservado.', async () => {
+      await api('POST', '/api/inscricoes/' + encodeURIComponent(i.id) + '/cancelar', {}); await atualizar();
+    }), 'perigo pequeno') : null,
+  ].filter(Boolean);
+  if (acoes.length) linha.append(el('div', { class: 'barra' }, ...acoes));
+  linha.append(status);
+  return linha;
+}
+
+/** Pessoas das inscrições confirmadas, em ordem alfabética: é quem pode chegar. */
+function participantesCheckin(inscricoes) {
+  return inscricoes.filter(i => i.estado === 'confirmada')
+    .flatMap(i => (i.participantes || []).map(p => ({ p, i })))
+    .sort((a, b) => nomeParticipanteEncontro(a.p).localeCompare(nomeParticipanteEncontro(b.p), 'pt-BR'));
+}
+
+/** Aba Check-in: buscar o nome e tocar para marcar a chegada (e desfazer, se errou). */
+function abaCheckinEncontro(alvo, { inscricoes, gestao, ativo }, aoMudar) {
+  const estado = encontroAberto;
+  const pessoas = participantesCheckin(inscricoes);
+  const busca = el('input', { type: 'search', 'aria-label': 'Buscar quem chegou', placeholder: 'Buscar quem chegou', maxlength: 100 });
+  busca.value = estado.buscaCheckin;
+  const contador = el('strong', { 'aria-live': 'polite' });
+  const lista = el('div', { class: 'encontro-checkin' });
+  const status = el('p', { role: 'status' });
+  const podeMarcar = gestao && ativo;
+  const ocupados = new Set();
+  function desenhar() {
+    contador.textContent = `${pessoas.filter(x => x.p.presenteEm).length} de ${pessoas.length} chegaram`;
+    const termo = normalizarEncontro(estado.buscaCheckin.trim());
+    const visiveis = pessoas.filter(x => !termo || normalizarEncontro(nomeParticipanteEncontro(x.p) + ' ' + nomeInscricaoEncontro(x.i)).includes(termo));
+    lista.replaceChildren(...(visiveis.length ? visiveis.map(({ p, i }) => {
+      const nome = nomeParticipanteEncontro(p), titular = nome === nomeInscricaoEncontro(i);
+      const detalhe = [titular ? (i.participantes.length > 1 ? `com mais ${i.participantes.length - 1}` : 'inscrição individual') : 'com ' + nomeInscricaoEncontro(i),
+        p.crianca ? 'criança' : '', !p.confirmado && !p.presenteEm ? 'participação ainda não confirmada' : ''].filter(Boolean).join(' · ');
+      return el('button', { type: 'button', 'aria-pressed': String(!!p.presenteEm), disabled: !podeMarcar,
+        onclick: async () => {
+          if (ocupados.has(p.id)) return;
+          ocupados.add(p.id);
+          // Marcar a chegada já confirma a participação (o servidor exige as duas).
+          const corpo = p.presenteEm ? { presente: false } : p.confirmado ? { presente: true } : { confirmado: true, presente: true };
+          try {
+            await api('PUT', '/api/inscricoes/' + encodeURIComponent(i.id) + '/participantes/' + encodeURIComponent(p.id) + '/presenca', corpo);
+            if (corpo.presente) { p.confirmado = true; p.presenteEm = new Date().toISOString(); mensagem(status, `${nome} chegou.`); }
+            else { p.presenteEm = null; mensagem(status, `Chegada de ${nome} desfeita.`); }
+            if (corpo.presente && estado.buscaCheckin) { estado.buscaCheckin = ''; busca.value = ''; }
+            desenhar(); aoMudar();
+            busca.focus?.();
+          } catch (erro) { mensagem(status, erro.message, false); }
+          finally { ocupados.delete(p.id); }
+        } },
+      el('span', { class: 'encontro-checkin-nome' }, nome, el('small', {}, detalhe)),
+      el('span', { class: 'encontro-checkin-marca', 'aria-hidden': 'true' }, p.presenteEm ? '✓' : ''));
+    }) : [el('p', { class: 'vazio' }, pessoas.length ? 'Ninguém com esse nome entre os confirmados.' : 'Nenhuma inscrição confirmada ainda.')]));
+  }
+  busca.addEventListener('input', () => { estado.buscaCheckin = busca.value; desenhar(); });
+  const naEspera = inscricoes.filter(i => i.estado === 'espera').length;
+  alvo.append(el('div', { class: 'encontro-filtros-barra' }, busca, contador), status, lista,
+    ...[!podeMarcar ? el('p', { class: 'dica' }, ativo ? 'Só quem gerencia encontros marca a chegada.' : 'Encontro cancelado: presenças bloqueadas.') : null,
+      naEspera ? el('p', { class: 'dica' }, `Quem está na lista de espera (${plural(naEspera, 'inscrição', 'inscrições')}) não aparece aqui até ter a vaga confirmada.`) : null].filter(Boolean));
+  desenhar();
+}
+
+function abaDivulgarEncontro(alvo, { e, gestao, ativo, atualizar }) {
+  if (!gestao) { alvo.append(el('p', { class: 'dica' }, 'O link de inscrição e o convite ficam com quem gerencia encontros.')); return; }
+  linkInscricaoEncontro(alvo, e, atualizar);
+  if (!ativo) return;
+  alvo.append(el('h3', {}, 'Convite para o WhatsApp'),
+    el('p', { class: 'dica' }, 'Texto com data, local e descrição, para colar no grupo. Não leva nenhum dado de inscritos.'),
+    el('div', { class: 'barra' }, botao('Preparar convite', () => prepararConviteEncontro(e))));
+}
+
+function abaTarefasEncontro(alvo, { e, tarefas, gestao, ativo, atualizar }) {
+  const status = el('p', { role: 'status' });
+  if (gestao && ativo) alvo.append(el('div', { class: 'barra' }, botao('Criar tarefa', () => formularioTarefaEncontro(e, null, atualizar), 'pequeno')));
+  const ordem = { pendente: 0, concluida: 1, cancelada: 2 };
+  const lista = [...tarefas].sort((a, b) => (ordem[a.estado] ?? 3) - (ordem[b.estado] ?? 3) || (a.prazo || '9999').localeCompare(b.prazo || '9999'));
+  if (!lista.length) alvo.append(el('p', { class: 'vazio' }, 'Nenhuma tarefa.'));
+  for (const t of lista) alvo.append(el('article', { class: 'item' },
+    el('div', { class: 'conteudo' }, el('div', { class: 'titulo' }, t.descricao, ...(t.estado !== 'pendente' ? [' ', el('span', { class: 'etiqueta' + (t.estado === 'concluida' ? ' nova' : '') }, estadosTarefaEncontro[t.estado] || t.estado)] : [])),
+      el('p', { class: 'sub' }, [t.prazo ? `Prazo ${dataEncontro(t.prazo)}` : 'Sem prazo',
+        t.responsavelNome || (t.responsavelUsuarioId ? 'Responsável indisponível' : 'Sem responsável')].join(' · '))),
+    gestao ? el('div', { class: 'acoes' }, ...[
+      ativo && t.estado !== 'cancelada' ? botao(t.estado === 'pendente' ? 'Concluir' : 'Reabrir', async () => {
+        try { await api('PUT', '/api/encontros/tarefas/' + encodeURIComponent(t.id), { estado: t.estado === 'pendente' ? 'concluida' : 'pendente' }); await atualizar(); }
+        catch (erro) { mensagem(status, erro.message, false); }
+      }) : null,
+      botao('Editar tarefa', () => formularioTarefaEncontro(e, t, atualizar)),
+    ].filter(Boolean)) : null));
+  alvo.append(status);
+}
+
+function abaRoteiroEncontro(alvo, { e, gestao, ativo, atualizar }) {
+  if (gestao && ativo && typeof montarRoteiroEncontro === 'function') alvo.append(el('div', { class: 'barra' }, botao('Montar roteiro', () => montarRoteiroEncontro(e, atualizar), 'pequeno')));
+  roteiroUtilizadoEncontro(alvo, e);
 }
 
 /** "5511912345678" → "(11) 91234-5678". */

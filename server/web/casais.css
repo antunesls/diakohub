@@ -187,3 +187,49 @@ input.interruptor:focus-visible { outline: 3px solid var(--primaria-suave); outl
   .dev-editor-layout { grid-template-columns: minmax(0, 1fr); }
   .dev-publicacao { position: static; }
 }
+
+/* Encontro aberto como página: cabeçalho, números, abas e check-in */
+.encontro-voltar { all: unset; cursor: pointer; color: var(--primaria); font-weight: 600; font-size: 14px; margin: 4px 0 8px; display: inline-block; }
+.encontro-voltar:focus-visible { outline: 3px solid var(--primaria-suave); border-radius: 6px; }
+.encontro-cabecalho { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: flex-start; }
+.encontro-cabecalho .conteudo { flex: 1 1 320px; min-width: 0; }
+.encontro-cabecalho .acoes { display: flex; flex-wrap: wrap; gap: 8px; align-items: flex-start; }
+.encontro-mais { position: relative; }
+.encontro-mais > summary { list-style: none; }
+.encontro-mais > summary::-webkit-details-marker { display: none; }
+.encontro-mais > summary::after { content: " ▾"; }
+.encontro-mais-menu { position: absolute; right: 0; top: calc(100% + 4px); z-index: 5; display: grid; gap: 6px; min-width: 200px; padding: 8px;
+  background: var(--superficie); border: 1px solid var(--linha); border-radius: 12px; box-shadow: 0 10px 30px rgb(0 0 0 / .14); }
+.encontro-mais-menu .botao { width: 100%; text-align: left; }
+.encontro-kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; margin: 16px 0 4px; }
+.encontro-kpi { border: 1px solid var(--linha); border-radius: 12px; padding: 10px 12px; background: var(--superficie); display: grid; gap: 4px; align-content: start; min-width: 0; }
+.encontro-kpi.largo { grid-column: span 2; }
+.encontro-kpi > span, .encontro-kpi div > span { font-size: 13px; color: var(--suave); }
+.encontro-kpi b { font-size: 20px; line-height: 1.15; font-variant-numeric: tabular-nums; }
+.encontro-kpi b.aviso { color: #7a4b00; }
+.encontro-barra { height: 8px; border-radius: 8px; background: var(--neutro); overflow: hidden; }
+.encontro-barra span { display: block; height: 100%; background: var(--primaria); }
+.encontro-abas button { display: inline-flex; align-items: center; gap: 6px; }
+.encontro-contagem { background: var(--neutro); color: var(--suave); border-radius: 999px; padding: 0 7px; font-size: 12px; font-weight: 600; line-height: 20px; font-variant-numeric: tabular-nums; }
+.encontro-contagem.aviso { background: #fdf3e1; color: #7a4b00; }
+.encontro-filtros-barra { display: flex; flex-wrap: wrap; gap: 10px 14px; align-items: center; margin-bottom: 12px; }
+.encontro-filtros-barra input[type=search] { flex: 0 1 300px; min-width: 0; }
+.encontro-filtros { display: flex; flex-wrap: wrap; gap: 6px; }
+.encontro-filtros button { display: inline-flex; align-items: center; gap: 6px; border: 1px solid var(--borda); border-radius: 999px; padding: 4px 11px; font: inherit; font-size: 13px; background: var(--superficie); color: var(--texto); cursor: pointer; }
+.encontro-filtros button[aria-pressed="true"] { background: var(--primaria-suave); border-color: var(--primaria); color: var(--primaria-escura); font-weight: 600; }
+.item.encontro-bloco.aberta { border-color: var(--primaria); }
+.encontro-checkin { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 8px; }
+.encontro-checkin button { display: flex; align-items: center; gap: 10px; text-align: left; font: inherit; color: var(--texto); border: 1px solid var(--linha); background: var(--superficie); border-radius: 12px; padding: 12px 14px; cursor: pointer; min-height: 56px; }
+.encontro-checkin button:disabled { cursor: default; opacity: .7; }
+.encontro-checkin button[aria-pressed="true"] { background: #e3f2e8; border-color: #b9dcc5; }
+.encontro-checkin-nome { flex: 1; min-width: 0; font-weight: 600; overflow-wrap: anywhere; }
+.encontro-checkin-nome small { display: block; font-weight: 400; color: var(--suave); font-size: 12.5px; }
+.encontro-checkin-marca { width: 26px; height: 26px; border-radius: 50%; border: 2px solid var(--borda); display: grid; place-items: center; color: #fff; font-weight: 700; flex: none; }
+.encontro-checkin button[aria-pressed="true"] .encontro-checkin-marca { background: var(--ok, #2e7d4f); border-color: var(--ok, #2e7d4f); }
+@media (max-width: 560px) { .encontro-kpi.largo { grid-column: 1 / -1; } .encontro-mais-menu { left: 0; right: auto; } }
+.encontro-aba .item.encontro-bloco { padding: 12px 16px; gap: 4px; }
+.encontro-aba .item .sub { margin: 2px 0 0; }
+.encontro-aba .encontro-bloco-topo .titulo { line-height: 1.35; }
+[data-painel="encontros"] .encontro-aba h3 { margin: 24px 0 8px; }
+[data-painel="encontros"] .encontro-aba > h3:first-child { margin-top: 4px; }
+.encontro-mais-menu .botao { justify-content: flex-start; }
