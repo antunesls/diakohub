@@ -28,7 +28,7 @@ test('escala tem seletor independente com busca e Minha escala mostra link e tom
   assert.match(script, /linkYoutube\(/);
   assert.match(minha, /m\.youtube/);
   assert.match(minha, /m\.tom/);
-  assert.ok(html.indexOf('/musica-youtube.js?v=1') < html.indexOf('/escalas.js?v=14'));
+  assert.ok(html.indexOf('/musica-youtube.js?v=1') < html.indexOf('/escalas.js?v=15'));
 });
 
 test('linha vazia de música não mostra texto null no resumo', () => {
@@ -88,4 +88,13 @@ test('seletor do painel tem tabela ordenável com prévia e Minha escala tem a b
   assert.ok(minha.indexOf('/repertorio-busca.js?v=2') < minha.indexOf('<script>'), 'busca e transposição antes do script da página');
   assert.match(minha, /Você tocou recentemente/);
   assert.match(minha, /m\.primeiraNota/);
+});
+
+test('escolher música na escala preenche o tom com uma função que ainda existe nos scripts do painel', () => {
+  const script = fs.readFileSync(path.join(__dirname, '../web/escalas.js'), 'utf8');
+  const busca = fs.readFileSync(path.join(__dirname, '../web/repertorio-busca.js'), 'utf8');
+  // tomPadraoRepertorio saiu do repertorio.js; a chamada que sobrou derrubava o "change" e a música não entrava na lista.
+  assert.doesNotMatch(script, /tomPadraoRepertorio/);
+  assert.match(script, /primeiroVinculo \? escolha\.dataset\.tomAntigo : tomDaMusica\(r\)/);
+  assert.match(busca, /function tomDaMusica\(/);
 });
