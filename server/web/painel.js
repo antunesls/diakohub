@@ -578,8 +578,8 @@ function itemRecado(r, editaveis, hoje) {
   const acoes = r.auto
     ? [el('span', { class: 'dica' }, 'Automático — edite na aba Membros')]
     : [
-        botao('↑', () => mover(editaveis, i, -1), 'secundario pequeno'),
-        botao('↓', () => mover(editaveis, i, 1), 'secundario pequeno'),
+        botao('↑', () => moverRecado(editaveis, i, -1), 'secundario pequeno'),
+        botao('↓', () => moverRecado(editaveis, i, 1), 'secundario pequeno'),
         botao('Editar', () => editarRecado(r)),
         botao('Excluir', () => confirm(`Excluir "${r.titulo}"?`) && api('DELETE', '/api/recados/' + r.id).then(carregarRecados), 'perigo pequeno'),
       ];
@@ -602,7 +602,7 @@ function itemRecado(r, editaveis, hoje) {
     el('div', { class: 'acoes' }, acoes));
 }
 
-async function mover(lista, i, delta) {
+async function moverRecado(lista, i, delta) {
   const j = i + delta;
   if (j < 0 || j >= lista.length) return;
   const ids = lista.map((r) => r.id);
