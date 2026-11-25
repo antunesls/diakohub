@@ -84,6 +84,27 @@ void main() {
         agora: DateTime.utc(2026, 11, 1));
     expect(dia, contains('DTSTART;VALUE=DATE:20261114'));
     expect(dia, contains('DTEND;VALUE=DATE:20261116'));
+    // DTSTAMP é o instante da geração em UTC, sem somar o fuso de novo.
+    expect(t, contains('DTSTAMP:20261101T120000Z'));
+    expect(icsDoEvento(e, igreja: 'Igreja', agora: DateTime.utc(2026, 11, 1, 12).toLocal()), contains('DTSTAMP:20261101T120000Z'));
+  });
+
+  test('link do Google Agenda (Android) com horário em UTC, dia inteiro e local', () {
+    final e = Evento(id: 'x', titulo: 'Culto de Jovens', inicio: DateTime(2026, 11, 7, 19, 30), fim: DateTime(2026, 11, 7, 21),
+        local: 'Templo', descricao: 'Traga um amigo');
+    final q = Uri.parse(linkGoogleAgenda(e, igreja: 'Igreja Diakonia')).queryParameters;
+    expect(q['action'], 'TEMPLATE');
+    expect(q['text'], 'Culto de Jovens');
+    expect(q['dates'], '20261107T223000Z/20261108T000000Z');
+    expect(q['location'], 'Templo');
+    expect(q['details'], 'Traga um amigo\n\nIgreja Diakonia');
+    final retiro = Evento(id: 'r', titulo: 'Retiro', inicio: DateTime(2026, 11, 14), fim: DateTime(2026, 11, 16), diaInteiro: true);
+    final qr = Uri.parse(linkGoogleAgenda(retiro, igreja: 'Igreja')).queryParameters;
+    expect(qr['dates'], '20261114/20261116');
+    expect(qr.containsKey('location'), isFalse);
+    // Sem fim: 1 hora de duração, como no .ics.
+    final semFim = Evento(id: 's', titulo: 'Oração', inicio: DateTime(2026, 11, 9, 7), fim: DateTime(2026, 11, 9, 7));
+    expect(Uri.parse(linkGoogleAgenda(semFim, igreja: '')).queryParameters['dates'], '20261109T100000Z/20261109T110000Z');
   });
 
   test('links do mapa e do WhatsApp', () {
@@ -193,7 +214,11 @@ void main() {
       final r = await chamar('GET', evento['ics'] as String, null, false);
       expect(r.statusCode, 200);
       expect(r.headers['content-type'], contains('text/calendar'));
+      expect(r.headers['content-disposition'], startsWith('inline;'), reason: 'iPhone abre direto no Calendário');
       expect(await r.readAsString(), contains('SUMMARY:Culto de Jovens'));
+      final google = Uri.parse(evento['google'] as String);
+      expect(google.host, 'calendar.google.com');
+      expect(google.queryParameters['text'], 'Culto de Jovens');
     });
 
     test('cultos, endereço, PIX e redes; validação no /admin', () async {

@@ -5353,6 +5353,7 @@ class Servidor {
             'horario': horario(e),
             'local': e.local,
             'ics': '/api/public/eventos/${Uri.encodeComponent(e.id)}.ics',
+            'google': linkGoogleAgenda(e, igreja: nomeIgreja),
           },
       ],
       'galeria': [
@@ -5394,9 +5395,10 @@ class Servidor {
     final e = _eventosDoSite().where((e) => e.id == id).firstOrNull;
     if (e == null) return Response.notFound('Evento não encontrado.');
     final nome = e.titulo.replaceAll(RegExp(r'[^A-Za-z0-9]+'), '-').replaceAll(RegExp(r'^-|-$'), '');
-    return Response.ok(icsDoEvento(e, igreja: nomeIgreja, agora: _agora().toUtc()), headers: {
+    return Response.ok(icsDoEvento(e, igreja: nomeIgreja, agora: _agora()), headers: {
       'content-type': 'text/calendar; charset=utf-8',
-      'content-disposition': 'attachment; filename="${nome.isEmpty ? 'evento' : nome}.ics"',
+      // inline: o iPhone abre direto em "Adicionar ao Calendário" (com attachment, vai para Arquivos).
+      'content-disposition': 'inline; filename="${nome.isEmpty ? 'evento' : nome}.ics"',
       'cache-control': 'no-cache',
     });
   }

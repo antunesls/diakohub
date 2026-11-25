@@ -11,9 +11,15 @@
   .topo-site { background: var(--superficie); border-bottom: 1px solid var(--linha); }
   .topo-site .dentro { max-width: 1120px; margin: 0 auto; padding: 14px 20px; display: flex; flex-wrap: wrap; align-items: center; gap: 12px 24px; }
   .topo-site img { height: 40px; width: auto; display: block; }
-  .topo-site nav { display: flex; gap: 22px; font-weight: 600; font-size: 15px; }
+  .topo-site nav { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 22px; font-weight: 600; font-size: 15px; }
   .topo-site nav a { color: var(--texto); text-decoration: none; }
   .topo-site nav a:hover { color: var(--primaria); }
+  /* Minha Escala: pílula verde (o verde "ok" do site, mais vivo que o da marca) para se destacar no menu. */
+  .topo-site nav a.menu-escala { display: inline-flex; align-items: center; gap: 7px; min-height: 38px; padding: 0 16px; border-radius: 19px;
+    background: var(--ok); color: #fff; font-size: 14px; white-space: nowrap; }
+  .topo-site nav a.menu-escala:hover { background: #236240; color: #fff; }
+  .topo-site nav a.menu-escala:focus-visible { outline: 3px solid var(--primaria); outline-offset: 2px; }
+  .topo-site nav a.menu-escala svg { width: 17px; height: 17px; flex: none; }
   .topo-site .espaco { flex: 1; }
   .urgente { background: #fbefe2; color: #6b3d00; border-bottom: 1px solid #e9c9a3; }
   .urgente .dentro { max-width: 1120px; margin: 0 auto; padding: 12px 20px; display: flex; gap: 12px; align-items: flex-start; }
@@ -254,6 +260,10 @@
     s.innerHTML = caminho; // ícone fixo deste arquivo, nunca conteúdo do painel
     return s;
   };
+  // "+ Agenda": no Android o app do Google Agenda não abre .ics, então lá o botão abre o evento já
+  // preenchido no Google Agenda; no iPhone, Outlook e computador vai o convite .ics.
+  const ehAndroid = typeof navigator !== 'undefined' && /Android/i.test(navigator.userAgent || '');
+  const linkAgenda = (e) => ehAndroid && e.google ? { href: e.google, target: '_blank', rel: 'noopener' } : { href: e.ics };
   const dataCurta = (iso) => new Date(iso).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
   const diaIso = (d) => `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
 
@@ -335,7 +345,8 @@
 
   function montar(s) {
     document.title = s.igreja;
-    const menu = [['recepcao', 'Recepção', '/recepcao'], ['louvor', 'Louvor', 'https://diakoniatulipas.com.br/minha-escala']];
+    // O 4º item marca o acesso em destaque (pílula verde com ícone de calendário).
+    const menu = [['recepcao', 'Recepção', '/recepcao'], ['minha-escala', 'Minha Escala', 'https://diakoniatulipas.com.br/minha-escala', true]];
 
     // Avisos urgentes: faixa no topo
     $('urgentes').replaceChildren(...s.urgentes.map((u) => el('div', { class: 'urgente', role: 'alert' },
@@ -387,7 +398,7 @@
           el('span', { class: 'data' },
             d.toLocaleDateString('pt-BR', { weekday: 'short' }).replace('.', ''), el('b', {}, String(d.getDate()))),
           el('div', { class: 'info' }, el('strong', {}, e.titulo), el('span', {}, [e.horario, e.local].filter(Boolean).join(' · '))),
-          el('a', { href: e.ics, 'aria-label': 'Adicionar "' + e.titulo + '" ao meu calendário' }, '+ Agenda')));
+          el('a', { ...linkAgenda(e), 'aria-label': 'Adicionar "' + e.titulo + '" ao meu calendário' }, '+ Agenda')));
       }
       principal.push(secao('agenda', 'Próximos eventos', el('div', { class: 'lista' }, linhas)));
     }
@@ -483,7 +494,9 @@
               onclick: () => copiar(s.pix.chave, 'Chave copiada.') }, 'Copiar chave')))));
     }
 
-    $('menu-site').replaceChildren(...menu.map(([id, nome, destino]) => el('a', { href: destino || '#' + id }, nome)));
+    const iconeEscala = '<rect x="3.5" y="5" width="17" height="15.5" rx="3"></rect><path d="M8 3v4M16 3v4M3.5 10h17"></path><path d="M9 15l2 2 4-4"></path>';
+    $('menu-site').replaceChildren(...menu.map(([id, nome, destino, destaque]) => el('a',
+      { href: destino || '#' + id, class: destaque ? 'menu-escala' : null }, destaque ? [svg(iconeEscala), nome] : nome)));
     $('principal').replaceChildren(...principal);
     $('lateral').replaceChildren(...lateral);
     $('principal').hidden = principal.length === 0;
@@ -560,7 +573,7 @@
             e.local ? el('span', {}, e.local) : null,
             sit ? el('span', { class: 'selo' + (sit[1] ? ' agora' : '') }, sit[0]) : null),
           el('div', { class: 'botoes' },
-            el('a', { class: 'botao claro pequeno', href: e.ics, 'aria-label': 'Adicionar "' + e.titulo + '" ao meu calendário' }, '+ Agenda'),
+            el('a', { class: 'botao claro pequeno', ...linkAgenda(e), 'aria-label': 'Adicionar "' + e.titulo + '" ao meu calendário' }, '+ Agenda'),
             mapa ? el('a', { class: 'botao secundario pequeno', href: mapa, target: '_blank', rel: 'noopener' }, 'Como chegar') : null));
       })));
     $('hoje').hidden = false;

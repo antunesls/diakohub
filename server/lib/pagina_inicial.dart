@@ -104,15 +104,38 @@ String linkMapa(String endereco) =>
 /// Link de conversa no WhatsApp (números brasileiros sem DDI ganham o 55).
 String linkWhatsapp(String digitos) => 'https://wa.me/${digitos.length <= 11 ? '55$digitos' : digitos}';
 
-/// Convite de calendário (.ics) de um evento, para o botão "+ Agenda" do site.
-/// Horário de Brasília convertido para UTC (o Brasil não tem horário de verão desde 2019).
+String _dd(int n) => n.toString().padLeft(2, '0');
+String _dataCompacta(DateTime d) => '${d.year}${_dd(d.month)}${_dd(d.day)}';
+String _utcCompacta(DateTime u) => '${_dataCompacta(u)}T${_dd(u.hour)}${_dd(u.minute)}${_dd(u.second)}Z';
+
+/// Horário da igreja (Brasília, como os eventos chegam da agenda) em UTC, no formato do calendário.
+/// O Brasil não tem horário de verão desde 2019.
+String _utcDeBrasilia(DateTime d) =>
+    _utcCompacta(DateTime.utc(d.year, d.month, d.day, d.hour, d.minute, d.second).add(const Duration(hours: 3)));
+
+/// Fim usado no calendário: evento sem duração (ou com fim antes do início) fica com 1 hora.
+DateTime _fimDoEvento(Evento e) => e.fim.isAfter(e.inicio) ? e.fim : e.inicio.add(const Duration(hours: 1));
+
+/// Link "adicionar evento" do Google Agenda, já preenchido. No Android é o caminho que funciona:
+/// o app do Google Agenda não abre arquivos .ics.
+String linkGoogleAgenda(Evento e, {required String igreja}) {
+  final datas = e.diaInteiro
+      ? '${_dataCompacta(e.inicio)}/${_dataCompacta(e.fim.isAfter(e.inicio) ? e.fim : e.inicio.add(const Duration(days: 1)))}'
+      : '${_utcDeBrasilia(e.inicio)}/${_utcDeBrasilia(_fimDoEvento(e))}';
+  return Uri.https('calendar.google.com', '/calendar/render', {
+    'action': 'TEMPLATE',
+    'text': e.titulo,
+    'dates': datas,
+    'details': [e.descricao, igreja].where((t) => t.isNotEmpty).join('\n\n'),
+    if (e.local.isNotEmpty) 'location': e.local,
+  }).toString();
+}
+
+/// Convite de calendário (.ics) de um evento, para o botão "+ Agenda" do site (iPhone, Outlook,
+/// computador). [agora] é o instante da geração (DTSTAMP).
 String icsDoEvento(Evento e, {required String igreja, required DateTime agora}) {
-  String dd(int n) => n.toString().padLeft(2, '0');
-  String data(DateTime d) => '${d.year}${dd(d.month)}${dd(d.day)}';
-  String utc(DateTime d) {
-    final u = DateTime.utc(d.year, d.month, d.day, d.hour, d.minute, d.second).add(const Duration(hours: 3));
-    return '${data(u)}T${dd(u.hour)}${dd(u.minute)}${dd(u.second)}Z';
-  }
+  String data(DateTime d) => _dataCompacta(d);
+  String utc(DateTime d) => _utcDeBrasilia(d);
 
   String esc(String s) =>
       s.replaceAll(r'\', r'\\').replaceAll(';', r'\;').replaceAll(',', r'\,').replaceAll(RegExp(r'\r?\n'), r'\n');
@@ -124,9 +147,9 @@ String icsDoEvento(Evento e, {required String igreja, required DateTime agora}) 
     'METHOD:PUBLISH',
     'BEGIN:VEVENT',
     'UID:${e.id.replaceAll(RegExp(r'[^A-Za-z0-9._@-]'), '_')}@diakonews',
-    'DTSTAMP:${utc(agora)}',
+    'DTSTAMP:${_utcCompacta(agora.toUtc())}',
     if (e.diaInteiro) ...['DTSTART;VALUE=DATE:${data(e.inicio)}', 'DTEND;VALUE=DATE:${data(e.fim)}']
-    else ...['DTSTART:${utc(e.inicio)}', 'DTEND:${utc(e.fim.isAfter(e.inicio) ? e.fim : e.inicio.add(const Duration(hours: 1)))}'],
+    else ...['DTSTART:${utc(e.inicio)}', 'DTEND:${utc(_fimDoEvento(e))}'],
     'SUMMARY:${esc(e.titulo)}',
     if (e.local.isNotEmpty) 'LOCATION:${esc(e.local)}',
     'DESCRIPTION:${esc([e.descricao, igreja].where((t) => t.isNotEmpty).join('\n\n'))}',
