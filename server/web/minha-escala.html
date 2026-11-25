@@ -20,6 +20,7 @@
   .culto .musicas .titulo { color: var(--texto); }
   .culto .musicas .tom-nota { margin-left: 6px; font-weight: 600; color: var(--primaria-escura); white-space: nowrap; }
   .culto .musicas a { margin-left: 6px; }
+  .culto .google-agenda { display: inline-block; margin-top: 4px; font-size: 14px; font-weight: 600; color: var(--primaria); }
   .editor-musicas { margin-top: 12px; border-top: 1px solid var(--linha); padding-top: 10px; }
   .editor-musicas summary { cursor: pointer; font-weight: 600; color: var(--primaria); min-height: 32px; }
   .escolhidas { display: flex; flex-direction: column; gap: 6px; margin: 8px 0 10px; }
@@ -381,6 +382,10 @@
         texto.append(ol);
       }
       if (c.podeEscolherMusicas) texto.append(editorMusicas(c));
+      if (dados.podeAvisarIndisponibilidade) {
+        texto.append(criar('a', { className: 'google-agenda', href: linkGoogleAgenda(c), target: '_blank', rel: 'noopener noreferrer',
+          textContent: '+ Google Agenda' }));
+      }
       caixa.append(dia, texto);
       return caixa;
     }));
@@ -436,21 +441,37 @@
     }
   });
 
-  // Convite .ics feito aqui no celular (nada sai do aparelho): um evento de 2 horas por culto.
+  // Um evento de 2 horas por culto, em UTC (Brasília = UTC−3, sem horário de verão).
+  const utc = (d) => d.toISOString().replace(/[-:]/g, '').replace(/\.\d{3}/, '');
+  function horarioCulto(c) {
+    const [ano, mes, dia] = c.data.split('-').map(Number);
+    const [h, m] = c.hora.split(':').map(Number);
+    const inicio = new Date(Date.UTC(ano, mes - 1, dia, h + 3, m || 0));
+    return { inicio: utc(inicio), fim: utc(new Date(inicio.getTime() + 2 * 3600 * 1000)) };
+  }
+  const tituloAgenda = (c) => c.funcoes.map(nomeFuncao).join(' e ') + ' — ' + c.nome;
+
+  // O app do Google Agenda no Android não abre .ics; este link abre o evento já preenchido.
+  function linkGoogleAgenda(c) {
+    const { inicio, fim } = horarioCulto(c);
+    const q = new URLSearchParams({ action: 'TEMPLATE', text: tituloAgenda(c), dates: `${inicio}/${fim}`, details: dados.igreja });
+    return 'https://calendar.google.com/calendar/render?' + q;
+  }
+
+  // Convite .ics feito aqui no celular (nada sai do aparelho). DTSTAMP e horário em UTC: TZID sem
+  // VTIMEZONE e evento sem DTSTAMP fazem Outlook, Calendário do Windows e iPhone recusarem o arquivo.
   $('agenda').addEventListener('click', () => {
     const esc = (s) => s.replace(/[\\;,]/g, (m) => '\\' + m).replace(/\n/g, '\\n');
-    const linhas = ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//DiakoNews//Minha escala//PT', 'CALSCALE:GREGORIAN'];
+    const agora = utc(new Date());
+    const linhas = ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//DiakoNews//Minha escala//PT', 'CALSCALE:GREGORIAN', 'METHOD:PUBLISH'];
     for (const c of dados.cultos) {
-      const [h, m] = c.hora.split(':').map(Number);
-      const inicio = c.data.replace(/-/g, '') + 'T' + String(h).padStart(2, '0') + String(m).padStart(2, '0') + '00';
-      const fim = c.data.replace(/-/g, '') + 'T' + String(Math.min(h + 2, 23)).padStart(2, '0') + String(m).padStart(2, '0') + '00';
+      const { inicio, fim } = horarioCulto(c);
       linhas.push('BEGIN:VEVENT', `UID:escala-${c.data}-${c.hora.replace(':', '')}@diakonews`,
-        `DTSTART;TZID=America/Sao_Paulo:${inicio}`, `DTEND;TZID=America/Sao_Paulo:${fim}`,
-        `SUMMARY:${esc(c.funcoes.map(nomeFuncao).join(' e ') + ' — ' + c.nome)}`,
-        `DESCRIPTION:${esc(dados.igreja)}`, 'END:VEVENT');
+        `DTSTAMP:${agora}`, `DTSTART:${inicio}`, `DTEND:${fim}`,
+        `SUMMARY:${esc(tituloAgenda(c))}`, `DESCRIPTION:${esc(dados.igreja)}`, 'END:VEVENT');
     }
     linhas.push('END:VCALENDAR');
-    const blob = new Blob([linhas.join('\r\n')], { type: 'text/calendar' });
+    const blob = new Blob([linhas.join('\r\n') + '\r\n'], { type: 'text/calendar;charset=utf-8' });
     const a = Object.assign(document.createElement('a'), { href: URL.createObjectURL(blob), download: 'minha-escala.ics' });
     document.body.append(a);
     a.click();
