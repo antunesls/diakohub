@@ -108,6 +108,14 @@
   .evento a { font-size: 14px; font-weight: 600; white-space: nowrap; }
   .caixa { background: var(--superficie); border: 1px solid var(--linha); border-radius: 18px; padding: 18px 20px; display: flex; flex-direction: column; gap: 10px; }
   .caixa h2 { margin: 0; font-size: 21px; }
+  /* Agenda da igreja no celular (assinatura que fica sincronizada). */
+  .agenda-celular .titulo-icone { display: flex; align-items: center; gap: 12px; }
+  .agenda-celular .titulo-icone .icone-acao { grid-row: auto; flex: none; }
+  .agenda-celular p { margin: 0; font-size: 15px; color: var(--suave); }
+  .agenda-celular .botao { width: 100%; }
+  .agenda-celular .outras { display: flex; flex-wrap: wrap; gap: 6px 16px; font-size: 14px; font-weight: 600; }
+  .agenda-celular .outras a, .agenda-celular .outras button { color: var(--primaria); background: none; border: 0; padding: 0; font: inherit; cursor: pointer; text-decoration: underline; text-underline-offset: 3px; }
+  .agenda-celular textarea { min-height: 0; font: 13px/1.4 ui-monospace, monospace; }
   /* Devocional da semana: faixa de largura total, logo abaixo dos atalhos. */
   .devocional-semana { display: grid; gap: 12px 24px; align-items: end; }
   .devocional-semana .devocional-conteudo { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
@@ -264,6 +272,46 @@
   // preenchido no Google Agenda; no iPhone, Outlook e computador vai o convite .ics.
   const ehAndroid = typeof navigator !== 'undefined' && /Android/i.test(navigator.userAgent || '');
   const linkAgenda = (e) => ehAndroid && e.google ? { href: e.google, target: '_blank', rel: 'noopener' } : { href: e.ics };
+  // Assinar a agenda inteira: no iPhone e no Mac o endereço webcal abre "Assinar calendário"; no
+  // Android vai para o Google Agenda, que adiciona a agenda pelo mesmo endereço.
+  const aparelho = () => {
+    const ua = typeof navigator !== 'undefined' ? navigator.userAgent || '' : '';
+    return /Android/i.test(ua) ? 'android' : /iPhone|iPad|iPod|Macintosh/i.test(ua) ? 'apple' : 'outro';
+  };
+  function cardAgendaCelular(a) {
+    const tipo = aparelho();
+    const principal = {
+      android: { href: a.google, target: '_blank', rel: 'noopener', texto: 'Adicionar ao Google Agenda' },
+      apple: { href: a.webcal, texto: 'Assinar no Calendário' },
+      outro: { href: a.webcal, texto: 'Assinar no meu calendário' },
+    }[tipo];
+    const status = el('p', { role: 'status', class: 'dica' });
+    const manual = el('textarea', { readonly: true, rows: 2, hidden: true, 'aria-label': 'Endereço da agenda da igreja' });
+    async function copiarEndereco() {
+      try {
+        await navigator.clipboard.writeText(a.ics);
+        status.textContent = 'Endereço copiado. Cole no app de calendário, em "assinar" ou "adicionar pelo endereço (URL)".';
+        manual.hidden = true;
+      } catch {
+        manual.value = a.ics;
+        manual.hidden = false;
+        manual.select();
+        status.textContent = 'Toque e segure no endereço abaixo para copiar.';
+      }
+    }
+    const { texto, ...link } = principal;
+    return el('section', { class: 'caixa agenda-celular', id: 'agenda-celular', 'aria-labelledby': 'agenda-celular-t' },
+      el('div', { class: 'titulo-icone' },
+        el('span', { class: 'icone-acao' }, svg('<rect x="3.5" y="5" width="17" height="15.5" rx="3"></rect><path d="M8 3v4M16 3v4M3.5 10h17"></path><path d="M12 13v5M9.5 15.5h5"></path>', 'var(--primaria)')),
+        el('h2', { id: 'agenda-celular-t' }, 'Agenda da igreja no seu celular')),
+      el('p', {}, 'Assine uma vez e os eventos aparecem no calendário do seu celular. Mudanças e eventos novos chegam sozinhos.'),
+      el('a', { class: 'botao', ...link }, texto),
+      el('div', { class: 'outras' },
+        tipo !== 'android' ? el('a', { href: a.google, target: '_blank', rel: 'noopener' }, 'Usa o Google Agenda?') : null,
+        el('button', { type: 'button', onclick: copiarEndereco }, 'Copiar endereço'),
+        el('a', { href: '/ajuda/agenda-celular' }, 'Passo a passo')),
+      status, manual);
+  }
   const dataCurta = (iso) => new Date(iso).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
   const diaIso = (d) => `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
 
@@ -437,6 +485,8 @@
         s.endereco ? el('div', { class: 'endereco' }, s.endereco) : null,
         s.mapa ? el('a', { class: 'botao secundario', href: s.mapa, target: '_blank', rel: 'noopener' }, 'Como chegar') : null));
     }
+
+    if (s.assinatura) lateral.push(cardAgendaCelular(s.assinatura));
 
     // Devocional da semana: o mais recente publicado (o servidor só manda quando há um).
     // Fica em faixa própria, de largura total, logo abaixo dos atalhos.

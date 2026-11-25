@@ -8,19 +8,75 @@
 <title>Minha escala</title>
 <link rel="stylesheet" href="/estilo.css?v=5">
 <style>
-  .cultos { display: flex; flex-direction: column; gap: 10px; margin: 0 0 16px; }
-  .culto { display: flex; gap: 14px; align-items: center; padding: 14px 16px; background: var(--superficie); border: 1px solid var(--linha); border-radius: 18px; }
-  .culto .dia { width: 54px; flex: none; text-align: center; padding: 6px 0; border-radius: 12px; background: var(--primaria-suave); color: var(--primaria-escura); }
-  .culto .dia small { display: block; font-size: 12px; font-weight: 600; text-transform: uppercase; }
-  .culto .dia strong { display: block; font-size: 20px; line-height: 1.1; }
-  .culto .funcao { font-weight: 600; }
-  .culto .sub { font-size: 14px; color: var(--suave); }
-  .culto .musicas { margin: 6px 0 0; padding-left: 18px; font-size: 14px; color: var(--suave); }
-  .culto .musicas li { padding: 3px 0; }
-  .culto .musicas .titulo { color: var(--texto); }
-  .culto .musicas .tom-nota { margin-left: 6px; font-weight: 600; color: var(--primaria-escura); white-space: nowrap; }
-  .culto .musicas a { margin-left: 6px; }
-  .culto .google-agenda { display: inline-block; margin-top: 4px; font-size: 14px; font-weight: 600; color: var(--primaria); }
+  /* Opção A: próximo culto em destaque, os outros em lista curta, ações fixas no rodapé. */
+  .cabeca-me { display: flex; align-items: flex-start; gap: 12px; margin-bottom: 16px; text-align: left; }
+  .cabeca-me > div { flex: 1; min-width: 0; }
+  .cabeca-me h1, .cabeca-me .sobretitulo, .cabeca-me .intro { text-align: left; }
+  .cabeca-me h1 { margin: 0 0 4px; }
+  .cabeca-me .intro { margin: 0; }
+  .avatar { width: 42px; height: 42px; flex: none; border-radius: 50%; border: 0; background: var(--primaria-suave); color: var(--primaria-escura); font-weight: 700; font-size: 17px; cursor: pointer; }
+  .avatar:focus-visible, .item:focus-visible { outline: 3px solid var(--primaria); outline-offset: 2px; }
+  .destaque { border-radius: 22px; padding: 18px; background: var(--primaria); color: #fff; display: grid; gap: 12px; margin-bottom: 20px; }
+  .destaque .quando { font-size: 12.5px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: rgb(255 255 255 / .82); }
+  .destaque .data { font-family: var(--fonte-titulo); font-size: 27px; font-weight: 600; line-height: 1.1; }
+  .chips-funcao { display: flex; flex-wrap: wrap; gap: 6px; }
+  .chip { display: inline-flex; align-items: center; padding: 4px 10px; border-radius: 13px; font-size: 13px; font-weight: 600; background: var(--primaria-suave); color: var(--primaria-escura); }
+  .chip.ceia { background: #fbefe2; color: #6b3d00; }
+  .chip.falta, .destaque .chip.falta { background: #fbefe2; color: #6b3d00; }
+  .item .txt .falta { color: #8a5a00; font-weight: 600; }
+  .destaque .chip { background: rgb(255 255 255 / .16); color: #fff; }
+  .musicas { margin: 0; padding: 0; list-style: none; display: grid; gap: 8px; counter-reset: m; }
+  .musicas li { display: flex; gap: 10px; align-items: baseline; counter-increment: m; }
+  .musicas li::before { content: counter(m); width: 20px; height: 20px; flex: none; border-radius: 50%; display: grid; place-items: center; font-size: 11.5px; font-weight: 700; background: var(--neutro); color: var(--suave); }
+  .musicas .t { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+  .musicas small { display: block; font-size: 13px; color: var(--suave); }
+  .musicas a { font-size: 13.5px; font-weight: 600; white-space: nowrap; }
+  .destaque .musicas li::before { background: rgb(255 255 255 / .16); color: #fff; }
+  .destaque .musicas small { color: rgb(255 255 255 / .82); }
+  .destaque .musicas a { color: #fff; }
+  .destaque .acoes { display: flex; flex-wrap: wrap; gap: 8px; }
+  .botao.claro { background: #fff; color: var(--primaria-escura); }
+  .botao.claro:hover { background: var(--primaria-suave); color: var(--primaria-escura); }
+  .botao.vidro { background: rgb(255 255 255 / .16); color: #fff; }
+  .botao.vidro:hover { background: rgb(255 255 255 / .26); color: #fff; }
+  .vazio-escala { margin-bottom: 20px; }
+  .vazio-escala p { margin: 0; }
+  .secao-titulo { margin: 0 0 8px; font-family: var(--fonte); font-size: 12.5px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: var(--suave); }
+  .lista-compacta { background: var(--superficie); border: 1px solid var(--linha); border-radius: 18px; padding: 2px 14px; margin-bottom: 16px; }
+  .item { display: flex; width: 100%; align-items: center; gap: 12px; padding: 12px 0; border: 0; border-bottom: 1px solid var(--linha); background: none; text-align: left; color: inherit; font: inherit; cursor: pointer; }
+  .item:last-child { border-bottom: 0; }
+  .dia { width: 50px; flex: none; text-align: center; padding: 5px 0; border-radius: 12px; background: var(--primaria-suave); color: var(--primaria-escura); }
+  .dia small { display: block; font-size: 11.5px; font-weight: 700; text-transform: uppercase; }
+  .dia strong { display: block; font-size: 19px; line-height: 1.1; }
+  .item .txt { flex: 1; min-width: 0; display: grid; }
+  .item .txt strong { overflow-wrap: anywhere; }
+  .item .txt span { font-size: 14px; color: var(--suave); }
+  .item .seta { color: var(--suave); font-size: 22px; }
+  .avisos-ind { display: grid; gap: 8px; margin-bottom: 16px; }
+  .aviso-ind { display: flex; align-items: center; gap: 10px; padding: 12px 14px; border-radius: 16px; background: var(--neutro); font-size: 15px; }
+  .aviso-ind span { flex: 1; min-width: 0; }
+  .link { background: none; border: 0; padding: 4px 0; font: inherit; font-weight: 600; color: var(--primaria); cursor: pointer; }
+  .acoes-fixas { position: fixed; left: 0; right: 0; bottom: 0; z-index: 5; background: var(--superficie); border-top: 1px solid var(--linha);
+    padding: 10px max(16px, env(safe-area-inset-left, 0px)) calc(12px + env(safe-area-inset-bottom, 0px)) max(16px, env(safe-area-inset-right, 0px)); }
+  .acoes-fixas .dentro { max-width: 528px; margin: 0 auto; display: flex; gap: 10px; }
+  .acoes-fixas .botao { flex: 1; }
+  body.com-acoes main { padding-bottom: 110px; }
+  dialog.folha { padding: 10px 18px calc(18px + env(safe-area-inset-bottom, 0px)); border: 0; width: 100%; max-width: 560px; margin: auto auto 0; border-radius: 22px 22px 0 0; background: var(--superficie); color: var(--texto); }
+  dialog.folha::backdrop { background: rgb(30 29 26 / .45); }
+  @media (min-width: 600px) { dialog.folha { margin: auto; border-radius: 22px; } }
+  .folha .puxador { display: block; width: 42px; height: 5px; border-radius: 3px; background: var(--borda); margin: 0 auto 12px; }
+  .folha h2 { margin: 0 0 4px; font-size: 22px; }
+  .folha .acoes-folha { display: flex; gap: 10px; margin-top: 6px; }
+  .folha .acoes-folha .botao { flex: 1; }
+  .sugestoes { margin: 12px 0; }
+  .sugestoes label { font-weight: 600; }
+  .culto-corpo { flex: 1; min-height: 0; overflow-y: auto; padding: 4px 16px 24px; display: grid; gap: 16px; align-content: start; }
+  .culto-corpo .acoes { display: flex; flex-wrap: wrap; gap: 8px; }
+  .lista-agenda { display: grid; gap: 8px; margin: 12px 0; }
+  .lista-agenda a { display: flex; align-items: center; gap: 12px; padding: 10px 12px; border: 1px solid var(--linha); border-radius: 14px; color: var(--texto); text-decoration: none; }
+  .lista-agenda a .txt { flex: 1; min-width: 0; display: grid; }
+  .lista-agenda a .txt span { font-size: 13.5px; color: var(--suave); }
+  .lista-agenda a b { color: var(--primaria); font-size: 14px; white-space: nowrap; }
   .editor-musicas { margin-top: 12px; border-top: 1px solid var(--linha); padding-top: 10px; }
   .editor-musicas summary { cursor: pointer; font-weight: 600; color: var(--primaria); min-height: 32px; }
   .escolhidas { display: flex; flex-direction: column; gap: 6px; margin: 8px 0 10px; }
@@ -58,9 +114,6 @@
   .item-adicionar .marcar.on { background: var(--primaria); border-color: var(--primaria); color: var(--primaria-texto); font-size: 16px; }
   .rodape-tela { padding: 10px 16px calc(12px + env(safe-area-inset-bottom, 0px)); border-top: 1px solid var(--linha); background: var(--superficie); }
   .rodape-tela .botao { width: 100%; }
-  .avisos { list-style: none; margin: 0 0 12px; padding: 0; }
-  .avisos li { display: flex; align-items: center; gap: 8px; padding: 8px 0; border-bottom: 1px solid var(--linha); font-size: 15px; }
-  .avisos li span { flex: 1; }
   .grade2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: 10px; }
   h2 { font-size: 18px; margin-top: 4px; }
 </style>
@@ -88,36 +141,28 @@
   </section>
 
   <section id="conteudo" hidden>
-    <p class="sobretitulo">Minha escala</p>
-    <h1 id="ola"></h1>
-    <p class="intro" id="resumo"></p>
-    <button type="button" id="sair" class="botao secundario pequeno">Sair</button>
-
-    <div class="cultos" id="cultos"></div>
-    <button type="button" class="botao secundario" id="agenda" style="width:100%" hidden>Pôr na minha agenda</button>
-
-    <form id="form" class="cartao" style="margin-top:18px" novalidate>
-      <h2>Não vou poder</h2>
-      <p class="dica" style="margin-top:-6px">Avise com antecedência: quem monta a escala vê o aviso na hora.</p>
-      <ul class="avisos" id="avisos"></ul>
-      <div class="grade2">
-        <div class="campo"><label for="de">De</label><input type="date" id="de" required></div>
-        <div class="campo"><label for="ate">Até</label><input type="date" id="ate"></div>
+    <div class="cabeca-me">
+      <div>
+        <p class="sobretitulo">Minha escala</p>
+        <h1 id="ola"></h1>
+        <p class="intro" id="resumo"></p>
       </div>
-      <div class="campo"><label for="motivo">Motivo <span class="dica">(opcional)</span></label><input type="text" id="motivo" maxlength="80" placeholder="Ex.: viagem"></div>
-      <p id="resultado" role="status"></p>
-      <button class="botao" style="width:100%">Avisar</button>
-    </form>
+      <button type="button" id="abrir-conta" class="avatar" aria-label="Minha conta: senha e sair" aria-haspopup="dialog"></button>
+    </div>
 
-    <form id="form-senha" class="cartao" style="margin-top:18px">
-      <h2>Trocar minha senha</h2>
-      <div class="campo"><label for="senha-atual">Senha atual</label><input type="password" id="senha-atual" autocomplete="current-password" required></div>
-      <div class="campo"><label for="senha-nova">Nova senha</label><input type="password" id="senha-nova" autocomplete="new-password" required></div>
-      <p id="resultado-senha" role="status"></p>
-      <button class="botao secundario">Atualizar senha</button>
-    </form>
-
+    <div id="destaque"></div>
+    <h2 class="secao-titulo" id="depois-titulo" hidden>Depois</h2>
+    <div class="lista-compacta" id="depois" hidden></div>
+    <div class="avisos-ind" id="avisos"></div>
+    <p id="resultado" role="status"></p>
     <p class="dica" style="text-align:center;margin-top:18px">Sua escala é acessível somente após o login.</p>
+
+    <div class="acoes-fixas" id="acoes-fixas" hidden>
+      <div class="dentro">
+        <button type="button" class="botao secundario" id="abrir-nao-vou" aria-haspopup="dialog">Não vou poder</button>
+        <button type="button" class="botao" id="agenda">Pôr tudo na agenda</button>
+      </div>
+    </div>
   </section>
 </main>
 <dialog id="dlg-adicionar" class="tela-cheia" aria-labelledby="adicionar-titulo">
@@ -131,6 +176,53 @@
   </div>
   <div class="lista-tela" id="adicionar-lista"></div>
   <div class="rodape-tela"><button type="button" class="botao" id="adicionar-confirmar" disabled>Toque em + para escolher</button></div>
+</dialog>
+<dialog id="dlg-nao-vou" class="folha" aria-labelledby="nao-vou-titulo">
+  <span class="puxador" aria-hidden="true"></span>
+  <form id="form" novalidate>
+    <h2 id="nao-vou-titulo">Não vou poder</h2>
+    <p class="dica" style="margin:0">Avise com antecedência: quem monta a escala vê o aviso na hora.</p>
+    <div class="chips sugestoes" id="sugestoes" role="radiogroup" aria-label="Dia"></div>
+    <div class="grade2">
+      <div class="campo"><label for="de">De</label><input type="date" id="de" required></div>
+      <div class="campo"><label for="ate">Até</label><input type="date" id="ate"></div>
+    </div>
+    <div class="campo"><label for="motivo">Motivo <span class="dica">(opcional)</span></label><input type="text" id="motivo" maxlength="80" placeholder="Ex.: viagem"></div>
+    <p id="resultado-form" role="status"></p>
+    <div class="acoes-folha">
+      <button type="button" class="botao secundario" id="nao-vou-cancelar">Cancelar</button>
+      <button class="botao" id="nao-vou-avisar">Avisar</button>
+    </div>
+  </form>
+</dialog>
+<dialog id="dlg-conta" class="folha" aria-labelledby="conta-titulo">
+  <span class="puxador" aria-hidden="true"></span>
+  <h2 id="conta-titulo">Minha conta</h2>
+  <p class="dica" id="conta-nome" style="margin:0 0 12px"></p>
+  <form id="form-senha">
+    <div class="campo"><label for="senha-atual">Senha atual</label><input type="password" id="senha-atual" autocomplete="current-password" required></div>
+    <div class="campo"><label for="senha-nova">Nova senha</label><input type="password" id="senha-nova" autocomplete="new-password" required></div>
+    <p id="resultado-senha" role="status"></p>
+    <button class="botao secundario" style="width:100%">Trocar minha senha</button>
+  </form>
+  <div class="acoes-folha" style="margin-top:14px">
+    <button type="button" class="botao secundario" id="conta-fechar">Fechar</button>
+    <button type="button" class="botao perigo" id="sair">Sair</button>
+  </div>
+</dialog>
+<dialog id="dlg-culto" class="tela-cheia" aria-labelledby="culto-titulo">
+  <div class="topo-tela">
+    <button type="button" class="voltar" id="culto-voltar" aria-label="Voltar">←</button>
+    <div><strong id="culto-titulo"></strong><small id="culto-sub"></small></div>
+  </div>
+  <div class="culto-corpo" id="culto-corpo"></div>
+</dialog>
+<dialog id="dlg-agenda" class="folha" aria-labelledby="agenda-titulo">
+  <span class="puxador" aria-hidden="true"></span>
+  <h2 id="agenda-titulo">Pôr na agenda</h2>
+  <p class="dica" style="margin:0">O Google Agenda adiciona um culto por vez: toque em cada um.</p>
+  <div class="lista-agenda" id="lista-agenda"></div>
+  <button type="button" class="botao secundario" id="agenda-fechar" style="width:100%">Fechar</button>
 </dialog>
 <script src="/repertorio-busca.js?v=2"></script>
 <script src="/primeiro-acesso.js?v=1"></script>
@@ -146,7 +238,7 @@
       headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
       body: corpo === undefined ? undefined : JSON.stringify(corpo) });
     const j = await r.json().catch(() => ({}));
-    if (r.status === 401) { token = null; localStorage.removeItem('diako_token'); $('entrar').hidden = false; $('conteudo').hidden = true; }
+    if (r.status === 401) { token = null; localStorage.removeItem('diako_token'); $('entrar').hidden = false; $('conteudo').hidden = true; document.body.classList.remove('com-acoes'); }
     if (!r.ok) throw new Error(j.erro || 'Não foi possível carregar. Tente de novo.');
     return j;
   }
@@ -344,74 +436,155 @@
     adicionar.aoConfirmar?.(novas);
   });
 
+  const ehAndroid = () => /Android/i.test(navigator.userAgent || '');
+  const hojeIso = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
+  /** "hoje", "amanhã", "daqui a 4 dias". */
+  function quando(c) {
+    const dias = Math.round((new Date(c.data + 'T12:00:00') - new Date(hojeIso() + 'T12:00:00')) / 86400000);
+    return dias <= 0 ? 'hoje' : dias === 1 ? 'amanhã' : `daqui a ${dias} dias`;
+  }
+  /** "Domingo, 29/11". */
+  function dataLonga(c) {
+    const semana = new Date(c.data + 'T12:00:00').toLocaleDateString('pt-BR', { weekday: 'long' });
+    return semana.charAt(0).toUpperCase() + semana.slice(1).replace('-feira', '') + ', ' + ddmm(c.data);
+  }
+  /** A pessoa avisou que não pode neste dia (a escala ainda não foi trocada). */
+  const avisouFalta = (c) => dados.indisponibilidades.some((i) => i.de <= c.data && i.ate >= c.data);
+  const chipsDoCulto = (c) => criar('div', { className: 'chips-funcao' },
+    avisouFalta(c) ? criar('span', { className: 'chip falta', textContent: 'Você avisou que não vai' }) : null,
+    c.funcoes.map((f) => criar('span', { className: 'chip', textContent: nomeFuncao(f) })),
+    c.nome && c.nome !== 'Culto' ? criar('span', { className: 'chip', textContent: c.nome }) : null,
+    c.ceia ? criar('span', { className: 'chip ceia', textContent: 'Santa Ceia' }) : null);
+
+  function listaMusicas(c) {
+    if (!c.musicas || !c.musicas.length) return null;
+    return criar('ol', { className: 'musicas' }, c.musicas.map((m) => criar('li', {},
+      criar('span', { className: 't' }, m.titulo, detalheMusica(m) ? criar('small', { textContent: detalheMusica(m) }) : null),
+      m.youtube ? criar('a', { href: m.youtube, target: '_blank', rel: 'noopener noreferrer', textContent: 'Ouvir ↗' }) : null)));
+  }
+
+  /** "+ Agenda" de um culto: no Android abre o Google Agenda (o app não abre .ics); nos outros, baixa o convite. */
+  function botaoAgenda(c, classe) {
+    if (ehAndroid()) return criar('a', { className: classe, href: linkGoogleAgenda(c), target: '_blank', rel: 'noopener noreferrer', textContent: '+ Agenda' });
+    return botao('+ Agenda', () => baixarIcs([c], `culto-${c.data}.ics`), classe);
+  }
+  const botaoNaoVou = (c, classe) => dados.podeAvisarIndisponibilidade ? botao('Não vou neste', () => abrirNaoVou(c.data), classe) : null;
+
+  function cartaoDestaque(c) {
+    return criar('article', { className: 'destaque', aria: { label: 'Próximo culto' } },
+      criar('span', { className: 'quando', textContent: 'Próximo · ' + quando(c) }),
+      criar('span', { className: 'data', textContent: `${dataLonga(c)} · ${c.horaTexto}` }),
+      chipsDoCulto(c),
+      listaMusicas(c),
+      criar('div', { className: 'acoes' },
+        c.podeEscolherMusicas ? botao(c.musicas.length ? 'Alterar as músicas' : 'Escolher as músicas', () => abrirCulto(c, true), 'botao claro pequeno') : null,
+        botaoAgenda(c, 'botao ' + (c.podeEscolherMusicas ? 'vidro' : 'claro') + ' pequeno'),
+        botaoNaoVou(c, 'botao vidro pequeno')));
+  }
+
+  function itemDepois(c) {
+    const n = (c.musicas || []).length;
+    return criar('button', { type: 'button', className: 'item', onclick: () => abrirCulto(c),
+      aria: { label: `${dataLonga(c)}, ${c.horaTexto}: ${c.funcoes.map(nomeFuncao).join(' e ')}. Abrir` } },
+      criar('span', { className: 'dia' }, criar('small', { textContent: c.rotulo.slice(0, 3) }), criar('strong', { textContent: c.data.slice(8, 10) })),
+      criar('span', { className: 'txt' },
+        criar('strong', { textContent: c.funcoes.map(nomeFuncao).join(' e ') }),
+        criar('span', { textContent: [c.horaTexto, c.nome, c.ceia && 'Santa Ceia', n && `${n} ${n === 1 ? 'música' : 'músicas'}`].filter(Boolean).join(' · ') }),
+        avisouFalta(c) ? criar('span', { className: 'falta', textContent: 'Você avisou que não vai' }) : null),
+      criar('span', { className: 'seta', textContent: '›', aria: { hidden: 'true' } }));
+  }
+
+  // ---------- Culto aberto: tudo de um culto, e o editor do ministro ----------
+  let cultoAberto = null;
+  function abrirCulto(c, editar = false) {
+    cultoAberto = c.id;
+    if (editar) editoresAbertos.add(c.id);
+    desenharCulto(c);
+    if (!$('dlg-culto').open) $('dlg-culto').showModal();
+  }
+  function desenharCulto(c) {
+    $('culto-titulo').textContent = `${dataLonga(c)} · ${c.horaTexto}`;
+    $('culto-sub').textContent = [c.nome, quando(c)].join(' · ');
+    const corpo = $('culto-corpo');
+    corpo.replaceChildren(chipsDoCulto(c));
+    const musicas = listaMusicas(c);
+    if (musicas) corpo.append(criar('div', {}, criar('h2', { className: 'secao-titulo', textContent: 'Músicas' }), musicas));
+    if (c.podeEscolherMusicas) corpo.append(editorMusicas(c));
+    corpo.append(criar('div', { className: 'acoes' }, botaoAgenda(c, 'botao secundario pequeno'), botaoNaoVou(c, 'botao secundario pequeno')));
+  }
+  $('culto-voltar').addEventListener('click', () => $('dlg-culto').close());
+  $('dlg-culto').addEventListener('close', () => { cultoAberto = null; });
+
   function desenhar() {
     $('carregando').hidden = true;
     $('conteudo').hidden = false;
     $('ola').textContent = 'Olá, ' + dados.nome;
-    $('form').hidden = !dados.podeAvisarIndisponibilidade;
+    $('abrir-conta').textContent = (dados.nome || '?').trim().charAt(0).toUpperCase();
+    $('conta-nome').textContent = dados.nome + ' · ' + dados.igreja;
     const n = dados.cultos.length;
     $('resumo').textContent = n === 0
       ? 'Você não está escalado(a) nos próximos 60 dias.'
-      : `Você serve em ${n} ${n === 1 ? 'culto' : 'cultos'} nos próximos 60 dias. ${dados.igreja}.`;
-    $('cultos').replaceChildren(...dados.cultos.map((c) => {
-      const caixa = document.createElement('div');
-      caixa.className = 'culto';
-      const dia = document.createElement('div');
-      dia.className = 'dia';
-      dia.append(Object.assign(document.createElement('small'), { textContent: c.rotulo.slice(0, 3) }),
-        Object.assign(document.createElement('strong'), { textContent: c.data.slice(8, 10) }));
-      const texto = document.createElement('div');
-      texto.style.flex = '1';
-      texto.append(Object.assign(document.createElement('div'), { className: 'funcao', textContent: c.funcoes.map(nomeFuncao).join(' e ') }),
-        Object.assign(document.createElement('div'), { className: 'sub', textContent: `${c.rotulo.slice(4)} · ${c.horaTexto} · ${c.nome}${c.ceia ? ' · Santa Ceia' : ''}` }));
-      if (c.musicas && c.musicas.length) {
-        const ol = document.createElement('ol');
-        ol.className = 'musicas';
-        ol.append(...c.musicas.map((m) => {
-          const li = document.createElement('li');
-          li.append(criar('span', { className: 'titulo', textContent: m.titulo }));
-          if (detalheMusica(m)) li.append(criar('span', { className: 'tom-nota', textContent: detalheMusica(m) }));
-          if (m.youtube) {
-            const a = document.createElement('a');
-            a.href = m.youtube;
-            a.target = '_blank';
-            a.rel = 'noopener noreferrer';
-            a.textContent = 'Ouvir no YouTube ↗';
-            li.append(a);
-          }
-          return li;
-        }));
-        texto.append(ol);
-      }
-      if (c.podeEscolherMusicas) texto.append(editorMusicas(c));
-      if (dados.podeAvisarIndisponibilidade) {
-        texto.append(criar('a', { className: 'google-agenda', href: linkGoogleAgenda(c), target: '_blank', rel: 'noopener noreferrer',
-          textContent: '+ Google Agenda' }));
-      }
-      caixa.append(dia, texto);
-      return caixa;
-    }));
-    $('agenda').hidden = n === 0 || !dados.podeAvisarIndisponibilidade;
-    $('avisos').replaceChildren(...dados.indisponibilidades.map((i) => {
-      const li = document.createElement('li');
-      const remover = Object.assign(document.createElement('button'), { type: 'button', className: 'botao secundario pequeno', textContent: 'Desfazer' });
-      remover.addEventListener('click', async () => {
+      : `Você serve em ${n} ${n === 1 ? 'culto' : 'cultos'} nos próximos 60 dias.`;
+    const [proximo, ...depois] = dados.cultos;
+    $('destaque').replaceChildren(proximo ? cartaoDestaque(proximo)
+      : criar('div', { className: 'cartao vazio-escala' }, criar('p', { textContent: 'Nenhum culto para você nos próximos 60 dias. Quando te escalarem, ele aparece aqui.' })));
+    $('depois-titulo').hidden = $('depois').hidden = depois.length === 0;
+    $('depois').replaceChildren(...depois.map(itemDepois));
+    $('avisos').replaceChildren(...dados.indisponibilidades.map((i) => criar('div', { className: 'aviso-ind' },
+      criar('span', {}, 'Você avisou: ', criar('strong', { textContent: `não pode ${i.de === i.ate ? 'em' : 'de'} ${periodo(i.de, i.ate)}` }), i.motivo ? ` (${i.motivo}).` : '.'),
+      criar('button', { type: 'button', className: 'link', textContent: 'Desfazer', onclick: async () => {
         try {
           await chamar('/api/minha-escala/indisponivel/remover', { id: i.id });
           await carregar();
+          mensagem('Aviso desfeito.');
         } catch (err) {
           mensagem(err.message, false);
         }
-      });
-      li.append(Object.assign(document.createElement('span'), { textContent: `Indisponível ${periodo(i.de, i.ate)}${i.motivo ? ' · ' + i.motivo : ''}` }), remover);
-      return li;
-    }));
+      } }))));
+    // Quem só consulta (perfil Louvor) não avisa indisponibilidade: o botão e o "Não vou neste" somem.
+    $('form').hidden = !dados.podeAvisarIndisponibilidade;
+    $('abrir-nao-vou').hidden = !dados.podeAvisarIndisponibilidade;
+    $('agenda').hidden = n === 0;
+    $('acoes-fixas').hidden = $('abrir-nao-vou').hidden && $('agenda').hidden;
+    document.body.classList.toggle('com-acoes', !$('acoes-fixas').hidden);
+    // Culto aberto continua aberto depois de salvar as músicas.
+    if (cultoAberto) {
+      const c = dados.cultos.find((x) => x.id === cultoAberto);
+      c ? desenharCulto(c) : $('dlg-culto').close();
+    }
   }
 
-  function mensagem(texto, ok = true) {
-    $('resultado').textContent = texto;
-    $('resultado').className = ok ? 'sucesso' : 'erro';
+  function mensagem(texto, ok = true, onde = 'resultado') {
+    $(onde).textContent = texto;
+    $(onde).className = ok ? 'sucesso' : 'erro';
   }
+
+  // ---------- Não vou poder ----------
+  function abrirNaoVou(data) {
+    $('form').reset();
+    $('resultado-form').textContent = '';
+    const datas = [...new Set(dados.cultos.map((c) => c.data))].slice(0, 3);
+    const escolher = (d) => { $('de').value = d; $('ate').value = d; desenharSugestoes(d); };
+    function desenharSugestoes(marcada) {
+      $('sugestoes').replaceChildren(
+        ...datas.map((d) => {
+          const c = dados.cultos.find((x) => x.data === d);
+          const radio = criar('input', { type: 'radio', name: 'sugestao', value: d, checked: d === marcada, onchange: () => escolher(d) });
+          return criar('label', {}, radio, `${c.rotulo.slice(0, 3)} ${ddmm(d)}`);
+        }),
+        criar('label', {}, criar('input', { type: 'radio', name: 'sugestao', value: '', checked: !marcada && !!$('de').value,
+          onchange: () => { $('de').focus(); } }), 'Outro período'));
+    }
+    if (data) escolher(data); else desenharSugestoes('');
+    $('dlg-nao-vou').showModal();
+  }
+  $('abrir-nao-vou').addEventListener('click', () => abrirNaoVou(dados.cultos[0]?.data));
+  $('nao-vou-cancelar').addEventListener('click', () => $('dlg-nao-vou').close());
+  $('de').addEventListener('change', () => { if (!$('ate').value || $('ate').value < $('de').value) $('ate').value = $('de').value; });
+
+  // ---------- Minha conta ----------
+  $('abrir-conta').addEventListener('click', () => { $('resultado-senha').textContent = ''; $('dlg-conta').showModal(); });
+  $('conta-fechar').addEventListener('click', () => $('dlg-conta').close());
 
   async function carregar() {
     try {
@@ -428,16 +601,16 @@
 
   $('form').addEventListener('submit', async (e) => {
     e.preventDefault();
-    if (!$('de').value) return mensagem('Escolha a data.', false);
-    const botao = $('form').querySelector('button:not([type])');
+    if (!$('de').value) return mensagem('Escolha o dia.', false, 'resultado-form');
+    const botao = $('nao-vou-avisar');
     botao.disabled = true;
     try {
       await chamar('/api/minha-escala/indisponivel', { de: $('de').value, ate: $('ate').value || $('de').value, motivo: $('motivo').value.trim() });
-      $('form').reset();
+      $('dlg-nao-vou').close();
       await carregar();
       mensagem('Aviso enviado. Obrigado por avisar!');
     } catch (err) {
-      mensagem(err.message, false);
+      mensagem(err.message, false, 'resultado-form');
     } finally {
       botao.disabled = false;
     }
@@ -462,11 +635,11 @@
 
   // Convite .ics feito aqui no celular (nada sai do aparelho). DTSTAMP e horário em UTC: TZID sem
   // VTIMEZONE e evento sem DTSTAMP fazem Outlook, Calendário do Windows e iPhone recusarem o arquivo.
-  $('agenda').addEventListener('click', () => {
+  function baixarIcs(cultos, arquivo) {
     const esc = (s) => s.replace(/[\\;,]/g, (m) => '\\' + m).replace(/\n/g, '\\n');
     const agora = utc(new Date());
     const linhas = ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//DiakoNews//Minha escala//PT', 'CALSCALE:GREGORIAN', 'METHOD:PUBLISH'];
-    for (const c of dados.cultos) {
+    for (const c of cultos) {
       const { inicio, fim } = horarioCulto(c);
       linhas.push('BEGIN:VEVENT', `UID:escala-${c.data}-${c.hora.replace(':', '')}@diakonews`,
         `DTSTAMP:${agora}`, `DTSTART:${inicio}`, `DTEND:${fim}`,
@@ -474,11 +647,22 @@
     }
     linhas.push('END:VCALENDAR');
     const blob = new Blob([linhas.join('\r\n') + '\r\n'], { type: 'text/calendar;charset=utf-8' });
-    const a = Object.assign(document.createElement('a'), { href: URL.createObjectURL(blob), download: 'minha-escala.ics' });
+    const a = Object.assign(document.createElement('a'), { href: URL.createObjectURL(blob), download: arquivo });
     document.body.append(a);
     a.click();
     a.remove();
+  }
+
+  // "Pôr tudo na agenda": no Android, a lista com o link do Google Agenda de cada culto; nos outros, um .ics com todos.
+  $('agenda').addEventListener('click', () => {
+    if (!ehAndroid()) return baixarIcs(dados.cultos, 'minha-escala.ics');
+    $('lista-agenda').replaceChildren(...dados.cultos.map((c) => criar('a', { href: linkGoogleAgenda(c), target: '_blank', rel: 'noopener noreferrer' },
+      criar('span', { className: 'dia' }, criar('small', { textContent: c.rotulo.slice(0, 3) }), criar('strong', { textContent: c.data.slice(8, 10) })),
+      criar('span', { className: 'txt' }, criar('strong', { textContent: c.funcoes.map(nomeFuncao).join(' e ') }), criar('span', { textContent: `${c.horaTexto} · ${c.nome}` })),
+      criar('b', { textContent: '+ Agenda' }))));
+    $('dlg-agenda').showModal();
   });
+  $('agenda-fechar').addEventListener('click', () => $('dlg-agenda').close());
 
   $('form-login').addEventListener('submit', async (e) => {
     e.preventDefault();
@@ -496,6 +680,8 @@
     } catch (err) { $('erro-login').textContent = err.message; $('erro-login').hidden = false; }
   });
   $('sair').addEventListener('click', async () => {
+    if ($('dlg-conta').open) $('dlg-conta').close();
+    document.body.classList.remove('com-acoes');
     await chamar('/api/logout', {}).catch(() => {});
     token = null; localStorage.removeItem('diako_token');
     $('conteudo').hidden = true; $('invalido').hidden = true; $('entrar').hidden = false;

@@ -25,7 +25,23 @@ test('painel encaminha quem não tem aba no painel (integrante, ministro, louvor
 test('Louvor não vê formulário de indisponibilidade em Minha escala', () => {
   const html = fs.readFileSync(path.join(__dirname, '../web/minha-escala.html'), 'utf8');
   assert.match(html, /\$\('form'\)\.hidden = !dados\.podeAvisarIndisponibilidade/);
-  assert.match(html, /\$\('agenda'\)\.hidden = n === 0 \|\| !dados\.podeAvisarIndisponibilidade/);
+  assert.match(html, /\$\('abrir-nao-vou'\)\.hidden = !dados\.podeAvisarIndisponibilidade/);
+  assert.match(html, /dados\.podeAvisarIndisponibilidade \? botao\('Não vou neste'/);
+  // Pôr na agenda vale para qualquer pessoa escalada.
+  assert.match(html, /\$\('agenda'\)\.hidden = n === 0;/);
+});
+
+test('Minha escala (opção A): próximo culto em destaque, lista curta, ações no rodapé e conta separada', () => {
+  const html = fs.readFileSync(path.join(__dirname, '../web/minha-escala.html'), 'utf8');
+  for (const id of ['destaque', 'depois', 'acoes-fixas', 'abrir-nao-vou', 'abrir-conta', 'dlg-nao-vou', 'dlg-conta', 'dlg-culto', 'dlg-agenda']) {
+    assert.ok(html.includes(`id="${id}"`), id);
+  }
+  // Formulário de falta e troca de senha saíram do meio da página para as folhas.
+  assert.ok(html.indexOf('id="form"') > html.indexOf('<dialog id="dlg-nao-vou"'));
+  assert.ok(html.indexOf('id="form-senha"') > html.indexOf('<dialog id="dlg-conta"'));
+  assert.ok(html.indexOf('id="sair"') > html.indexOf('<dialog id="dlg-conta"'));
+  assert.match(html, /const \[proximo, \.\.\.depois\] = dados\.cultos;/);
+  assert.match(html, /if \(ehAndroid\(\)\) return criar\('a', \{ className: classe, href: linkGoogleAgenda\(c\)/);
 });
 
 test('administração de acessos permite vincular contas da Minha escala de qualquer perfil', () => {

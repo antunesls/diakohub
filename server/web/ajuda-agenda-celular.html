@@ -1,0 +1,109 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Agenda da igreja no celular</title>
+<link rel="stylesheet" href="/estilo.css?v=5">
+<style>
+  main { max-width: 760px; margin: 0 auto; padding: 32px 16px 64px; }
+  .topo-ajuda { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 20px; padding-bottom: 18px; margin-bottom: 28px; border-bottom: 1px solid var(--linha); }
+  .topo-ajuda img { height: 40px; width: auto; }
+  .topo-ajuda .espaco { flex: 1; }
+  h1 { font-size: 34px; margin-bottom: 8px; }
+  .lead { font-size: 18px; color: var(--suave); margin: 0 0 24px; }
+  h2 { font-size: 25px; margin: 40px 0 10px; scroll-margin-top: 16px; }
+  p, li { line-height: 1.6; }
+  ol li, ul li { margin-bottom: 6px; }
+  .nota { padding: 14px 18px; border-radius: 14px; background: var(--primaria-suave); color: var(--primaria-escura); margin: 16px 0; }
+  .nota p { margin: 0; }
+  .indice { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 8px; }
+  .indice a { padding: 4px 12px; border-radius: 16px; border: 1px solid var(--borda); text-decoration: none; font-size: 14px; font-weight: 600; }
+  code { padding: 1px 6px; border-radius: 6px; background: var(--neutro); font-size: 14px; overflow-wrap: anywhere; }
+  .endereco { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin: 12px 0; padding: 14px 16px; border-radius: 14px; background: var(--superficie); border: 1px solid var(--linha); }
+  .endereco code { flex: 1; min-width: 0; font-size: 15px; background: none; padding: 0; }
+  .acoes { display: flex; flex-wrap: wrap; gap: 10px; margin: 12px 0; }
+  @media (max-width: 520px) { h1 { font-size: 28px; } h2 { font-size: 22px; } }
+</style>
+</head>
+<body>
+<main>
+  <header class="topo-ajuda">
+    <a href="/"><img src="/logo.png" alt="Igreja Diakonia Tulipas"></a>
+    <span class="espaco"></span>
+    <a class="botao secundario pequeno" href="/">Voltar ao site</a>
+  </header>
+
+  <p class="sobretitulo">Ajuda</p>
+  <h1>Agenda da igreja no seu celular</h1>
+  <p class="lead">Assine a agenda da igreja uma vez e os eventos passam a aparecer no calendário do seu celular, junto dos seus compromissos. Quando a igreja muda um horário, cancela ou cria um evento, o seu calendário atualiza sozinho.</p>
+  <nav class="indice" aria-label="Nesta página">
+    <a href="#iphone">iPhone</a><a href="#android">Android</a><a href="#computador">Computador e Outlook</a>
+    <a href="#atualizacao">Quando atualiza</a><a href="#remover">Como remover</a>
+  </nav>
+
+  <p>Endereço da agenda (para quem precisar copiar):</p>
+  <div class="endereco">
+    <code id="endereco">/agenda.ics</code>
+    <button type="button" class="botao secundario pequeno" id="copiar">Copiar</button>
+  </div>
+  <p class="dica" id="copiado" role="status"></p>
+
+  <h2 id="iphone">iPhone e iPad</h2>
+  <div class="acoes"><a class="botao" id="assinar-apple" href="#">Assinar no Calendário</a></div>
+  <ol>
+    <li>Toque em <strong>Assinar no Calendário</strong> (aqui ou no card da página inicial).</li>
+    <li>O iPhone pergunta se quer assinar a agenda: toque em <strong>Assinar</strong>.</li>
+    <li>Na tela seguinte, escolha a cor e, em <strong>Atualização automática</strong>, deixe <strong>A cada hora</strong> ou <strong>A cada dia</strong>. Toque em <strong>Adicionar</strong>.</li>
+  </ol>
+  <div class="nota"><p>Se o botão não abrir o Calendário: vá em <strong>Ajustes › Calendário › Contas › Adicionar conta › Outra › Adicionar calendário assinado</strong> e cole o endereço acima.</p></div>
+
+  <h2 id="android">Android (Google Agenda)</h2>
+  <div class="acoes"><a class="botao" id="assinar-google" href="#" target="_blank" rel="noopener">Adicionar ao Google Agenda</a></div>
+  <ol>
+    <li>Toque em <strong>Adicionar ao Google Agenda</strong>. Se o celular perguntar, abra no navegador e entre na mesma conta Google do seu celular.</li>
+    <li>Confirme em <strong>Adicionar</strong>. A agenda aparece no app do Google Agenda em <strong>Outras agendas</strong>, com o nome “Agenda — Igreja Diakonia Tulipas”.</li>
+    <li>Se ela não aparecer no app, abra o menu do Google Agenda (☰), desça até a agenda da igreja e marque a caixa dela. Em <strong>Configurações</strong>, toque no nome da agenda e ligue <strong>Sincronizar</strong>.</li>
+  </ol>
+  <div class="nota"><p>Se o botão não funcionar no celular, faça uma vez pelo computador: abra <strong>calendar.google.com</strong>, clique no <strong>+</strong> ao lado de <strong>Outras agendas</strong>, escolha <strong>Do URL</strong>, cole o endereço acima e clique em <strong>Adicionar agenda</strong>. Em alguns minutos ela aparece no celular. O calendário da Samsung mostra as agendas da sua conta Google, então funciona do mesmo jeito.</p></div>
+
+  <h2 id="computador">Computador e Outlook</h2>
+  <ul>
+    <li><strong>Outlook:</strong> em <strong>Calendário › Adicionar calendário › Assinar da Web</strong>, cole o endereço acima.</li>
+    <li><strong>Mac (Calendário):</strong> o botão <strong>Assinar no Calendário</strong> também funciona. Ou em <strong>Arquivo › Nova assinatura de calendário</strong>, cole o endereço.</li>
+    <li><strong>Google Agenda no navegador:</strong> mesmo caminho do aviso acima (<strong>Outras agendas › + › Do URL</strong>).</li>
+  </ul>
+
+  <h2 id="atualizacao">Quando a agenda atualiza</h2>
+  <p>O calendário do celular volta a buscar a agenda da igreja de tempos em tempos. No iPhone, no intervalo que você escolheu. No Google Agenda, quem decide é o Google: costuma levar algumas horas, às vezes até um dia. Por isso, num evento muito em cima da hora, confira também a página inicial do site.</p>
+  <p>A agenda traz os eventos do último mês e dos próximos 12 meses, os mesmos que a igreja publica no site.</p>
+
+  <h2 id="remover">Como remover</h2>
+  <ul>
+    <li><strong>iPhone:</strong> no app Calendário, toque em <strong>Calendários</strong>, no <strong>i</strong> ao lado da agenda da igreja e em <strong>Apagar calendário</strong>.</li>
+    <li><strong>Google Agenda:</strong> em calendar.google.com, passe o mouse na agenda da igreja em <strong>Outras agendas</strong>, clique no <strong>×</strong> (cancelar inscrição).</li>
+  </ul>
+  <p>Remover a assinatura não apaga nada dos seus outros calendários.</p>
+</main>
+<script>
+  const https = location.origin + '/agenda.ics';
+  const webcal = https.replace(/^https?:\/\//, 'webcal://');
+  document.getElementById('endereco').textContent = https;
+  document.getElementById('assinar-apple').href = webcal;
+  document.getElementById('assinar-google').href = 'https://calendar.google.com/calendar/r?cid=' + encodeURIComponent(webcal);
+  document.getElementById('copiar').addEventListener('click', async () => {
+    const aviso = document.getElementById('copiado');
+    try {
+      await navigator.clipboard.writeText(https);
+      aviso.textContent = 'Endereço copiado.';
+    } catch {
+      const faixa = document.createRange();
+      faixa.selectNodeContents(document.getElementById('endereco'));
+      getSelection().removeAllRanges();
+      getSelection().addRange(faixa);
+      aviso.textContent = 'Endereço selecionado: toque e segure para copiar.';
+    }
+  });
+</script>
+</body>
+</html>

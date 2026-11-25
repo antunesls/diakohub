@@ -89,6 +89,45 @@ void main() {
     expect(icsDoEvento(e, igreja: 'Igreja', agora: DateTime.utc(2026, 11, 1, 12).toLocal()), contains('DTSTAMP:20261101T120000Z'));
   });
 
+  test('assinatura da agenda: nome, atualização, UID estável e linhas de até 75 bytes', () {
+    final longo = 'Encontro de casais com jantar, palestra e momento de oração — traga sua família e um prato de doce';
+    final eventos = [
+      Evento(id: 'jovens@2026-11-07T19:30:00.000', titulo: 'Culto de Jovens', inicio: DateTime(2026, 11, 7, 19, 30),
+          fim: DateTime(2026, 11, 7, 21), local: 'Salão'),
+      Evento(id: 'casais', titulo: longo, inicio: DateTime(2026, 11, 14), fim: DateTime(2026, 11, 15), diaInteiro: true,
+          descricao: longo),
+    ];
+    final t = icsDaAgenda(eventos, igreja: 'Igreja Diakonia Tulipas', agora: DateTime.utc(2026, 11, 7, 13));
+    expect(t, startsWith('BEGIN:VCALENDAR\r\n'));
+    expect(t, endsWith('END:VCALENDAR\r\n'));
+    expect(t, contains('X-WR-CALNAME:Agenda — Igreja Diakonia Tulipas'));
+    expect(t, contains('REFRESH-INTERVAL;VALUE=DURATION:PT4H'));
+    expect(t, contains('X-PUBLISHED-TTL:PT4H'));
+    expect('BEGIN:VEVENT'.allMatches(t).length, 2);
+    expect(t, contains('UID:jovens@2026-11-07T19_30_00.000@diakonews'));
+    expect(t, contains('DTSTART:20261107T223000Z'));
+    expect(t, contains('DTSTART;VALUE=DATE:20261114'));
+    expect(t, contains('DTSTAMP:20261107T130000Z'));
+    for (final linha in t.split('\r\n')) {
+      expect(utf8.encode(linha).length, lessThanOrEqualTo(75), reason: linha);
+    }
+    // Desdobrando (CRLF + espaço), o texto volta inteiro, com acentos intactos.
+    expect(t.replaceAll('\r\n ', ''), contains('SUMMARY:${longo.replaceAll(',', r'\,')}'));
+    // Sem eventos ainda é um calendário válido (o celular mantém a assinatura).
+    expect(icsDaAgenda(const [], igreja: 'Igreja', agora: DateTime.utc(2026)), isNot(contains('BEGIN:VEVENT')));
+  });
+
+  test('endereços para assinar: https, webcal e Google Agenda com o webcal', () {
+    final a = enderecosAssinatura('https://diakoniatulipas.com.br/');
+    expect(a['ics'], 'https://diakoniatulipas.com.br/agenda.ics');
+    expect(a['webcal'], 'webcal://diakoniatulipas.com.br/agenda.ics');
+    final google = Uri.parse(a['google']!);
+    expect(google.host, 'calendar.google.com');
+    expect(google.path, '/calendar/r');
+    expect(google.queryParameters['cid'], 'webcal://diakoniatulipas.com.br/agenda.ics');
+    expect(enderecosAssinatura('http://192.168.0.10:8080')['webcal'], 'webcal://192.168.0.10:8080/agenda.ics');
+  });
+
   test('link do Google Agenda (Android) com horário em UTC, dia inteiro e local', () {
     final e = Evento(id: 'x', titulo: 'Culto de Jovens', inicio: DateTime(2026, 11, 7, 19, 30), fim: DateTime(2026, 11, 7, 21),
         local: 'Templo', descricao: 'Traga um amigo');
@@ -204,6 +243,9 @@ void main() {
       expect(j['eventos'], isEmpty);
       final idIcs = '/api/public/eventos/${Uri.encodeComponent('jovens@2026-11-07T19:30:00.000')}.ics';
       expect((await chamar('GET', idIcs, null, false)).statusCode, 404);
+      // Assinatura: só com a agenda liberada no site.
+      expect(j.containsKey('assinatura'), isFalse);
+      expect((await chamar('GET', '/agenda.ics', null, false)).statusCode, 404);
 
       await chamar('PUT', '/api/admin/configuracoes', {'siteAgenda': true});
       j = await inicio();
@@ -219,6 +261,23 @@ void main() {
       final google = Uri.parse(evento['google'] as String);
       expect(google.host, 'calendar.google.com');
       expect(google.queryParameters['text'], 'Culto de Jovens');
+
+      final assinatura = j['assinatura'] as Map;
+      expect(assinatura['ics'], 'http://192.168.0.10:8080/agenda.ics');
+      expect(assinatura['webcal'], 'webcal://192.168.0.10:8080/agenda.ics');
+      expect(Uri.parse(assinatura['google'] as String).queryParameters['cid'], assinatura['webcal']);
+      final feed = await chamar('GET', '/agenda.ics', null, false);
+      expect(feed.statusCode, 200);
+      expect(feed.headers['content-type'], contains('text/calendar'));
+      expect(feed.headers['content-disposition'], startsWith('inline;'));
+      final texto = await feed.readAsString();
+      expect(texto, contains('X-WR-CALNAME:Agenda'));
+      expect(texto, contains('SUMMARY:Culto de Jovens'));
+      expect(texto, contains('LOCATION:Salão'));
+      // Desligar a agenda no site tira a assinatura do ar (o celular para de receber eventos novos).
+      await chamar('PUT', '/api/admin/configuracoes', {'siteAgenda': false});
+      expect((await chamar('GET', '/agenda.ics', null, false)).statusCode, 404);
+      expect((await inicio()).containsKey('assinatura'), isFalse);
     });
 
     test('cultos, endereço, PIX e redes; validação no /admin', () async {

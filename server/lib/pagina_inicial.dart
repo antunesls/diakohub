@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:typed_data';
 
 import 'package:diako_core/diako_core.dart';
@@ -131,30 +132,85 @@ String linkGoogleAgenda(Evento e, {required String igreja}) {
   }).toString();
 }
 
+String _escIcs(String s) =>
+    s.replaceAll(r'\', r'\\').replaceAll(';', r'\;').replaceAll(',', r'\,').replaceAll(RegExp(r'\r?\n'), r'\n');
+
+/// Um VEVENT. O UID é estável (vem do id do evento, por ocorrência), então numa assinatura o
+/// calendário atualiza o mesmo evento em vez de duplicar.
+List<String> _vevento(Evento e, {required String igreja, required String dtstamp}) => [
+      'BEGIN:VEVENT',
+      'UID:${e.id.replaceAll(RegExp(r'[^A-Za-z0-9._@-]'), '_')}@diakonews',
+      'DTSTAMP:$dtstamp',
+      if (e.diaInteiro) ...[
+        'DTSTART;VALUE=DATE:${_dataCompacta(e.inicio)}',
+        'DTEND;VALUE=DATE:${_dataCompacta(e.fim.isAfter(e.inicio) ? e.fim : e.inicio.add(const Duration(days: 1)))}',
+      ] else ...[
+        'DTSTART:${_utcDeBrasilia(e.inicio)}',
+        'DTEND:${_utcDeBrasilia(_fimDoEvento(e))}',
+      ],
+      'SUMMARY:${_escIcs(e.titulo)}',
+      if (e.local.isNotEmpty) 'LOCATION:${_escIcs(e.local)}',
+      'DESCRIPTION:${_escIcs([e.descricao, igreja].where((t) => t.isNotEmpty).join('\n\n'))}',
+      'END:VEVENT',
+    ];
+
+/// Linhas de no máximo 75 bytes, continuadas com espaço (RFC 5545 §3.1), sem partir um caractere.
+String _dobrarIcs(List<String> linhas) {
+  final saida = StringBuffer();
+  for (final linha in linhas) {
+    var bytes = 0;
+    var limite = 75;
+    for (final rune in linha.runes) {
+      final tamanho = utf8.encode(String.fromCharCode(rune)).length;
+      if (bytes + tamanho > limite) {
+        saida.write('\r\n ');
+        bytes = 1;
+        limite = 75;
+      }
+      saida.writeCharCode(rune);
+      bytes += tamanho;
+    }
+    saida.write('\r\n');
+  }
+  return saida.toString();
+}
+
+List<String> _cabecalhoIcs() =>
+    ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//DiakoNews//Agenda//PT', 'CALSCALE:GREGORIAN', 'METHOD:PUBLISH'];
+
 /// Convite de calendário (.ics) de um evento, para o botão "+ Agenda" do site (iPhone, Outlook,
 /// computador). [agora] é o instante da geração (DTSTAMP).
-String icsDoEvento(Evento e, {required String igreja, required DateTime agora}) {
-  String data(DateTime d) => _dataCompacta(d);
-  String utc(DateTime d) => _utcDeBrasilia(d);
+String icsDoEvento(Evento e, {required String igreja, required DateTime agora}) => _dobrarIcs([
+      ..._cabecalhoIcs(),
+      ..._vevento(e, igreja: igreja, dtstamp: _utcCompacta(agora.toUtc())),
+      'END:VCALENDAR',
+    ]);
 
-  String esc(String s) =>
-      s.replaceAll(r'\', r'\\').replaceAll(';', r'\;').replaceAll(',', r'\,').replaceAll(RegExp(r'\r?\n'), r'\n');
-  final linhas = [
-    'BEGIN:VCALENDAR',
-    'VERSION:2.0',
-    'PRODID:-//DiakoNews//Agenda//PT',
-    'CALSCALE:GREGORIAN',
-    'METHOD:PUBLISH',
-    'BEGIN:VEVENT',
-    'UID:${e.id.replaceAll(RegExp(r'[^A-Za-z0-9._@-]'), '_')}@diakonews',
-    'DTSTAMP:${_utcCompacta(agora.toUtc())}',
-    if (e.diaInteiro) ...['DTSTART;VALUE=DATE:${data(e.inicio)}', 'DTEND;VALUE=DATE:${data(e.fim)}']
-    else ...['DTSTART:${utc(e.inicio)}', 'DTEND:${utc(_fimDoEvento(e))}'],
-    'SUMMARY:${esc(e.titulo)}',
-    if (e.local.isNotEmpty) 'LOCATION:${esc(e.local)}',
-    'DESCRIPTION:${esc([e.descricao, igreja].where((t) => t.isNotEmpty).join('\n\n'))}',
-    'END:VEVENT',
+/// Agenda inteira para assinar no celular (/agenda.ics): o calendário volta a buscar este endereço
+/// sozinho, então eventos novos, mudanças e cancelamentos chegam sem a pessoa fazer nada.
+/// REFRESH-INTERVAL e X-PUBLISHED-TTL pedem para atualizar a cada 4 horas (o Google decide o próprio ritmo).
+String icsDaAgenda(List<Evento> eventos, {required String igreja, required DateTime agora}) {
+  final dtstamp = _utcCompacta(agora.toUtc());
+  return _dobrarIcs([
+    ..._cabecalhoIcs(),
+    'X-WR-CALNAME:${_escIcs('Agenda — $igreja')}',
+    'X-WR-CALDESC:${_escIcs('Eventos publicados no site da $igreja.')}',
+    'X-WR-TIMEZONE:America/Sao_Paulo',
+    'REFRESH-INTERVAL;VALUE=DURATION:PT4H',
+    'X-PUBLISHED-TTL:PT4H',
+    for (final e in eventos) ..._vevento(e, igreja: igreja, dtstamp: dtstamp),
     'END:VCALENDAR',
-  ];
-  return '${linhas.join('\r\n')}\r\n';
+  ]);
+}
+
+/// Endereços para assinar a agenda: o https (copiar, Outlook), o webcal (abre "Assinar calendário"
+/// no iPhone e no Mac) e o do Google Agenda, que já recebe o webcal para adicionar.
+Map<String, String> enderecosAssinatura(String urlBase) {
+  final https = '${urlBase.replaceFirst(RegExp(r'/+$'), '')}/agenda.ics';
+  final webcal = https.replaceFirst(RegExp(r'^https?://'), 'webcal://');
+  return {
+    'ics': https,
+    'webcal': webcal,
+    'google': Uri.https('calendar.google.com', '/calendar/r', {'cid': webcal}).toString(),
+  };
 }

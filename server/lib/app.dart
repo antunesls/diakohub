@@ -247,6 +247,8 @@ class Servidor {
       ..get('/', (Request _) => cfg?.siteAtivo == true ? _pagina('inicio.html') : Response.found('/painel'))
       ..get('/api/public/inicio', _inicio)
       ..get('/api/public/eventos/<arquivo>', _icsEvento)
+      ..get('/agenda.ics', _icsAgenda)
+      ..get('/ajuda/agenda-celular', (Request _) => _pagina('ajuda-agenda-celular.html'))
       ..get('/pix.png', _pngPix)
       ..get('/oracao', (Request _) => _pagina('oracao.html'))
       ..get('/mensagens', (Request _) => _pagina('mensagens.html'))
@@ -5316,6 +5318,23 @@ class Servidor {
   List<Evento> _eventosDoSite() =>
       cfg?.siteAgenda == true ? (agenda?.proximos(dias: 30) ?? const <Evento>[]) : const <Evento>[];
 
+  /// Agenda publicada no site: página inicial ligada, agenda liberada nela e calendário configurado.
+  bool get _agendaNoSite => cfg?.siteAtivo == true && cfg?.siteAgenda == true && agenda?.configurada == true;
+
+  /// GET /agenda.ics — assinatura da agenda da igreja (último mês e próximos 12 meses), com os
+  /// mesmos eventos que o site publica. O celular volta a buscar sozinho: fica sincronizada.
+  Response _icsAgenda(Request _) {
+    if (!_agendaNoSite) return Response.notFound('A agenda da igreja não está publicada no site.');
+    final agora = _agora();
+    final hoje = DateTime(agora.year, agora.month, agora.day);
+    final eventos = agenda!.eventos(de: hoje.subtract(const Duration(days: 31)), ate: hoje.add(const Duration(days: 366)));
+    return Response.ok(icsDaAgenda(eventos, igreja: nomeIgreja, agora: agora), headers: {
+      'content-type': 'text/calendar; charset=utf-8',
+      'content-disposition': 'inline; filename="agenda.ics"',
+      'cache-control': 'no-cache',
+    });
+  }
+
   /// GET /api/public/inicio — só dados públicos: recados marcados "no site", agenda (se liberada),
   /// cultos, endereço, PIX e redes. Nada de pedidos de oração, mensagens ou aniversariantes.
   Response _inicio(Request _) {
@@ -5356,6 +5375,8 @@ class Servidor {
             'google': linkGoogleAgenda(e, igreja: nomeIgreja),
           },
       ],
+      // Assinar a agenda inteira no celular (fica sincronizada); só com a agenda do site ligada.
+      if (_agendaNoSite) 'assinatura': enderecosAssinatura(_urlBase),
       'galeria': [
         if (c.siteGaleria)
           for (final f in _fotos().where((f) => f['ativo'] != false))
