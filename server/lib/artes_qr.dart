@@ -23,7 +23,7 @@ class ArtesQr {
   /// Nomes gerados pelo servidor: "<qr>-<hex>.png" (a arte, sem o QR) e "<qr>-foto-<hex>.jpg" (a foto
   /// de fundo do editor automático, para reabrir e editar). O nome muda a cada envio.
   static bool nomeValido(String nome) =>
-      RegExp(r'^(oracao|mensagens|pix|visitante|devocional)-([0-9a-f]{20}\.png|foto-[0-9a-f]{20}\.jpg)$').hasMatch(nome);
+      RegExp(r'^(oracao|mensagens|pix|visitante|devocional|agenda)-([0-9a-f]{20}\.png|foto-[0-9a-f]{20}\.jpg)$').hasMatch(nome);
 
   File? arquivo(String nome) => nomeValido(nome) ? File(p.join(pasta, nome)) : null;
 
@@ -92,7 +92,7 @@ Uint8List normalizarArte(Uint8List bytes, {bool jpg = false}) {
   return jpg ? img.encodeJpg(tela, quality: 88) : img.encodePng(tela);
 }
 
-/// Refaz os QR projetados (oração, mensagens, PIX, visitante e devocionais), com a arte de cada um, na pasta de cartazes, de onde
+/// Refaz os QR projetados (oração, mensagens, PIX, visitante, devocionais e agenda), com a arte de cada um, na pasta de cartazes, de onde
 /// o Holyrics os abre e o agente os copia para o PC da igreja.
 Future<void> gravarQrsProjetados(String pastaCartazes, Configuracoes cfg, ArtesQr artes) async {
   await gravarQr(pastaCartazes, cfg.urlOracao, arte: await artes.carregar(cfg, 'oracao'));
@@ -102,4 +102,5 @@ Future<void> gravarQrsProjetados(String pastaCartazes, Configuracoes cfg, ArtesQ
   await gravarQrVisitante(pastaCartazes, cfg.urlVisitante,
       ativo: cfg.visitanteQrAtivo, arte: await artes.carregar(cfg, 'visitante'));
   await gravarQrDevocional(pastaCartazes, '${cfg.urlBase}/devocional', arte: await artes.carregar(cfg, 'devocional'));
+  await gravarQrAgenda(pastaCartazes, '${cfg.urlBase}/agenda', arte: await artes.carregar(cfg, 'agenda'));
 }

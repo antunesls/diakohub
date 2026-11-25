@@ -11,8 +11,8 @@ test('ficha do membro tem o botão do certificado e o painel carrega o script', 
   const painel = web('painel.js');
   assert.match(html, /id="certificado-da-ficha"[^>]*hidden/);
   assert.match(html, /<dialog id="dlg-certificado">/);
-  assert.ok(html.indexOf('/painel.js?v=35') !== -1);
-  assert.ok(html.indexOf('/painel.js?v=35') < html.indexOf('/certificado.js?v=1'));
+  assert.ok(html.indexOf('/painel.js?v=36') !== -1);
+  assert.ok(html.indexOf('/painel.js?v=36') < html.indexOf('/certificado.js?v=1'));
   // Só aparece para quem tem data de batismo (o servidor recusa sem ela).
   assert.match(painel, /\$\('certificado-da-ficha'\)\.hidden = !m\.dataBatismo/);
   assert.match(painel, /Certificado\.abrir\(fichaAberta\)/);
@@ -111,4 +111,18 @@ test('sem imagens salvas não pede assinatura nem carimbo; erro do servidor fech
   assert.equal(t.els['cert-resultado'].textContent, 'A ficha não tem data de batismo.');
   assert.equal(t.els['cert-resultado'].className, 'erro');
   assert.equal(t.els['cert-baixar'].hidden, true);
+});
+
+test('aba Status mostra o QR dos devocionais e o da agenda (este só com a agenda no site), com projeção', () => {
+  const html = web('painel.html');
+  const painel = web('painel.js');
+  assert.match(html, /<img class="qr" src="\/qr-devocional\.png"/);
+  assert.match(html, /<div class="cartao" style="text-align:center" id="cartao-qr-agenda" hidden>/);
+  assert.match(html, /<img class="qr" src="\/qr-agenda\.png"/);
+  assert.match(html, /id="projetar-qr-agenda" data-permissao="projetar" hidden>Projetar QR da agenda</);
+  assert.match(painel, /\$\('cartao-qr-agenda'\)\.hidden = !estado\.agendaNoSite;/);
+  assert.match(painel, /\$\('projetar-qr-agenda'\)\.hidden = !estado\.qrAgendaHolyrics;/);
+  assert.match(painel, /file: estado\.qrAgendaHolyrics/);
+  const arte = web('arte-qr.js');
+  assert.match(arte, /id: 'agenda', nome: 'Agenda da igreja'[\s\S]*caminho: '\/agenda'/);
 });

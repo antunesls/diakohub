@@ -122,7 +122,7 @@ const arquivoQrPix = 'qr-pix.png';
 /// mas o agente os copia para a pasta de imagens do Holyrics.
 bool ehArquivoDeQr(String nome) =>
     nome == arquivoQr || nome == arquivoQrMensagens || nome == arquivoQrPix || nome == arquivoQrVisitante ||
-    nome == arquivoQrDevocional;
+    nome == arquivoQrDevocional || nome == arquivoQrAgenda;
 
 /// QR da página de devocionais (abre o devocional em destaque e a assinatura) para o telão.
 const arquivoQrDevocional = 'qr-devocional.png';
@@ -131,6 +131,16 @@ Future<File> gravarQrDevocional(String pasta, String url, {ArteDoQr? arte}) asyn
   await Directory(pasta).create(recursive: true);
   final f = File(p.join(pasta, arquivoQrDevocional));
   await f.writeAsBytes(gerarPngQr(url, rotulo: 'DEVOCIONAIS', arte: arte));
+  return f;
+}
+
+/// QR da agenda da igreja (abre /agenda, que leva a assinar a agenda no celular) para o telão.
+const arquivoQrAgenda = 'qr-agenda.png';
+
+Future<File> gravarQrAgenda(String pasta, String url, {ArteDoQr? arte}) async {
+  await Directory(pasta).create(recursive: true);
+  final f = File(p.join(pasta, arquivoQrAgenda));
+  await f.writeAsBytes(gerarPngQr(url, rotulo: 'AGENDA DA IGREJA', arte: arte));
   return f;
 }
 

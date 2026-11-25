@@ -2471,6 +2471,17 @@ async function carregarStatus() {
   $('link-mensagens').textContent = estado.urlMensagens;
   $('link-mensagens').href = estado.urlMensagens;
   $('cartao-qr-visitante').hidden = estado.visitanteQrAtivo === false;
+  // Agenda: o QR só aparece com a agenda publicada no site (senão a assinatura não existe).
+  $('cartao-qr-agenda').hidden = !estado.agendaNoSite;
+  $('projetar-qr-agenda').hidden = !estado.qrAgendaHolyrics;
+  if (estado.urlAgenda) {
+    $('link-agenda').textContent = estado.urlAgenda;
+    $('link-agenda').href = estado.urlAgenda;
+  }
+  if (estado.urlDevocional) {
+    $('link-devocional').textContent = estado.urlDevocional;
+    $('link-devocional').href = estado.urlDevocional;
+  }
   $('projetar-qr-visitante').hidden = !estado.qrVisitanteHolyrics;
   if (estado.urlVisitante) {
     $('link-visitante').textContent = estado.urlVisitante;
@@ -2511,6 +2522,11 @@ $('projetar-qr-devocional').addEventListener('click', async () => {
   if (!estado.qrDevocionalHolyrics) return mensagem($('resultado-status'), 'O QR dos devocionais ainda não foi gerado. Reinicie o servidor.', false);
   const r = await api('POST', '/api/holyrics/ShowImage', { file: estado.qrDevocionalHolyrics });
   mensagem($('resultado-status'), r.status === 'ok' ? 'QR dos devocionais no telão.' : r.error, r.status === 'ok');
+});
+$('projetar-qr-agenda').addEventListener('click', async () => {
+  if (!estado.qrAgendaHolyrics) return mensagem($('resultado-status'), 'Publique a agenda no site (Administração › Página inicial) para projetar o QR.', false);
+  const r = await api('POST', '/api/holyrics/ShowImage', { file: estado.qrAgendaHolyrics });
+  mensagem($('resultado-status'), r.status === 'ok' ? 'QR da agenda no telão.' : r.error, r.status === 'ok');
 });
 $('projetar-qr-visitante').addEventListener('click', async () => {
   if (!estado.qrVisitanteHolyrics) {

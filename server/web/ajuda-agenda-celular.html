@@ -22,6 +22,9 @@
   code { padding: 1px 6px; border-radius: 6px; background: var(--neutro); font-size: 14px; overflow-wrap: anywhere; }
   .endereco { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin: 12px 0; padding: 14px 16px; border-radius: 14px; background: var(--superficie); border: 1px solid var(--linha); }
   .endereco code { flex: 1; min-width: 0; font-size: 15px; background: none; padding: 0; }
+  .aqui { display: grid; gap: 8px; margin: 0 0 24px; padding: 18px; border-radius: 18px; background: var(--primaria-suave); }
+  .aqui .botao { min-height: 52px; font-size: 17px; }
+  .aqui .dica { margin: 0; color: var(--primaria-escura); }
   .acoes { display: flex; flex-wrap: wrap; gap: 10px; margin: 12px 0; }
   @media (max-width: 520px) { h1 { font-size: 28px; } h2 { font-size: 22px; } }
 </style>
@@ -37,6 +40,11 @@
   <p class="sobretitulo">Ajuda</p>
   <h1>Agenda da igreja no seu celular</h1>
   <p class="lead">Assine a agenda da igreja uma vez e os eventos passam a aparecer no calendário do seu celular, junto dos seus compromissos. Quando a igreja muda um horário, cancela ou cria um evento, o seu calendário atualiza sozinho.</p>
+  <div class="aqui" id="aqui" hidden>
+    <a class="botao" id="assinar-aqui" href="#"></a>
+    <p class="dica" id="assinar-aqui-dica"></p>
+  </div>
+
   <nav class="indice" aria-label="Nesta página">
     <a href="#iphone">iPhone</a><a href="#android">Android</a><a href="#computador">Computador e Outlook</a>
     <a href="#atualizacao">Quando atualiza</a><a href="#remover">Como remover</a>
@@ -91,6 +99,19 @@
   document.getElementById('endereco').textContent = https;
   document.getElementById('assinar-apple').href = webcal;
   document.getElementById('assinar-google').href = 'https://calendar.google.com/calendar/r?cid=' + encodeURIComponent(webcal);
+  // Quem chega pelo QR (celular) já vê o botão do próprio aparelho no topo.
+  const ua = navigator.userAgent || '';
+  const aparelho = /Android/i.test(ua) ? 'android' : /iPhone|iPad|iPod/i.test(ua) ? 'iphone' : '';
+  if (aparelho) {
+    const botao = document.getElementById('assinar-aqui');
+    botao.textContent = aparelho === 'android' ? 'Adicionar ao Google Agenda' : 'Assinar no Calendário do iPhone';
+    botao.href = aparelho === 'android' ? 'https://calendar.google.com/calendar/r?cid=' + encodeURIComponent(webcal) : webcal;
+    if (aparelho === 'android') { botao.target = '_blank'; botao.rel = 'noopener'; }
+    document.getElementById('assinar-aqui-dica').textContent = aparelho === 'android'
+      ? 'Toque, entre na sua conta Google se pedir e confirme em Adicionar. Se não der certo, veja o passo a passo abaixo.'
+      : 'Toque e confirme em Assinar. Os eventos novos chegam sozinhos.';
+    document.getElementById('aqui').hidden = false;
+  }
   document.getElementById('copiar').addEventListener('click', async () => {
     const aviso = document.getElementById('copiado');
     try {

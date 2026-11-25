@@ -1115,6 +1115,7 @@
             <button class="botao secundario" id="projetar-qr-mensagens" data-permissao="projetar">Projetar QR de mensagens</button>
             <button class="botao secundario" id="projetar-qr-visitante" data-permissao="projetar">Projetar QR de visitante</button>
             <button class="botao secundario" id="projetar-qr-devocional" data-permissao="projetar">Projetar QR dos devocionais</button>
+            <button class="botao secundario" id="projetar-qr-agenda" data-permissao="projetar" hidden>Projetar QR da agenda</button>
           </div>
           <p id="resultado-status" role="status"></p>
         </div>
@@ -1136,6 +1137,18 @@
           <a href="/qr-visitante.png" download="qr-visitante.png"><img class="qr" src="/qr-visitante.png" alt="QR code para o cadastro de visitante"></a>
           <p><a id="link-visitante" href="/visitante" target="_blank"></a></p>
           <p class="dica">Deixe impresso na recepção: o visitante se cadastra pelo celular e já autoriza o uso dos dados (LGPD). Clique na imagem para baixar.</p>
+        </div>
+        <div class="cartao" style="text-align:center">
+          <h2 style="font-size:18px">QR code dos devocionais</h2>
+          <a href="/qr-devocional.png" download="qr-devocional.png"><img class="qr" src="/qr-devocional.png" alt="QR code para a página de devocionais"></a>
+          <p><a id="link-devocional" href="/devocional" target="_blank"></a></p>
+          <p class="dica">Abre o devocional da semana e a assinatura por e-mail. Clique na imagem para baixar e imprimir.</p>
+        </div>
+        <div class="cartao" style="text-align:center" id="cartao-qr-agenda" hidden>
+          <h2 style="font-size:18px">QR code da agenda da igreja</h2>
+          <a href="/qr-agenda.png" download="qr-agenda.png"><img class="qr" src="/qr-agenda.png" alt="QR code para assinar a agenda da igreja no celular"></a>
+          <p><a id="link-agenda" href="/agenda" target="_blank"></a></p>
+          <p class="dica">Quem lê assina a agenda no celular (iPhone ou Google Agenda) e recebe os eventos novos sozinho. Clique na imagem para baixar e imprimir.</p>
         </div>
         <div class="cartao">
           <h2 style="font-size:18px">Mural da recepção</h2>
@@ -1617,7 +1630,7 @@
 <script src="/materiais.js?v=1"></script>
 <script src="/casais.js?v=6"></script>
 <script src="/devocionais.js?v=3"></script>
-<script src="/painel.js?v=35"></script>
+<script src="/painel.js?v=36"></script>
 <script src="/certificado.js?v=1"></script>
 <script src="/acessos-escala.js?v=4"></script>
 <script src="/ministerios.js?v=1"></script>

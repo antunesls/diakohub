@@ -314,6 +314,27 @@ void main() {
       expect(fundoDaArte(await qrDevocional()), isFalse);
     });
 
+    test('QR da agenda: arte como os outros, /qr-agenda.png, /agenda abre a página e o estado só projeta com a agenda no site', () async {
+      final arte = img.Image(width: 1920, height: 1080);
+      img.fill(arte, color: img.ColorRgb8(60, 30, 20));
+      Future<img.Image> qrAgenda() async =>
+          img.decodePng(Uint8List.fromList(await (await req('GET', '/qr-agenda.png')).read().expand((b) => b).toList()))!;
+      bool fundoDaArte(img.Image i) => i.getPixel(5, 5).r == 60 && i.getPixel(5, 5).g == 30;
+      expect(fundoDaArte(await qrAgenda()), isFalse, reason: 'sem arte: o QR em fundo branco');
+      expect((await req('POST', '/api/admin/arte-qr?qr=agenda&modo=arte&posicao=direita-meio&tamanho=M',
+          bytes: img.encodePng(arte))).statusCode, 200);
+      expect(cfg.arteQr('agenda').modo, 'arte');
+      expect(fundoDaArte(await qrAgenda()), isTrue);
+      expect((await req('DELETE', '/api/admin/arte-qr?qr=agenda')).statusCode, 200);
+      expect(fundoDaArte(await qrAgenda()), isFalse);
+      // Sem agenda publicada no site: o estado não oferece projetar (a assinatura nem existe).
+      final estado = await corpo(await req('GET', '/api/estado')) as Map;
+      expect(estado['agendaNoSite'], isFalse);
+      expect(estado['qrAgendaHolyrics'], isNull);
+      expect(estado['urlAgenda'], endsWith('/agenda'));
+      expect(estado['urlDevocional'], endsWith('/devocional'));
+    });
+
     test('arte dos QR: envio, posição, troca, volta ao padrão e backup', () async {
       final arte = img.Image(width: 1280, height: 720); // outra proporção de 16:9: vira 1920x1080
       img.fill(arte, color: img.ColorRgb8(20, 40, 90));
