@@ -53,6 +53,16 @@ final _linhaAlternada = PdfColor.fromHex('F3F7F6');
 const _ordemFuncoes = <String, List<String>>{
   'pastoral': ['Direção', 'Pregação', 'Oração e ofertas', 'Santa Ceia'],
   'louvor': ['Ministro', 'Vocal', 'Teclado', 'Violão', 'Guitarra', 'Baixo', 'Bateria', 'Técnico de som', 'Projeção'],
+  'infantil': ['Professor(a)', 'Auxiliar', 'Berçário'],
+  'recepcao': ['Porta', 'Boas-vindas', 'Estacionamento', 'Café'],
+};
+
+/// Título no alto do PDF, por escala.
+const _titulos = <String, String>{
+  'pastoral': 'Escala pastoral',
+  'louvor': 'Escala do louvor',
+  'infantil': 'Escala do infantil',
+  'recepcao': 'Escala da recepção',
 };
 
 /// A fonte base do PDF só desenha latin1: acentos passam direto e o resto
@@ -90,7 +100,7 @@ Future<Uint8List> gerarEscalaPdf({
     throw ArgumentError('Escala ou formato inválido.');
   }
   final paisagem = formato == 'paisagem';
-  final titulo = tipo == 'pastoral' ? 'Escala pastoral' : 'Escala do louvor';
+  final titulo = _titulos[tipo]!;
   final nomeIgreja = textoLatin1(igreja);
   final mes = textoLatin1(tituloMes);
   final imagem = logo == null ? null : pw.MemoryImage(logo);

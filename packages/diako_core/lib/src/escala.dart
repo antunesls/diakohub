@@ -1,15 +1,26 @@
 import 'membro.dart';
 
-/// As duas escalas do culto.
+/// As escalas do culto. Cada uma tem permissões próprias de ver e de montar.
 enum TipoEscala {
-  pastoral('Pastoral', ['Direção', 'Pregação', 'Oração e ofertas', funcaoCeia]),
-  louvor('Louvor', ['Ministro', 'Vocal', 'Teclado', 'Violão', 'Guitarra', 'Baixo', 'Bateria', 'Técnico de som', 'Projeção']);
+  pastoral('Pastoral', 'pastoral', ['Direção', 'Pregação', 'Oração e ofertas', funcaoCeia]),
+  louvor('Louvor', 'do louvor', ['Ministro', 'Vocal', 'Teclado', 'Violão', 'Guitarra', 'Baixo', 'Bateria', 'Técnico de som', 'Projeção']),
+  infantil('Infantil', 'do infantil', ['Professor(a)', 'Auxiliar', 'Berçário']),
+  recepcao('Recepção', 'da recepção', ['Porta', 'Boas-vindas', 'Estacionamento', 'Café']);
 
-  const TipoEscala(this.nome, this.funcoes);
+  const TipoEscala(this.nome, this.complemento, this.funcoes);
   final String nome;
+
+  /// "pastoral", "do louvor": o que vem depois de "Escala" numa frase.
+  final String complemento;
 
   /// Todas as funções desta escala, na ordem das colunas.
   final List<String> funcoes;
+
+  /// "Escala pastoral", "Escala do louvor".
+  String get titulo => 'Escala $complemento';
+
+  /// Campo gravado no culto quando ele não participa desta escala ("escalaPastoral": false).
+  String get campoParticipa => 'escala${name[0].toUpperCase()}${name.substring(1)}';
 
   static TipoEscala? porNome(Object? nome) => values.where((t) => t.name == nome).firstOrNull;
 }
@@ -40,7 +51,8 @@ class Musica {
   }
 }
 
-/// Um culto do mês com quem serve em cada função. [pastoral] e [louvor]: função → ids de membros.
+/// Um culto do mês com quem serve em cada função: por escala, função → ids de membros.
+/// [pastoral], [louvor], [escalaPastoral] e [escalaLouvor] são atalhos das duas escalas mais antigas.
 class CultoEscala {
   CultoEscala({
     required this.id,
@@ -49,13 +61,26 @@ class CultoEscala {
     this.nome = 'Culto',
     this.ceia = false,
     this.tema = '',
-    this.escalaPastoral = true,
-    this.escalaLouvor = true,
+    bool escalaPastoral = true,
+    bool escalaLouvor = true,
     Map<String, List<String>>? pastoral,
     Map<String, List<String>>? louvor,
+    Map<TipoEscala, Map<String, List<String>>>? escalas,
+    Map<TipoEscala, bool>? participacao,
     List<Musica>? musicas,
-  })  : pastoral = pastoral ?? {},
-        louvor = louvor ?? {},
+  })  : _escalas = {
+          for (final t in TipoEscala.values)
+            t: switch (t) {
+              TipoEscala.pastoral => pastoral ?? escalas?[t] ?? {},
+              TipoEscala.louvor => louvor ?? escalas?[t] ?? {},
+              _ => escalas?[t] ?? {},
+            },
+        },
+        _participa = {
+          for (final t in TipoEscala.values)
+            t: (participacao?[t] ?? true) &&
+                switch (t) { TipoEscala.pastoral => escalaPastoral, TipoEscala.louvor => escalaLouvor, _ => true },
+        },
         musicas = musicas ?? [];
 
   final String id;
@@ -70,15 +95,26 @@ class CultoEscala {
 
   /// Tema da pregação (opcional).
   final String tema;
-  final bool escalaPastoral;
-  final bool escalaLouvor;
-  final Map<String, List<String>> pastoral;
-  final Map<String, List<String>> louvor;
+  final Map<TipoEscala, Map<String, List<String>>> _escalas;
+  final Map<TipoEscala, bool> _participa;
   final List<Musica> musicas;
 
-  Map<String, List<String>> da(TipoEscala tipo) => tipo == TipoEscala.pastoral ? pastoral : louvor;
+  Map<String, List<String>> get pastoral => da(TipoEscala.pastoral);
+  Map<String, List<String>> get louvor => da(TipoEscala.louvor);
+  bool get escalaPastoral => participa(TipoEscala.pastoral);
+  bool get escalaLouvor => participa(TipoEscala.louvor);
 
-  bool participa(TipoEscala tipo) => tipo == TipoEscala.pastoral ? escalaPastoral : escalaLouvor;
+  Map<String, List<String>> da(TipoEscala tipo) => _escalas[tipo]!;
+
+  bool participa(TipoEscala tipo) => _participa[tipo]!;
+
+  /// Participa de pelo menos uma escala (senão o culto nem aparece).
+  bool get participaDeAlguma => TipoEscala.values.any(participa);
+
+  /// Cópia sem as pessoas das escalas fora de [visiveis]: quem não pode ver uma escala não
+  /// recebe nem os nomes nem os avisos ("Também na porta") que viriam dela.
+  CultoEscala soComEscalas(Set<TipoEscala> visiveis) =>
+      copiar(escalas: {for (final t in TipoEscala.values) if (!visiveis.contains(t)) t: const {}});
 
   /// Funções deste culto: a Santa Ceia só aparece no culto de ceia.
   List<String> funcoes(TipoEscala tipo) => [
@@ -86,7 +122,7 @@ class CultoEscala {
           if (participa(tipo) && (f != funcaoCeia || ceia)) f,
       ];
 
-  /// Quem serve neste culto, em qualquer função das duas escalas.
+  /// Quem serve neste culto, em qualquer função de qualquer escala.
   Iterable<({TipoEscala tipo, String funcao, String membroId})> get servindo sync* {
     for (final tipo in TipoEscala.values) {
       for (final f in funcoes(tipo)) {
@@ -104,10 +140,9 @@ class CultoEscala {
     String? hora,
     bool? ceia,
     String? tema,
-    bool? escalaPastoral,
-    bool? escalaLouvor,
-    Map<String, List<String>>? pastoral,
-    Map<String, List<String>>? louvor,
+    /// Só as escalas que mudam; as outras ficam como estão.
+    Map<TipoEscala, Map<String, List<String>>>? escalas,
+    Map<TipoEscala, bool>? participacao,
     List<Musica>? musicas,
   }) =>
       CultoEscala(
@@ -117,10 +152,8 @@ class CultoEscala {
         nome: nome ?? this.nome,
         ceia: ceia ?? this.ceia,
         tema: tema ?? this.tema,
-        escalaPastoral: escalaPastoral ?? this.escalaPastoral,
-        escalaLouvor: escalaLouvor ?? this.escalaLouvor,
-        pastoral: pastoral ?? this.pastoral,
-        louvor: louvor ?? this.louvor,
+        escalas: {..._escalas, ...?escalas},
+        participacao: {..._participa, ...?participacao},
         musicas: musicas ?? this.musicas,
       );
 
@@ -129,12 +162,11 @@ class CultoEscala {
         'data': data,
         'hora': hora,
         'nome': nome,
-        if (!escalaPastoral) 'escalaPastoral': false,
-        if (!escalaLouvor) 'escalaLouvor': false,
+        for (final t in TipoEscala.values) if (!participa(t)) t.campoParticipa: false,
         if (ceia) 'ceia': true,
         if (tema.isNotEmpty) 'tema': tema,
-        'pastoral': {for (final e in pastoral.entries) if (e.value.isNotEmpty) e.key: e.value},
-        'louvor': {for (final e in louvor.entries) if (e.value.isNotEmpty) e.key: e.value},
+        for (final t in TipoEscala.values)
+          t.name: {for (final e in da(t).entries) if (e.value.isNotEmpty) e.key: e.value},
         if (musicas.isNotEmpty) 'musicas': [for (final m in musicas) m.toJson()],
       };
 
@@ -157,10 +189,8 @@ class CultoEscala {
       nome: nome.isEmpty ? 'Culto' : nome,
       ceia: j['ceia'] == true,
       tema: tema,
-      escalaPastoral: j['escalaPastoral'] != false,
-      escalaLouvor: j['escalaLouvor'] != false,
-      pastoral: lerFuncoes(TipoEscala.pastoral, j['pastoral']),
-      louvor: lerFuncoes(TipoEscala.louvor, j['louvor']),
+      participacao: {for (final t in TipoEscala.values) t: j[t.campoParticipa] != false},
+      escalas: {for (final t in TipoEscala.values) t: lerFuncoes(t, j[t.name])},
       musicas: [for (final m in (j['musicas'] as List? ?? const [])) Musica.fromJson(Map<String, dynamic>.from(m as Map))],
     );
   }
@@ -289,7 +319,17 @@ const _funcoesPastorais = ['pastor', 'pastora', 'presbitero', 'presbitera', 'dia
 bool podeServir(Membro m, TipoEscala tipo) {
   if (!m.ativo) return false;
   final ministerios = [for (final x in m.ministerios) semAcento(x.toLowerCase()) ?? ''];
-  if (tipo == TipoEscala.louvor) return ministerios.any((x) => x.contains('louvor') || x.contains('musica'));
+  bool tem(List<String> partes) => ministerios.any((x) => partes.any(x.contains));
+  switch (tipo) {
+    case TipoEscala.louvor:
+      return tem(['louvor', 'musica']);
+    case TipoEscala.infantil:
+      return tem(['infantil', 'kids', 'crianca']);
+    case TipoEscala.recepcao:
+      return tem(['recepcao', 'acolhimento']);
+    case TipoEscala.pastoral:
+      break;
+  }
   final funcao = semAcento((m.funcao ?? '').toLowerCase()) ?? '';
   return ministerios.any((x) => x.contains('pastoral') || x.contains('lideranca')) ||
       _funcoesPastorais.any((f) => RegExp('\\b$f\\b').hasMatch(funcao));
@@ -306,6 +346,10 @@ String naFuncao(String funcao) => switch (funcao) {
       'Guitarra' => 'na guitarra',
       'Técnico de som' => 'na mesa de som',
       'Projeção' => 'na projeção',
+      'Professor(a)' => 'como professor(a)',
+      'Auxiliar' => 'como auxiliar',
+      'Porta' => 'na porta',
+      'Boas-vindas' => 'nas boas-vindas',
       _ => 'no ${funcao.toLowerCase()}',
     };
 
@@ -375,14 +419,14 @@ String nomeCurto(String nome) {
 /// [primeiraNota] devolve a nota em que a voz entra (já no tom do culto) ou '' quando não há.
 String textoEscalaWhatsapp(List<CultoEscala> cultos, TipoEscala tipo, int mes, String Function(String membroId) nomeDe,
     {String Function(Musica m)? primeiraNota}) {
-  final linhas = <String>['*Escala ${tipo == TipoEscala.pastoral ? 'pastoral' : 'do louvor'} — ${nomesMeses[mes - 1]}*'];
+  final linhas = <String>['*${tipo.titulo} — ${nomesMeses[mes - 1]}*'];
   for (final c in cultos) {
     if (!c.participa(tipo)) continue;
     final partes = <String>[
       for (final f in c.funcoes(tipo))
         if ((c.da(tipo)[f] ?? const []).isNotEmpty) '$f: ${c.da(tipo)[f]!.map((id) => nomeCurto(nomeDe(id))).join(', ')}',
     ];
-    if (partes.isEmpty && (tipo == TipoEscala.pastoral || c.musicas.isEmpty)) continue;
+    if (partes.isEmpty && (tipo != TipoEscala.louvor || c.musicas.isEmpty)) continue;
     linhas
       ..add('')
       ..add('*${rotuloDia(c.data)} · ${horaCurtaEscala(c.hora)}*${c.ceia ? ' (Santa Ceia)' : ''}${c.nome != 'Culto' ? ' — ${c.nome}' : ''}');

@@ -16,6 +16,9 @@ const qrsComArte = ['oracao', 'mensagens', 'pix', 'visitante', 'devocional'];
 /// "padrao" = QR branco; "automatico" = arte montada no /admin; "arte" = imagem enviada pronta.
 const modosArteQr = {'padrao', 'automatico', 'arte'};
 
+/// Escalas de cada horário de culto (participação em /admin › Página inicial): os nomes de TipoEscala.
+const _escalasDoCulto = ['pastoral', 'louvor', 'infantil', 'recepcao'];
+
 /// "oracao" + "Modo" → "arteQrOracaoModo".
 String _chaveArteQr(String qr, String campo) => 'arteQr${qr[0].toUpperCase()}${qr.substring(1)}$campo';
 
@@ -380,10 +383,10 @@ class Configuracoes {
             if (e.key is! String || !RegExp(r'^[1-7]@([01]\d|2[0-3]):[0-5]\d$').hasMatch(e.key as String) ||
                 e.value is! Map) throw const FormatException('Horário da escala inválido.');
             final opcoes = e.value as Map;
-            if (opcoes.keys.any((x) => x != 'pastoral' && x != 'louvor') || opcoes.values.any((x) => x is! bool)) {
-              throw const FormatException('Marque Pastoral e Louvor com verdadeiro ou falso.');
+            if (opcoes.keys.any((x) => !_escalasDoCulto.contains(x)) || opcoes.values.any((x) => x is! bool)) {
+              throw const FormatException('Marque cada escala (Pastoral, Louvor, Infantil, Recepção) com verdadeiro ou falso.');
             }
-            regras[e.key as String] = {'pastoral': opcoes['pastoral'] != false, 'louvor': opcoes['louvor'] != false};
+            regras[e.key as String] = {for (final t in _escalasDoCulto) t: opcoes[t] != false};
           }
           novos[k] = regras;
         case 'siteEndereco':

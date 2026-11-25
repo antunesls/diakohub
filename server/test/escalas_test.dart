@@ -41,7 +41,7 @@ void main() {
     expect(Perfil.telao.pode(Permissao.escalaLouvor), isFalse);
     // DiakoPlayer: só lê escalas e repertório; não edita, não projeta, não entra no painel.
     expect(Perfil.porNome('player'), Perfil.player);
-    expect(Perfil.player.permissoes, {Permissao.sessao, Permissao.escalasVer});
+    expect(Perfil.player.permissoes, {Permissao.sessao, Permissao.escalasVer, Permissao.verPastoral, Permissao.verLouvor});
     expect(permissaoDaRota('GET', 'api/escalas/hoje'), Permissao.escalasVer);
     expect(permissaoDaRota('GET', 'api/repertorio'), Permissao.escalasVer);
     expect(Perfil.secretaria.pode(Permissao.escalaLouvor), isFalse);
@@ -158,7 +158,7 @@ void main() {
       expect(publico['cultos'].toString(), contains('Quarta'));
       expect((await chamar('GET', '/api/escalas/pdf?mes=2026-11&tipo=louvor&formato=paisagem', token: admin)).$1, 400);
       await chamar('PUT', '/api/admin/configuracoes', token: admin, json: {
-        'cultosEscalas': {'3@20:00': {'pastoral': false, 'louvor': false}},
+        'cultosEscalas': {'3@20:00': {'pastoral': false, 'louvor': false, 'infantil': false, 'recepcao': false}},
       });
       nov = await mes('2026-11');
       expect((nov['cultos'] as List).length, 5);
@@ -192,8 +192,8 @@ void main() {
         'siteCultos': 'Domingo — 09h\nQuarta — 19h30\nSábado — 17h',
         'cultosEscalas': {
           '7@09:00': {'pastoral': true, 'louvor': true},
-          '3@19:30': {'pastoral': false, 'louvor': false},
-          '6@17:00': {'pastoral': false, 'louvor': false},
+          '3@19:30': {'pastoral': false, 'louvor': false, 'infantil': false, 'recepcao': false},
+          '6@17:00': {'pastoral': false, 'louvor': false, 'infantil': false, 'recepcao': false},
         },
       });
       final depois = await mes('2026-11');
@@ -221,7 +221,7 @@ void main() {
         'siteCultos': 'Domingo — 09h\nDomingo — 19h',
         'cultosEscalas': {
           '7@09:00': {'pastoral': true, 'louvor': true},
-          '7@19:00': {'pastoral': false, 'louvor': false},
+          '7@19:00': {'pastoral': false, 'louvor': false, 'infantil': false, 'recepcao': false},
         },
       });
       expect((await mes('2026-11'))['cultos'].length, 5);
@@ -235,7 +235,7 @@ void main() {
         expect((await chamar('PUT', '/api/admin/configuracoes', token: admin, json: {'cultosEscalas': valor})).$1, 400);
       }
       await chamar('PUT', '/api/admin/configuracoes', token: admin, json: {
-        'cultosEscalas': {'3@20:00': {'pastoral': false, 'louvor': false}},
+        'cultosEscalas': {'3@20:00': {'pastoral': false, 'louvor': false, 'infantil': false, 'recepcao': false}},
       });
       final out = await mes('2026-10');
       expect((out['cultos'] as List).length, 3); // 7, 14 e 21; hoje (28) já segue a regra.
@@ -324,6 +324,84 @@ void main() {
       expect((await chamar('DELETE', '/api/escalas/${extra['id']}', token: admin)).$1, 200);
     });
 
+    test('Infantil e Recepção: cada ministério vê e monta só a própria escala, sem vazar nomes', () async {
+      await chamar('PUT', '/api/admin/configuracoes', token: admin, json: {'siteCultos': 'Domingo — 19h'});
+      await chamar('POST', '/api/escalas/gerar', token: admin, json: {'mes': '2026-11'});
+      final tia = await membro('Tia Carla Infantil', ministerios: ['Infantil']);
+      final porteiro = await membro('Jonas Porteiro', ministerios: ['Recepção']);
+      final cantor = await membro('Bruno Cantor', ministerios: ['Louvor']);
+      final id = culto(await mes('2026-11'), '2026-11-01')['id'];
+      final infantil = await criarUsuario('lider.infantil', Perfil.comissaoInfantil);
+      final recepcao = await criarUsuario('lider.recepcao', Perfil.comissaoRecepcao);
+      final midia = await criarUsuario('midia.escalas', Perfil.midia);
+
+      // Cada comissão escala na própria escala; na dos outros, recusa.
+      expect((await chamar('PUT', '/api/escalas/$id', token: infantil,
+          json: {'tipo': 'infantil', 'funcao': 'Professor(a)', 'membros': [tia]})).$1, 200);
+      expect((await chamar('PUT', '/api/escalas/$id', token: recepcao,
+          json: {'tipo': 'recepcao', 'funcao': 'Porta', 'membros': [porteiro]})).$1, 200);
+      expect((await chamar('PUT', '/api/escalas/$id', token: recepcao,
+          json: {'tipo': 'recepcao', 'funcao': 'Café', 'membros': [porteiro]})).$1, 200);
+      expect((await chamar('PUT', '/api/escalas/$id', token: infantil,
+          json: {'tipo': 'recepcao', 'funcao': 'Porta', 'membros': [tia]})).$1, 403);
+      expect((await chamar('PUT', '/api/escalas/$id', token: recepcao,
+          json: {'tipo': 'louvor', 'funcao': 'Vocal', 'membros': [porteiro]})).$1, 403);
+      expect((await chamar('PUT', '/api/escalas/$id', token: infantil, json: {'musicas': []})).$1, 403);
+      // A tia também canta: o aviso de conflito do louvor não pode contar que ela está no infantil.
+      await chamar('PUT', '/api/escalas/$id', token: admin, json: {'tipo': 'louvor', 'funcao': 'Vocal', 'membros': [tia, cantor]});
+
+      final visto = await mes('2026-11', token: infantil);
+      expect([for (final e in visto['escalas']) e['id']], ['infantil']);
+      expect(visto['pode'], {'pastoral': false, 'louvor': false, 'infantil': true, 'recepcao': false, 'cultos': false});
+      final c = culto(visto, '2026-11-01');
+      expect(c.keys, isNot(contains('louvor')));
+      expect(c.keys, isNot(contains('recepcao')));
+      expect(c.keys, isNot(contains('pastoral')));
+      expect((c['funcoes'] as Map).keys, ['infantil']);
+      expect(c['infantil']['Professor(a)'].single['nome'], 'Tia Carla Infantil');
+      expect(c['infantil']['Professor(a)'].single.containsKey('aviso'), isFalse, reason: 'conflito com o louvor não aparece');
+      expect(c['musicas'], isEmpty);
+      expect((visto['whatsapp'] as Map).keys, ['infantil']);
+      expect((visto['avisos'] as Map).keys, ['infantil']);
+      final semCadastro = {...visto}..remove('pessoas'); // cadastro de membros ativos, para "Mostrar todos"
+      expect(jsonEncode(semCadastro), isNot(contains('Jonas Porteiro')));
+      expect(jsonEncode(semCadastro), isNot(contains('Bruno Cantor')));
+      // Lista de quem escalar: só a marcação do infantil, e a tia está nela.
+      final pessoas = visto['pessoas'] as List;
+      expect(pessoas.firstWhere((p) => p['id'] == tia)['infantil'], isTrue);
+      expect(pessoas.firstWhere((p) => p['id'] == porteiro)['infantil'], isFalse);
+      expect(pessoas.first.keys.toSet(), {'id', 'nome', 'infantil'});
+
+      // PDF e tablet seguem a mesma regra.
+      expect((await chamar('GET', '/api/escalas/pdf?mes=2026-11&tipo=louvor&formato=paisagem', token: infantil)).$1, 403);
+      final pdfInfantil = await handler(Request('GET', Uri.parse('http://x/api/escalas/pdf?mes=2026-11&tipo=infantil&formato=paisagem'),
+          headers: {'authorization': 'Bearer $infantil'}));
+      expect(pdfInfantil.statusCode, 200);
+      expect(pdfInfantil.headers['content-type'], 'application/pdf');
+      final hojeInfantil = (await chamar('GET', '/api/escalas/hoje?todos=1', token: infantil)).$2;
+      expect(jsonEncode(hojeInfantil), isNot(contains('Jonas Porteiro')));
+
+      // Mídia (vê pastoral e louvor) não vê infantil nem recepção, e o aviso da tia não revela o infantil.
+      final daMidia = await mes('2026-11', token: midia);
+      expect([for (final e in daMidia['escalas']) e['id']], ['pastoral', 'louvor']);
+      expect(jsonEncode(daMidia), isNot(contains('Jonas Porteiro')));
+      final vocal = culto(daMidia, '2026-11-01')['louvor']['Vocal'] as List;
+      expect(vocal.firstWhere((p) => p['nome'] == 'Tia Carla Infantil').containsKey('aviso'), isFalse);
+      expect((await chamar('GET', '/api/escalas/pdf?mes=2026-11&tipo=recepcao&formato=paisagem', token: midia)).$1, 403);
+
+      // A administração vê as quatro, com o conflito da tia entre louvor e infantil.
+      final tudo = await mes('2026-11');
+      expect([for (final e in tudo['escalas']) e['id']], ['pastoral', 'louvor', 'infantil', 'recepcao']);
+      expect(culto(tudo, '2026-11-01')['recepcao']['Porta'].single['nome'], 'Jonas Porteiro');
+      final daRecepcao = culto(tudo, '2026-11-01')['recepcao'];
+      expect(daRecepcao['Café'].single['nome'], 'Jonas Porteiro');
+      expect(daRecepcao['Porta'].single['aviso'], 'Também no café');
+      expect(tudo['whatsapp']['recepcao'], contains('Café: Jonas Porteiro'));
+      expect(culto(tudo, '2026-11-01')['funcoes']['recepcao'], ['Porta', 'Boas-vindas', 'Estacionamento', 'Café']);
+      expect((culto(tudo, '2026-11-01')['louvor']['Vocal'] as List).first['aviso'], 'Também como professor(a)');
+      expect(tudo['whatsapp']['recepcao'], contains('*Escala da recepção'));
+    });
+
     test('repetir o mês anterior preenche só as funções vazias, pelo mesmo culto da semana', () async {
       await chamar('PUT', '/api/admin/configuracoes', token: admin, json: {'siteCultos': 'Domingo — 19h\nQuarta — 20h'});
       final ana = await membro('Ana Lima', ministerios: ['Louvor']);
@@ -376,7 +454,25 @@ void main() {
       expect((await mes('2026-12'))['cultos'], isEmpty);
       expect((await chamar('DELETE', '/api/escalas/$id', token: lider)).$1, 403);
       expect((await chamar('GET', '/api/membros', token: lider)).$1, 403);
-      expect((await mes('2026-11', token: lider))['pode'], {'pastoral': false, 'louvor': true});
+      expect((await mes('2026-11', token: lider))['pode'], {'pastoral': false, 'louvor': true, 'infantil': false, 'recepcao': false, 'cultos': false});
+
+      // "Cultos" é permissão própria: dada à Comissão, ela gera o mês, cria culto extra e edita os
+      // dados do culto sem montar a escala pastoral; excluir continua com a pastoral.
+      final (stPerfil, _) = await chamar('PUT', '/api/admin/perfis/comissao-louvor', token: admin,
+          json: {'permissoes': [...Perfil.comissaoLouvor.permissoes.map((p) => p.name), 'cultos']});
+      expect(stPerfil, 200);
+      expect((await mes('2026-11', token: lider))['pode'], {'pastoral': false, 'louvor': true, 'infantil': false, 'recepcao': false, 'cultos': true});
+      expect((await chamar('POST', '/api/escalas/gerar', token: lider, json: {'mes': '2026-12'})).$1, 200);
+      expect((await mes('2026-12'))['cultos'], isNotEmpty);
+      final (stExtra, extra) = await chamar('POST', '/api/escalas', token: lider, json: {'data': '2026-11-20', 'hora': '19h'});
+      expect(stExtra, 201);
+      expect((await chamar('PUT', '/api/escalas/${extra['id']}', token: lider,
+          json: {'nome': 'Vigília', 'tema': 'Fé', 'ceia': true, 'hora': '20h'})).$1, 200);
+      expect((await chamar('PUT', '/api/escalas/${extra['id']}', token: lider,
+          json: {'tipo': 'pastoral', 'funcao': 'Pregação', 'membros': [bruno]})).$1, 403);
+      expect((await chamar('DELETE', '/api/escalas/${extra['id']}', token: lider)).$1, 403);
+      expect((await chamar('DELETE', '/api/escalas/${extra['id']}', token: admin)).$1, 200);
+      await chamar('POST', '/api/admin/perfis/comissao-louvor/restaurar', token: admin);
 
       final visto = await mes('2026-11', token: midia);
       expect(visto['pessoas'], isEmpty); // nomes do cadastro só para quem monta escala

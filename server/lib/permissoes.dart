@@ -35,9 +35,18 @@ enum Permissao {
   visitantes('Ver os visitantes do dia e dar as boas-vindas', AreaPermissao.pessoas, ''),
   visitantesHistorico('Ver visitantes de outros dias', AreaPermissao.pessoas, 'Sem esta, só aparecem os visitantes de hoje (como na Recepção).'),
   visitantesCadastrar('Cadastrar visitantes (recepção)', AreaPermissao.pessoas, 'Página /recepcao pelo celular.'),
-  escalasVer('Ver as escalas', AreaPermissao.escalas, 'Abas Escalas, Repertório e Roteiros (só consulta).'),
-  escalaPastoral('Montar a escala pastoral e os cultos do mês', AreaPermissao.escalas, ''),
+  escalasVer('Abrir as abas Escalas, Repertório e Roteiros', AreaPermissao.escalas,
+      'Só consulta. Cada escala ainda precisa da própria permissão de ver (abaixo).'),
+  verPastoral('Ver a escala pastoral', AreaPermissao.escalas, ''),
+  escalaPastoral('Montar a escala pastoral e excluir cultos', AreaPermissao.escalas, ''),
+  cultos('Gerar os cultos do mês, criar culto extra e editar cultos', AreaPermissao.escalas,
+      'Gerar pelos horários da página inicial, "+ Culto extra" e mudar nome, horário, tema e Santa Ceia. Não exclui culto.'),
+  verLouvor('Ver a escala do louvor', AreaPermissao.escalas, 'Inclui as músicas dos cultos.'),
   escalaLouvor('Montar a escala e as músicas do louvor', AreaPermissao.escalas, ''),
+  verInfantil('Ver a escala do infantil', AreaPermissao.escalas, ''),
+  escalaInfantil('Montar a escala do infantil', AreaPermissao.escalas, ''),
+  verRecepcao('Ver a escala da recepção', AreaPermissao.escalas, ''),
+  escalaRecepcao('Montar a escala da recepção', AreaPermissao.escalas, ''),
   minhaEscala('Consultar a própria escala', AreaPermissao.escalas, 'Página Minha escala.'),
   indisponibilidade('Avisar indisponibilidade', AreaPermissao.escalas, 'Na Minha escala, marcar os dias em que não pode servir.'),
   musicasMinistro('Escolher as músicas dos cultos em que ministra', AreaPermissao.escalas, 'Na Minha escala, para quem é ministro de louvor.'),
@@ -68,7 +77,11 @@ enum Permissao {
   Set<Permissao> get implica => switch (this) {
         motivosParticulares || motivosEditar => {motivosVer},
         visitantesHistorico || visitantesCadastrar => {visitantes},
-        escalaPastoral || escalaLouvor => {escalasVer},
+        verPastoral || verLouvor || verInfantil || verRecepcao || cultos => {escalasVer},
+        escalaPastoral => {verPastoral},
+        escalaLouvor => {verLouvor},
+        escalaInfantil => {verInfantil},
+        escalaRecepcao => {verRecepcao},
         indisponibilidade || musicasMinistro => {minhaEscala},
         palavrasTodas => {palavras},
         agendaEditar => {agendaVer},
@@ -103,13 +116,22 @@ enum Permissao {
 // os perfis de uma área só (comissão, gestão da casa, pregador) entram direto na própria aba.
 const _base = {Permissao.sessao, Permissao.painel, Permissao.motivosVer, Permissao.recados, Permissao.agendaVer, Permissao.cartazes};
 
+/// Ver e montar as quatro escalas, mais gerar e editar os cultos.
+const _todasEscalas = {
+  Permissao.escalaPastoral, Permissao.cultos, Permissao.escalaLouvor, Permissao.escalaInfantil, Permissao.escalaRecepcao,
+  Permissao.verPastoral, Permissao.verLouvor, Permissao.verInfantil, Permissao.verRecepcao,
+};
+
+/// O que quem tinha "Ver as escalas" já via antes das escalas separadas.
+const _verPastoralELouvor = {Permissao.escalasVer, Permissao.verPastoral, Permissao.verLouvor};
+
 /// Os perfis de fábrica. Viram dados editáveis em data/perfis.json; "Restaurar padrão" volta a estes.
 enum PerfilPadrao {
   administrador('Administrador', 'Tudo, inclusive configurações, backup e usuários.', {
     ..._base, Permissao.motivosParticulares, Permissao.motivosEditar, Permissao.mensagens, Permissao.agendaEditar,
     Permissao.galeria, Permissao.membros, Permissao.gestaoCasa, Permissao.resumo, Permissao.projetar, Permissao.admin, Permissao.usuarios,
-    Permissao.visitantes, Permissao.visitantesHistorico, Permissao.visitantesCadastrar, Permissao.escalasVer,
-    Permissao.escalaPastoral, Permissao.escalaLouvor, Permissao.minhaEscala, Permissao.indisponibilidade,
+    Permissao.visitantes, Permissao.visitantesHistorico, Permissao.visitantesCadastrar, Permissao.escalasVer, ..._todasEscalas,
+    Permissao.minhaEscala, Permissao.indisponibilidade,
     Permissao.acessosEscala, Permissao.palavras, Permissao.palavrasTodas, Permissao.atas, Permissao.atasSigilosas,
     Permissao.ministerios, Permissao.atasTodosMinisterios, Permissao.casais, Permissao.casaisGerenciar, Permissao.encontros,
     Permissao.devocionais,
@@ -117,8 +139,8 @@ enum PerfilPadrao {
   pastor('Pastor', 'Todo o conteúdo, inclusive pedidos particulares. Sem configurações técnicas.', {
     ..._base, Permissao.motivosParticulares, Permissao.motivosEditar, Permissao.mensagens, Permissao.agendaEditar,
     Permissao.galeria, Permissao.membros, Permissao.gestaoCasa, Permissao.resumo, Permissao.projetar,
-    Permissao.visitantes, Permissao.visitantesHistorico, Permissao.visitantesCadastrar, Permissao.escalasVer,
-    Permissao.escalaPastoral, Permissao.escalaLouvor, Permissao.minhaEscala, Permissao.indisponibilidade,
+    Permissao.visitantes, Permissao.visitantesHistorico, Permissao.visitantesCadastrar, Permissao.escalasVer, ..._todasEscalas,
+    Permissao.minhaEscala, Permissao.indisponibilidade,
     Permissao.palavras, Permissao.palavrasTodas, Permissao.atas, Permissao.atasSigilosas,
     Permissao.ministerios, Permissao.atasTodosMinisterios, Permissao.casais, Permissao.casaisGerenciar, Permissao.encontros,
     Permissao.devocionais,
@@ -126,14 +148,15 @@ enum PerfilPadrao {
   secretaria('Secretaria', 'Recados, agenda, mensagens, aniversariantes e pedidos públicos.', {
     ..._base, Permissao.motivosEditar, Permissao.mensagens, Permissao.agendaEditar, Permissao.membros, Permissao.gestaoCasa, Permissao.resumo,
     Permissao.visitantes, Permissao.visitantesHistorico, Permissao.visitantesCadastrar, Permissao.escalasVer,
+    Permissao.verPastoral, Permissao.verLouvor, Permissao.verInfantil, Permissao.verRecepcao,
     Permissao.minhaEscala, Permissao.indisponibilidade, Permissao.acessosEscala, Permissao.atas, Permissao.ministerios, Permissao.casais,
     Permissao.encontros,
   }),
   midia('Mídia', 'Cartazes, galeria do site, recados e projeção no telão.', {
-    ..._base, Permissao.galeria, Permissao.projetar, Permissao.escalasVer,
+    ..._base, Permissao.galeria, Permissao.projetar, ..._verPastoralELouvor,
   }),
   telao('Telão (tablet)', 'Operar o telão no culto: recados, pedidos públicos, boas-vindas e projeção.', {
-    ..._base, Permissao.projetar, Permissao.visitantes, Permissao.visitantesHistorico, Permissao.escalasVer,
+    ..._base, Permissao.projetar, Permissao.visitantes, Permissao.visitantesHistorico, ..._verPastoralELouvor,
   }),
   recepcao('Recepção', 'Obreiro da recepção: cadastra visitantes pelo celular (/recepcao) e vê os do dia. Nada mais.', {
     Permissao.sessao, Permissao.visitantes, Permissao.visitantesCadastrar,
@@ -145,8 +168,14 @@ enum PerfilPadrao {
     Permissao.sessao, Permissao.casais, Permissao.casaisGerenciar, Permissao.encontros, Permissao.devocionais,
   }),
   comissaoLouvor('Comissão do Louvor', 'Membros da comissão: montam a escala e as músicas do louvor e veem a escala pastoral e a agenda.', {
-    Permissao.sessao, Permissao.agendaVer, Permissao.escalasVer, Permissao.escalaLouvor, Permissao.minhaEscala,
+    Permissao.sessao, Permissao.agendaVer, ..._verPastoralELouvor, Permissao.escalaLouvor, Permissao.minhaEscala,
     Permissao.indisponibilidade,
+  }),
+  comissaoInfantil('Comissão do Infantil', 'Monta a escala do infantil e consulta a própria escala. Não vê as outras escalas.', {
+    Permissao.sessao, Permissao.agendaVer, Permissao.escalaInfantil, Permissao.minhaEscala, Permissao.indisponibilidade,
+  }),
+  comissaoRecepcao('Comissão da Recepção', 'Monta a escala da recepção e consulta a própria escala. Não vê as outras escalas.', {
+    Permissao.sessao, Permissao.agendaVer, Permissao.escalaRecepcao, Permissao.minhaEscala, Permissao.indisponibilidade,
   }),
   louvor('Louvor', 'Consulta somente a própria escala e as músicas dos cultos em que serve.', {
     Permissao.sessao, Permissao.minhaEscala,
@@ -155,14 +184,14 @@ enum PerfilPadrao {
     Permissao.sessao, Permissao.minhaEscala, Permissao.indisponibilidade, Permissao.musicasMinistro,
   }),
   pregador('Pregador', 'Prepara as próprias Palavras (sermões) no painel e consulta a própria escala.', {
-    Permissao.sessao, Permissao.palavras, Permissao.escalasVer, Permissao.minhaEscala, Permissao.indisponibilidade,
+    Permissao.sessao, Permissao.palavras, ..._verPastoralELouvor, Permissao.minhaEscala, Permissao.indisponibilidade,
   }),
   integrante('Integrante', 'Consulta a própria escala e avisa indisponibilidades.', {
     Permissao.sessao, Permissao.minhaEscala, Permissao.indisponibilidade,
   }),
   // Conta de máquina: o DiakoPlayer (PC do som) lê o culto e o repertório para montar a fila do louvor.
   player('DiakoPlayer', 'Conta do PC do som: o DiakoPlayer lê as escalas e o repertório para montar a fila do louvor. Não entra no painel.', {
-    Permissao.sessao, Permissao.escalasVer,
+    Permissao.sessao, ..._verPastoralELouvor,
   });
 
   const PerfilPadrao(this.nome, this.descricao, this.permissoes);
@@ -220,6 +249,8 @@ class Perfil {
   static final gestaoCasa = PerfilPadrao.gestaoCasa.criar();
   static final liderCasais = PerfilPadrao.liderCasais.criar();
   static final comissaoLouvor = PerfilPadrao.comissaoLouvor.criar();
+  static final comissaoInfantil = PerfilPadrao.comissaoInfantil.criar();
+  static final comissaoRecepcao = PerfilPadrao.comissaoRecepcao.criar();
   static final louvor = PerfilPadrao.louvor.criar();
   static final ministro = PerfilPadrao.ministro.criar();
   static final pregador = PerfilPadrao.pregador.criar();
@@ -228,7 +259,8 @@ class Perfil {
 
   /// Os padrões de fábrica, na ordem de [PerfilPadrao].
   static final List<Perfil> values = [
-    administrador, pastor, secretaria, midia, telao, recepcao, gestaoCasa, comissaoLouvor, louvor, ministro, pregador,
+    administrador, pastor, secretaria, midia, telao, recepcao, gestaoCasa, comissaoLouvor, comissaoInfantil, comissaoRecepcao,
+    louvor, ministro, pregador,
     integrante, player, liderCasais,
   ];
 

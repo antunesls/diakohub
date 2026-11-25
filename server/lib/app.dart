@@ -4024,7 +4024,7 @@ class Servidor {
         regra = regras['${horario.diaSemana}@${horario.hora}'] as Map?;
       }
     }
-    return c.copiar(escalaPastoral: regra?['pastoral'] != false, escalaLouvor: regra?['louvor'] != false);
+    return c.copiar(participacao: {for (final t in TipoEscala.values) t: regra?[t.name] != false});
   }
 
   /// Persiste a participação vigente sem alterar alocações, músicas ou passado.
@@ -4035,7 +4035,7 @@ class Servidor {
     final alterados = <Map<String, dynamic>>[];
     for (final culto in _cultos().where((c) => c.data.compareTo(hoje) >= 0)) {
       final novo = _participacaoCulto(culto);
-      if (novo.escalaPastoral != culto.escalaPastoral || novo.escalaLouvor != culto.escalaLouvor) {
+      if (TipoEscala.values.any((t) => novo.participa(t) != culto.participa(t))) {
         alterados.add(novo.toJson());
       }
     }
@@ -4044,7 +4044,7 @@ class Servidor {
 
   List<CultoEscala> _cultosVisiveis() => [
     for (final c in _cultos().map(_participacaoCulto))
-      if (c.escalaPastoral || c.escalaLouvor) c,
+      if (c.participaDeAlguma) c,
   ];
 
   List<Indisponibilidade> _indisponibilidades() =>
@@ -4054,13 +4054,38 @@ class Servidor {
 
   static String Function(String) _nomeDe(Map<String, Membro> membros) => (id) => membros[id]?.nome ?? '(pessoa removida)';
 
-  bool _podeEscala(Request req, TipoEscala tipo) =>
-      Auth.contaDa(req)?.pode(tipo == TipoEscala.pastoral ? Permissao.escalaPastoral : Permissao.escalaLouvor) ?? false;
+  static Permissao _permissaoVer(TipoEscala tipo) => switch (tipo) {
+        TipoEscala.pastoral => Permissao.verPastoral,
+        TipoEscala.louvor => Permissao.verLouvor,
+        TipoEscala.infantil => Permissao.verInfantil,
+        TipoEscala.recepcao => Permissao.verRecepcao,
+      };
+
+  static Permissao _permissaoMontar(TipoEscala tipo) => switch (tipo) {
+        TipoEscala.pastoral => Permissao.escalaPastoral,
+        TipoEscala.louvor => Permissao.escalaLouvor,
+        TipoEscala.infantil => Permissao.escalaInfantil,
+        TipoEscala.recepcao => Permissao.escalaRecepcao,
+      };
+
+  /// Montar esta escala (quem serve em cada função; no louvor, também as músicas).
+  bool _podeEscala(Request req, TipoEscala tipo) => Auth.contaDa(req)?.pode(_permissaoMontar(tipo)) ?? false;
+
+  /// Escalas que a conta pode ver: as outras não saem do servidor (nem nomes, nem avisos, nem PDF).
+  Set<TipoEscala> _escalasVisiveis(Request req) => {
+        for (final t in TipoEscala.values)
+          if (Auth.contaDa(req)?.pode(_permissaoVer(t)) ?? false) t,
+      };
+
+  /// Gerar os cultos do mês, criar culto extra e editar os dados do culto (excluir fica com a pastoral).
+  bool _podeCultos(Request req) => Auth.contaDa(req)?.pode(Permissao.cultos) ?? false;
+
+  static Response get _semPermissaoCultos => _erro(403, 'Seu perfil não pode gerar, criar ou editar cultos.');
 
   bool _podeAlgumaEscala(Request req) => TipoEscala.values.any((t) => _podeEscala(req, t));
 
   static Response _semPermissaoEscala(TipoEscala? tipo) => _erro(403,
-      tipo == null ? 'Seu perfil não pode montar escalas.' : 'Seu perfil não pode alterar a escala ${tipo == TipoEscala.pastoral ? 'pastoral' : 'do louvor'}.');
+      tipo == null ? 'Seu perfil não pode montar escalas.' : 'Seu perfil não pode alterar a escala ${tipo.complemento}.');
 
   /// "2026-11" → (2026, 11).
   static ({int ano, int mes})? _mesDe(Object? v) {
@@ -4072,16 +4097,21 @@ class Servidor {
 
   static String _prefixoMes(int ano, int mes) => '$ano-${mes.toString().padLeft(2, '0')}';
 
-  /// Culto como o painel e o tablet mostram: nomes e avisos já resolvidos por função.
-  Map<String, dynamic> _cultoParaTela(CultoEscala c, Map<String, Membro> membros, List<Indisponibilidade> ind,
-          [Map<String, RepertorioMusica>? repertorio]) =>
-      {
-        ...c.toJson(),
-        'musicas': c.escalaLouvor ? _musicasParaTela(c.musicas, repertorio ?? _repertorioPorId()) : [],
+  /// Culto como o painel e o tablet mostram: nomes e avisos já resolvidos por função, só nas
+  /// escalas [visiveis] (as outras nem aparecem no JSON).
+  Map<String, dynamic> _cultoParaTela(CultoEscala original, Map<String, Membro> membros, List<Indisponibilidade> ind,
+      {required Set<TipoEscala> visiveis, Map<String, RepertorioMusica>? repertorio}) {
+    final c = original.soComEscalas(visiveis);
+    return {
+        ...c.toJson()..removeWhere((k, _) => TipoEscala.values.any((t) => k == t.name && !visiveis.contains(t))),
+        'musicas': c.escalaLouvor && visiveis.contains(TipoEscala.louvor)
+            ? _musicasParaTela(c.musicas, repertorio ?? _repertorioPorId())
+            : [],
         'rotulo': rotuloDia(c.data),
         'horaTexto': horaCurtaEscala(c.hora),
-        'funcoes': {for (final t in TipoEscala.values) t.name: c.funcoes(t)},
+        'funcoes': {for (final t in TipoEscala.values) if (visiveis.contains(t)) t.name: c.funcoes(t)},
         for (final t in TipoEscala.values)
+          if (visiveis.contains(t))
           t.name: {
             for (final f in c.funcoes(t))
               f: [
@@ -4094,8 +4124,10 @@ class Servidor {
               ],
           },
       };
+  }
 
-  /// GET /api/escalas?mes=aaaa-mm — cultos do mês com as duas escalas, avisos e textos do WhatsApp.
+  /// GET /api/escalas?mes=aaaa-mm — cultos do mês com as escalas que a conta pode ver, avisos e
+  /// textos do WhatsApp.
   Response _listarEscalas(Request req) {
     final agora = _agora();
     final mes = _mesDe(req.url.queryParameters['mes']) ?? (ano: agora.year, mes: agora.month);
@@ -4103,36 +4135,47 @@ class Servidor {
     final membros = _membrosPorId();
     final ind = _indisponibilidades();
     final nome = _nomeDe(membros);
-    final cultos = _cultosVisiveis().where((c) => c.data.startsWith(prefixo)).toList();
+    final visiveis = _escalasVisiveis(req);
+    final cultosDoMes = _cultosVisiveis().where((c) => c.data.startsWith(prefixo)).toList();
+    // Avisos de conflito ("também na porta") só entre as escalas que a conta vê.
+    final cultos = [for (final c in cultosDoMes) c.soComEscalas(visiveis)];
     final repertorio = _repertorioPorId();
     final editor = _podeAlgumaEscala(req);
+    final monta = [for (final t in TipoEscala.values) if (_podeEscala(req, t)) t];
     return _json({
       'mes': prefixo,
       'titulo': '${nomesMeses[mes.mes - 1]} de ${mes.ano}',
       'horariosConfigurados': horariosDosCultos(cfg?.siteCultos ?? '').isNotEmpty,
       // Controle do DiakoPlayer: o painel mostra "Abrir no DiakoPlayer" nas músicas do louvor.
       if ((cfg?.diakoPlayerUrl ?? '').isNotEmpty) 'diakoPlayerUrl': cfg!.diakoPlayerUrl,
-      'cultos': [for (final c in cultos) _cultoParaTela(c, membros, ind, repertorio)],
+      'cultos': [for (final c in cultos) _cultoParaTela(c, membros, ind, visiveis: visiveis, repertorio: repertorio)],
       'avisos': {
         for (final t in TipoEscala.values)
-          t.name: [for (final a in avisosDoMes(cultos, t, nome, ind)) {'tipo': a.tipo, 'titulo': a.titulo, 'texto': a.texto}],
+          if (visiveis.contains(t))
+            t.name: [for (final a in avisosDoMes(cultos, t, nome, ind)) {'tipo': a.tipo, 'titulo': a.titulo, 'texto': a.texto}],
       },
       'whatsapp': {
         for (final t in TipoEscala.values)
-          t.name: textoEscalaWhatsapp(cultos, t, mes.mes, nome, primeiraNota: (m) => _primeiraNota(m, repertorio)),
+          if (visiveis.contains(t))
+            t.name: textoEscalaWhatsapp(cultos, t, mes.mes, nome, primeiraNota: (m) => _primeiraNota(m, repertorio)),
       },
-      // Nomes de quem pode ser escalado: só para quem monta escala.
+      // As escalas que a conta vê, na ordem das abas.
+      'escalas': [for (final t in TipoEscala.values) if (visiveis.contains(t)) {'id': t.name, 'nome': t.nome, 'titulo': t.titulo}],
+      // Nomes de quem pode ser escalado: só para quem monta escala, e só nas escalas que monta.
       'pessoas': editor
           ? ([
               for (final m in membros.values)
-                if (m.ativo) {'id': m.id, 'nome': m.nome, 'pastoral': podeServir(m, TipoEscala.pastoral), 'louvor': podeServir(m, TipoEscala.louvor)},
+                if (m.ativo) {'id': m.id, 'nome': m.nome, for (final t in monta) t.name: podeServir(m, t)},
             ]..sort((a, b) => (a['nome'] as String).compareTo(b['nome'] as String)))
           : const [],
       'indisponibilidades': [
         for (final i in ind)
           if (i.ate.compareTo('$prefixo-01') >= 0 && i.de.compareTo('$prefixo-31') <= 0) {...i.toJson(), 'nome': nome(i.membroId)},
       ],
-      'pode': {'pastoral': _podeEscala(req, TipoEscala.pastoral), 'louvor': _podeEscala(req, TipoEscala.louvor)},
+      'pode': {
+        for (final t in TipoEscala.values) t.name: _podeEscala(req, t),
+        'cultos': _podeCultos(req),
+      },
     });
   }
 
@@ -4167,7 +4210,7 @@ class Servidor {
       'cultos': [
         for (final c in lista)
           {
-            ..._cultoParaTela(c, membros, ind),
+            ..._cultoParaTela(c, membros, ind, visiveis: _escalasVisiveis(req)),
             // Modelo de roteiro do Modo Culto (o do culto, senão o padrão; sem nenhum, o do sistema).
             if (modeloDoCulto(modelos, c.nome) case final m?) 'roteiro': [for (final i in m.itens) i.toJson()],
           },
@@ -4186,6 +4229,7 @@ class Servidor {
     if (tipo == null || mes == null || (formato != 'paisagem' && formato != 'retrato')) {
       return _erro(400, 'Mês, escala ou formato inválidos.');
     }
+    if (!_escalasVisiveis(req).contains(tipo)) return _erro(403, 'Seu perfil não pode ver a ${tipo.titulo.toLowerCase()}.');
     final prefixo = _prefixoMes(mes.ano, mes.mes);
     final membros = _membrosPorId();
     final repertorio = _repertorioPorId();
@@ -4228,7 +4272,7 @@ class Servidor {
 
   /// POST /api/escalas/gerar {mes} — cria os cultos do mês a partir dos horários da página inicial.
   Future<Response> _gerarCultos(Request req) async {
-    if (!_podeEscala(req, TipoEscala.pastoral)) return _semPermissaoEscala(TipoEscala.pastoral);
+    if (!_podeCultos(req)) return _semPermissaoCultos;
     final mes = _mesDe((await _corpo(req))['mes']);
     if (mes == null) return _erro(400, 'Mês inválido.');
     final horarios = horariosDosCultos(cfg?.siteCultos ?? '');
@@ -4240,7 +4284,7 @@ class Servidor {
       for (final c in cultosDoMes(mes.ano, mes.mes, horarios))
         if (!existentes.contains('${c.data} ${c.hora}'))
           for (final culto in [_participacaoCulto(CultoEscala(id: novoId(), data: c.data, hora: c.hora, nome: c.nome, ceia: c.ceia))])
-            if (culto.escalaPastoral || culto.escalaLouvor) culto.toJson(),
+            if (culto.participaDeAlguma) culto.toJson(),
     ];
     if (novos.isNotEmpty) {
       await store.salvarVarios('escalas', novos);
@@ -4281,12 +4325,12 @@ class Servidor {
         mudou = true;
         preenchidas++;
       }
-      if (mudou) alterados.add((tipo == TipoEscala.pastoral ? c.copiar(pastoral: escala) : c.copiar(louvor: escala)).toJson());
+      if (mudou) alterados.add(c.copiar(escalas: {tipo: escala}).toJson());
     }
     if (alterados.isNotEmpty) {
       await store.salvarVarios('escalas', alterados);
       await _auditar(req, tipo: 'escala', acao: 'escala-repetida',
-          alvo: 'Escala ${tipo == TipoEscala.pastoral ? 'pastoral' : 'do louvor'} — ${_nomeMes(mes.ano, mes.mes)}',
+          alvo: '${tipo.titulo} — ${_nomeMes(mes.ano, mes.mes)}',
           detalhe: '$preenchidas função(ões) preenchida(s) com quem serviu em ${_nomeMes(anterior.year, anterior.month)}');
     }
     return _json({'preenchidas': preenchidas});
@@ -4294,7 +4338,7 @@ class Servidor {
 
   /// POST /api/escalas {data, hora, nome?, ceia?} — culto extra (fora dos horários de sempre).
   Future<Response> _criarCulto(Request req) async {
-    if (!_podeEscala(req, TipoEscala.pastoral)) return _semPermissaoEscala(TipoEscala.pastoral);
+    if (!_podeCultos(req)) return _semPermissaoCultos;
     final corpo = await _corpo(req);
     final CultoEscala culto;
     try {
@@ -4308,7 +4352,7 @@ class Servidor {
     await store.salvar('escalas', culto.toJson());
     await _auditar(req, tipo: 'escala', acao: 'culto-criado', alvo: _alvoCulto(culto.toJson()),
         detalhe: 'Culto extra criado (${culto.nome}${culto.ceia ? ', com Santa Ceia' : ''})');
-    return _json(_cultoParaTela(culto, _membrosPorId(), _indisponibilidades()), status: 201);
+    return _json(_cultoParaTela(culto, _membrosPorId(), _indisponibilidades(), visiveis: _escalasVisiveis(req)), status: 201);
   }
 
   /// PUT /api/escalas/<id> — {tipo, funcao, membros: [ids]} (quem serve numa função), {musicas} (louvor)
@@ -4351,7 +4395,7 @@ class Servidor {
     }
     for (final k in const ['nome', 'hora', 'ceia', 'tema']) {
       if (!corpo.containsKey(k)) continue;
-      if (!_podeEscala(req, TipoEscala.pastoral)) return _semPermissaoEscala(TipoEscala.pastoral);
+      if (!_podeCultos(req)) return _semPermissaoCultos;
       doc[k] = corpo[k];
     }
     final CultoEscala culto;
@@ -4381,7 +4425,7 @@ class Servidor {
     for (final e in eventos) {
       await _auditar(req, tipo: e.tipo, acao: e.acao, alvo: _alvoCulto(atual), detalhe: e.detalhe);
     }
-    return _json(_cultoParaTela(culto, _membrosPorId(), _indisponibilidades()));
+    return _json(_cultoParaTela(culto, _membrosPorId(), _indisponibilidades(), visiveis: _escalasVisiveis(req)));
   }
 
   Future<Response> _excluirCulto(Request req, String id) async {

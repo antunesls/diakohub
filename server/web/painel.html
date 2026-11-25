@@ -774,10 +774,7 @@
           <strong id="escala-titulo"></strong>
           <button type="button" class="icone" id="escala-proximo" aria-label="Próximo mês">›</button>
         </div>
-        <div class="segmentos" role="tablist" aria-label="Escala">
-          <button type="button" role="tab" data-escala="pastoral" aria-selected="false">Pastores</button>
-          <button type="button" role="tab" data-escala="louvor" aria-selected="true">Louvor</button>
-        </div>
+        <div class="segmentos" role="tablist" aria-label="Escala" id="escala-abas"></div>
         <span class="espaco"></span>
         <button type="button" class="botao secundario pequeno" id="escala-repetir" hidden></button>
         <button type="button" class="botao secundario pequeno" data-permissao="acessosEscala" data-ir="acessos">Acessos às escalas</button>
@@ -787,6 +784,9 @@
         <button type="button" class="botao pequeno" id="escala-extra" hidden>+ Culto extra</button>
       </div>
       <p id="resultado-escala" role="status"></p>
+      <div class="cartao" id="escala-sem-acesso" hidden>
+        <p style="margin:0">Seu perfil ainda não pode ver nenhuma escala. Peça à administração para liberar a escala do seu ministério em <strong>Usuários e acessos › Perfis</strong>.</p>
+      </div>
       <div class="cartao escala-vazia" id="escala-vazia" hidden>
         <p style="margin:0 0 12px">Nenhum culto em <span id="escala-vazia-mes"></span> ainda.</p>
         <button type="button" class="botao" id="escala-gerar" hidden>Gerar cultos do mês</button>
@@ -1630,7 +1630,7 @@
 <script src="/palavras.js?v=7"></script>
 <script src="/palavras-ensaio-tela.js?v=1"></script>
 <script src="/escala-impressao.js?v=3"></script>
-<script src="/horarios-escalas.js?v=1"></script>
-<script src="/escalas.js?v=15"></script>
+<script src="/horarios-escalas.js?v=2"></script>
+<script src="/escalas.js?v=16"></script>
 </body>
 </html>

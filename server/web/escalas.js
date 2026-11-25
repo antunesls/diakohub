@@ -1,13 +1,29 @@
-// Aba Escalas do painel: cultos do mês com a escala pastoral e a do louvor.
+// Aba Escalas do painel: cultos do mês com as escalas que a conta pode ver (pastoral, louvor,
+// infantil, recepção). O servidor só manda as escalas visíveis; as abas seguem d.escalas.
 // Carregado depois do painel.js (usa api, el, botao, mensagem, abrirDialogo, pode e o mapa carregar).
 
 const escala = {
   mes: null, // 'aaaa-mm'
-  tipo: 'louvor', // 'pastoral' | 'louvor'
+  tipo: null, // id de TIPOS_ESCALA (horarios-escalas.js)
   dados: null, // resposta de GET /api/escalas
 };
 
-const NOMES_ESCALA = { pastoral: 'Pastoral', louvor: 'Louvor' };
+const NOMES_ESCALA = Object.fromEntries(TIPOS_ESCALA.map((t) => [t.id, t.nome]));
+
+/** Quem aparece na lista para escalar em cada escala (mesma regra de podeServir, no diako_core). */
+const DICA_ESCALAR = {
+  pastoral: 'A lista mostra quem tem o ministério Pastoral ou Liderança, ou a função de pastor, presbítero, diácono ou evangelista na ficha.',
+  louvor: 'A lista mostra quem tem o ministério Louvor (ou Música) na ficha. Pode marcar mais de uma pessoa.',
+  infantil: 'A lista mostra quem tem o ministério Infantil (ou Kids, Crianças) na ficha. Pode marcar mais de uma pessoa.',
+  recepcao: 'A lista mostra quem tem o ministério Recepção (ou Acolhimento) na ficha. Pode marcar mais de uma pessoa.',
+};
+
+/** Escala que abre: a atual, se ainda visível; senão a primeira que a conta monta; senão a primeira que vê. */
+function escolherTipo(d) {
+  const ids = d.escalas.map((t) => t.id);
+  if (ids.includes(escala.tipo)) return escala.tipo;
+  return ids.find((id) => d.pode[id]) || ids[0] || null;
+}
 
 const mesIso = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
 const comMaiuscula = (s) => s.charAt(0).toUpperCase() + s.slice(1);
@@ -21,17 +37,15 @@ function mudarMes(delta) {
 
 $('escala-anterior').addEventListener('click', () => mudarMes(-1));
 $('escala-proximo').addEventListener('click', () => mudarMes(1));
-document.querySelectorAll('[data-escala]').forEach((b) => b.addEventListener('click', () => {
+$('escala-abas').addEventListener('click', (e) => {
+  const b = e.target.closest('[data-escala]');
+  if (!b) return;
   escala.tipo = b.dataset.escala;
   desenharEscala();
-}));
+});
 
 async function carregarEscalas() {
-  if (!escala.mes) {
-    escala.mes = mesIso(new Date());
-    // Quem só monta o louvor (ou só a pastoral) já abre na sua escala.
-    escala.tipo = pode('escalaLouvor') && !pode('escalaPastoral') ? 'louvor' : pode('escalaPastoral') ? 'pastoral' : 'louvor';
-  }
+  if (!escala.mes) escala.mes = mesIso(new Date());
   try {
     escala.dados = await api('GET', '/api/escalas?mes=' + escala.mes);
     desenharEscala();
@@ -45,25 +59,33 @@ carregar.escalas = carregarEscalas;
 /** Funções que viram colunas no mês: a Santa Ceia só se algum culto for de ceia. */
 function colunasDoMes(d, tipo) {
   const todas = new Set(d.cultos.flatMap((c) => c.funcoes[tipo]));
-  const ordem = tipo === 'pastoral' ? ['Direção', 'Pregação', 'Oração e ofertas', 'Santa Ceia'] : ['Ministro', 'Vocal', 'Teclado', 'Violão', 'Guitarra', 'Baixo', 'Bateria', 'Técnico de som', 'Projeção'];
-  return ordem.filter((f) => todas.has(f));
+  return tipoEscala(tipo).funcoes.filter((f) => todas.has(f));
 }
 
 function desenharEscala() {
   if (!escala.dados) return;
-  const tipo = escala.tipo;
+  const tipo = escala.tipo = escolherTipo(escala.dados);
+  $('escala-abas').replaceChildren(...escala.dados.escalas.map((t) => el('button', {
+    type: 'button', role: 'tab', 'data-escala': t.id, 'aria-selected': String(t.id === tipo),
+  }, t.nome)));
+  $('escala-titulo').textContent = comMaiuscula(escala.dados.titulo);
+  $('resultado-escala').textContent = '';
+  // Sem nenhuma escala liberada: só o aviso (as permissões de ver ficam em Usuários e acessos › Perfis).
+  $('escala-sem-acesso').hidden = !!tipo;
+  if (!tipo) {
+    for (const id of ['escala-vazia', 'escala-conteudo', 'escala-repetir', 'escala-extra', 'escala-indisponivel',
+      'escala-ver-indisponibilidades', 'escala-imprimir']) $(id).hidden = true;
+    return;
+  }
   const d = { ...escala.dados, cultos: cultosDaEscala(escala.dados.cultos, tipo) };
   const podeTipo = d.pode[tipo];
-  const algum = d.pode.pastoral || d.pode.louvor;
-  document.querySelectorAll('[data-escala]').forEach((b) => b.setAttribute('aria-selected', String(b.dataset.escala === tipo)));
-  $('escala-titulo').textContent = comMaiuscula(d.titulo);
-  $('resultado-escala').textContent = '';
+  const algum = TIPOS_ESCALA.some((t) => d.pode[t.id]);
 
   const [a, m] = escala.mes.split('-').map(Number);
   const anterior = mesIso(new Date(a, m - 2, 1));
   $('escala-repetir').textContent = 'Repetir ' + nomeMes(anterior);
   $('escala-repetir').hidden = !podeTipo || d.cultos.length === 0;
-  $('escala-extra').hidden = !d.pode.pastoral;
+  $('escala-extra').hidden = !d.pode.cultos;
   $('escala-indisponivel').hidden = !algum;
   $('escala-ver-indisponibilidades').hidden = !algum;
   $('escala-imprimir').hidden = d.cultos.length === 0;
@@ -72,7 +94,7 @@ function desenharEscala() {
   $('escala-vazia').hidden = !vazio;
   $('escala-conteudo').hidden = vazio;
   $('escala-vazia-mes').textContent = d.titulo;
-  $('escala-gerar').hidden = !d.pode.pastoral || !d.horariosConfigurados;
+  $('escala-gerar').hidden = !d.pode.cultos || !d.horariosConfigurados;
   $('escala-sem-horarios').hidden = d.horariosConfigurados;
   if (vazio) return;
 
@@ -101,7 +123,7 @@ function desenharEscala() {
       el('div', { style: 'font-weight:600' }, `${c.rotulo} · ${c.horaTexto}`),
       el('div', { class: 'sub' }, c.nome + (c.tema && tipo === 'pastoral' ? ' · ' + c.tema : '')),
       c.ceia ? el('span', { class: 'ceia' }, 'Santa Ceia') : null,
-      d.pode.pastoral ? el('div', {}, el('button', { type: 'button', class: 'link', style: 'font-size:13px', onclick: () => abrirCulto(c) }, 'Editar culto')) : null),
+      d.pode.cultos ? el('div', {}, el('button', { type: 'button', class: 'link', style: 'font-size:13px', onclick: () => abrirCulto(c) }, 'Editar culto')) : null),
     ...colunas.map((f) => el('td', {}, celulaEscala(c, tipo, f, podeTipo))),
     tipo === 'louvor' ? el('td', {}, celulaMusicas(c, d.pode.louvor)) : null));
   $('escala-grade').replaceChildren(el('thead', {}, cabecalho), el('tbody', {}, ...linhas));
@@ -177,7 +199,7 @@ let escalarAtual = null;
 function situacaoPessoa(p, c, tipo, funcao) {
   const ind = escala.dados.indisponibilidades.find((i) => i.membroId === p.id && i.de <= c.data && i.ate >= c.data);
   if (ind) return { classe: 'indisponivel', texto: `Indisponível ${periodo(ind.de, ind.ate)}${ind.motivo ? ' · ' + ind.motivo : ''}` };
-  for (const t of ['pastoral', 'louvor']) {
+  for (const t of Object.keys(c.funcoes)) {
     for (const f of c.funcoes[t]) {
       if ((t !== tipo || f !== funcao) && (c[t][f] || []).some((x) => x.id === p.id)) {
         return { classe: 'conflito', texto: `Já está em ${f.toLowerCase()} neste culto` };
@@ -204,7 +226,7 @@ function desenharEscalar() {
       caixa,
       el('span', { class: 'iniciais', 'aria-hidden': 'true' }, iniciais(p.nome)),
       el('span', { style: 'flex:1' }, el('span', { class: 'nome' }, p.nome), el('span', { class: 'situacao ' + s.classe }, s.texto)));
-  }) : [el('p', { class: 'dica', style: 'margin:0' }, todos ? 'Ninguém encontrado.' : `Ninguém com o ministério ${tipo === 'louvor' ? 'Louvor' : 'Pastoral'} na ficha. Marque "Mostrar todos" ou ajuste as fichas em Membros.`)]));
+  }) : [el('p', { class: 'dica', style: 'margin:0' }, todos ? 'Ninguém encontrado.' : `Ninguém com o ministério ${NOMES_ESCALA[tipo]} na ficha. Marque "Mostrar todos" ou ajuste as fichas em Membros.`)]));
 }
 
 function abrirEscalar(c, tipo, funcao) {
@@ -215,9 +237,7 @@ function abrirEscalar(c, tipo, funcao) {
   $('escalar-pergunta').textContent = `Quem fica com ${funcao.toLowerCase()} neste culto?`;
   $('escalar-busca').value = '';
   $('escalar-todos').checked = false;
-  $('escalar-dica').textContent = tipo === 'louvor'
-    ? 'A lista mostra quem tem o ministério Louvor (ou Música) na ficha. Pode marcar mais de uma pessoa.'
-    : 'A lista mostra quem tem o ministério Pastoral ou Liderança, ou a função de pastor, presbítero, diácono ou evangelista na ficha.';
+  $('escalar-dica').textContent = DICA_ESCALAR[tipo];
   desenharEscalar();
   abrirDialogo($('dlg-escalar'), $('erro-escalar'), async () => {
     await api('PUT', '/api/escalas/' + c.id, { tipo, funcao, membros: [...escalarAtual.marcados] });
@@ -502,7 +522,7 @@ function abrirCulto(c) {
   $('culto-nome').value = novo ? '' : c.nome;
   $('culto-tema').value = novo ? '' : c.tema || '';
   $('culto-ceia').checked = !novo && !!c.ceia;
-  $('culto-excluir').hidden = novo;
+  $('culto-excluir').hidden = novo || !escala.dados.pode.pastoral;
   $('culto-excluir').onclick = async () => {
     if (!confirm(`Excluir o culto de ${c.rotulo} e a escala dele?`)) return;
     try {

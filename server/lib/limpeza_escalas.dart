@@ -1,6 +1,6 @@
 import 'store.dart';
 
-/// Tira das escalas (pastoral e louvor, todos os cultos, inclusive os passados) e das
+/// Tira das escalas (todas, em todos os cultos, inclusive os passados) e das
 /// indisponibilidades cada pessoa para a qual [sai] responde true. Os outros campos do culto
 /// ficam intactos e função sem ninguém sai do mapa, como o CultoEscala.toJson grava.
 /// Retorna quantos cultos mudaram.
@@ -9,7 +9,7 @@ Future<int> tirarDasEscalas(Store store, bool Function(String membroId) sai) asy
   for (final culto in store.listar('escalas')) {
     var mudou = false;
     final novo = {...culto};
-    for (final tipo in const ['pastoral', 'louvor']) {
+    for (final tipo in const ['pastoral', 'louvor', 'infantil', 'recepcao']) {
       final funcoes = culto[tipo];
       if (funcoes is! Map) continue;
       final limpo = <String, dynamic>{};

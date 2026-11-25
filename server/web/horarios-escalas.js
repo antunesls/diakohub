@@ -1,3 +1,18 @@
+// As escalas do culto (mesma ordem e nomes de TipoEscala, no diako_core). `campo` é o que o culto
+// grava quando não participa da escala ("escalaPastoral": false).
+const TIPOS_ESCALA = [
+  { id: 'pastoral', nome: 'Pastoral', titulo: 'Escala pastoral', campo: 'escalaPastoral',
+    funcoes: ['Direção', 'Pregação', 'Oração e ofertas', 'Santa Ceia'] },
+  { id: 'louvor', nome: 'Louvor', titulo: 'Escala do louvor', campo: 'escalaLouvor',
+    funcoes: ['Ministro', 'Vocal', 'Teclado', 'Violão', 'Guitarra', 'Baixo', 'Bateria', 'Técnico de som', 'Projeção'] },
+  { id: 'infantil', nome: 'Infantil', titulo: 'Escala do infantil', campo: 'escalaInfantil',
+    funcoes: ['Professor(a)', 'Auxiliar', 'Berçário'] },
+  { id: 'recepcao', nome: 'Recepção', titulo: 'Escala da recepção', campo: 'escalaRecepcao',
+    funcoes: ['Porta', 'Boas-vindas', 'Estacionamento', 'Café'] },
+];
+
+const tipoEscala = (id) => TIPOS_ESCALA.find((t) => t.id === id);
+
 // Mesmas regras de dia/hora de horariosDosCultos (diako_core).
 function horariosParaEscalas(texto) {
   const dias = ['segunda', 'terca', 'quarta', 'quinta', 'sexta', 'sabado', 'domingo'];
@@ -19,7 +34,8 @@ function horariosParaEscalas(texto) {
 }
 
 function cultosDaEscala(cultos, tipo) {
-  return cultos.filter((c) => c[tipo === 'pastoral' ? 'escalaPastoral' : 'escalaLouvor'] !== false);
+  const campo = tipoEscala(tipo)?.campo;
+  return cultos.filter((c) => !campo || c[campo] !== false);
 }
 
-if (typeof module !== 'undefined') module.exports = { horariosParaEscalas, cultosDaEscala };
+if (typeof module !== 'undefined') module.exports = { TIPOS_ESCALA, tipoEscala, horariosParaEscalas, cultosDaEscala };

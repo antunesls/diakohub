@@ -161,7 +161,9 @@
 
   const ddmm = (iso) => iso.slice(8, 10) + '/' + iso.slice(5, 7);
   const periodo = (de, ate) => (de === ate ? ddmm(de) : `${ddmm(de)} a ${ddmm(ate)}`);
-  const nomeFuncao = (f) => f.tipo === 'louvor' ? `${f.funcao} · louvor` : f.funcao;
+  // "Porta · recepção": a função com o ministério (a pastoral fica só com a função).
+  const MINISTERIO_ESCALA = { louvor: 'louvor', infantil: 'infantil', recepcao: 'recepção' };
+  const nomeFuncao = (f) => MINISTERIO_ESCALA[f.tipo] ? `${f.funcao} · ${MINISTERIO_ESCALA[f.tipo]}` : f.funcao;
 
   /** Cria um elemento: props vão como propriedades (on* viram eventos); filhos nulos são ignorados. */
   function criar(tag, props = {}, ...filhos) {

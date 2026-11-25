@@ -113,6 +113,58 @@ void main() {
       expect(recarregado.buscar('liderCasais')!.pode(encontros), isFalse);
     });
 
+    test('cultos separados da escala pastoral: quem montava a pastoral continua gerando e editando', () async {
+      await File(p.join(pasta.path, 'perfis.json')).writeAsString(jsonEncode({
+        'permissoesConhecidas': [for (final q in Permissao.values) if (q != Permissao.cultos) q.name],
+        'perfis': [
+          {'id': 'pastor', 'nome': 'Pastor', 'permissoes': ['sessao', 'escalasVer']},
+          {'id': 'coordenacao', 'nome': 'Coordenação', 'permissoes': ['sessao', 'escalasVer', 'escalaPastoral']},
+          {'id': 'so-consulta', 'nome': 'Só consulta', 'permissoes': ['sessao', 'escalasVer']},
+        ],
+      }));
+      final perfis = Perfis(pasta.path);
+      await perfis.carregar();
+      expect(perfis.buscar('coordenacao')!.pode(Permissao.cultos), isTrue);
+      expect(perfis.buscar('pastor')!.pode(Permissao.cultos), isTrue, reason: 'padrão de fábrica');
+      expect(perfis.buscar('so-consulta')!.pode(Permissao.cultos), isFalse);
+      expect(perfis.buscar('comissao-louvor')!.pode(Permissao.cultos), isFalse);
+
+      // Já conhecida: tirar de um perfil não volta na próxima carga.
+      await perfis.atualizar('coordenacao', permissoes: {Permissao.escalaPastoral});
+      final deNovo = Perfis(pasta.path);
+      await deNovo.carregar();
+      expect(deNovo.buscar('coordenacao')!.pode(Permissao.cultos), isFalse);
+      expect(deNovo.buscar('coordenacao')!.pode(Permissao.escalaPastoral), isTrue);
+    });
+
+    test('escalas separadas: quem via as escalas continua vendo pastoral e louvor, não infantil e recepção', () async {
+      final novas = {'verPastoral', 'verLouvor', 'verInfantil', 'verRecepcao', 'escalaInfantil', 'escalaRecepcao'};
+      await File(p.join(pasta.path, 'perfis.json')).writeAsString(jsonEncode({
+        'permissoesConhecidas': [for (final q in Permissao.values) if (!novas.contains(q.name)) q.name],
+        'perfis': [
+          {'id': 'midia', 'nome': 'Mídia', 'permissoes': ['sessao', 'cartazes', 'escalasVer']},
+          {'id': 'equipe-som', 'nome': 'Equipe do som', 'permissoes': ['sessao', 'escalasVer']},
+          {'id': 'so-cartazes', 'nome': 'Só cartazes', 'permissoes': ['sessao', 'cartazes']},
+        ],
+      }));
+      final perfis = Perfis(pasta.path);
+      await perfis.carregar();
+      for (final id in ['midia', 'equipe-som']) {
+        final x = perfis.buscar(id)!;
+        expect(x.pode(Permissao.verPastoral) && x.pode(Permissao.verLouvor), isTrue, reason: id);
+        expect(x.pode(Permissao.verInfantil) || x.pode(Permissao.verRecepcao), isFalse, reason: id);
+      }
+      expect(perfis.buscar('so-cartazes')!.pode(Permissao.verPastoral), isFalse);
+      // Perfis novos de fábrica entram, cada um só com a própria escala.
+      final infantil = perfis.buscar('comissaoInfantil')!;
+      expect(infantil.pode(Permissao.escalaInfantil) && infantil.pode(Permissao.verInfantil), isTrue);
+      expect(infantil.pode(Permissao.verPastoral) || infantil.pode(Permissao.verLouvor) || infantil.pode(Permissao.verRecepcao), isFalse);
+      expect(perfis.buscar('administrador')!.pode(Permissao.escalaRecepcao), isTrue);
+      // Montar implica ver: não dá para montar a recepção sem vê-la.
+      final criado = await perfis.criar(nome: 'Porteiros', permissoes: {Permissao.escalaRecepcao});
+      expect(criado.permissoes, containsAll([Permissao.verRecepcao, Permissao.escalasVer]));
+    });
+
     test('descrição de fábrica antiga é atualizada; descrição editada é preservada', () async {
       await File(p.join(pasta.path, 'perfis.json')).writeAsString(jsonEncode({
         'permissoesConhecidas': [for (final q in Permissao.values) q.name],

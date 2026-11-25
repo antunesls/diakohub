@@ -35,6 +35,15 @@ class Perfis {
     },
   };
 
+  /// Permissões que saíram de dentro de outra: um perfil (padrão ou criado) que tinha a antiga
+  /// ganha a nova na atualização, para ninguém perder o que já fazia.
+  static const _separadas = {
+    Permissao.cultos: Permissao.escalaPastoral,
+    // "Ver as escalas" mostrava a pastoral e o louvor; agora cada escala tem a sua.
+    Permissao.verPastoral: Permissao.escalasVer,
+    Permissao.verLouvor: Permissao.escalasVer,
+  };
+
   static String _descricaoAtual(PerfilPadrao? fabrica, String salva) =>
       fabrica != null && (_descricoesAntigas[fabrica.id]?.contains(salva) ?? false) ? fabrica.descricao : salva;
 
@@ -69,6 +78,9 @@ class Perfis {
         if (fabrica != null)
           for (final nova in fabrica.permissoes) if (!conhecidas.contains(nova.name)) nova,
       };
+      for (final MapEntry(key: nova, value: origem) in _separadas.entries) {
+        if (!conhecidas.contains(nova.name) && permissoes.contains(origem)) permissoes.add(nova);
+      }
       lidos.add(Perfil(
           id: id,
           nome: m['nome'] as String? ?? id,

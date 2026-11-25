@@ -22,8 +22,10 @@ function tela() {
   vm.runInContext(fs.readFileSync(path.join(__dirname, '../web/escalas.js'), 'utf8'), contexto);
   vm.runInContext(`
     escala.mes = '2026-11';
+    escala.tipo = 'louvor';
     escala.dados = {
       titulo: 'novembro de 2026', pode: { pastoral: false, louvor: false },
+      escalas: [{ id: 'pastoral', nome: 'Pastoral' }, { id: 'louvor', nome: 'Louvor' }],
       cultos: [{ rotulo: 'Domingo, 01/11', horaTexto: '19h', nome: 'Culto',
         funcoes: { pastoral: [], louvor: [] }, pastoral: {}, louvor: {}, musicas: [] }],
       avisos: { pastoral: [], louvor: [] }, indisponibilidades: [], whatsapp: {}
@@ -87,6 +89,30 @@ test('trocar a aba esconde somente a escala desmarcada e ajusta a contagem', () 
   executar(`escala.tipo = 'pastoral'; desenharEscala();`);
   assert.match(texto($('escala-resumo')), /2 cultos no mês/);
   assert.match(texto($('escala-grade')), /Qua 04/);
+});
+
+test('abas seguem só as escalas que o servidor mandou e abrem na que a pessoa monta', () => {
+  const { $, executar } = tela();
+  executar(`escala.tipo = null;
+    escala.dados.escalas = [{ id: 'infantil', nome: 'Infantil' }, { id: 'recepcao', nome: 'Recepção' }];
+    escala.dados.pode = { infantil: false, recepcao: true };
+    escala.dados.cultos[0].funcoes = { infantil: ['Professor(a)', 'Auxiliar', 'Berçário'], recepcao: ['Porta', 'Boas-vindas', 'Estacionamento', 'Café'] };
+    escala.dados.cultos[0].infantil = {}; escala.dados.cultos[0].recepcao = {};
+    escala.dados.avisos = { infantil: [], recepcao: [] }; escala.dados.whatsapp = { infantil: '', recepcao: '' };
+    desenharEscala();`);
+  assert.deepEqual($('escala-abas').filhos.map(texto), ['Infantil', 'Recepção']);
+  assert.equal($('escala-abas').filhos[1]['aria-selected'], 'true');
+  assert.match(texto($('escala-grade')), /Porta/);
+  assert.doesNotMatch(texto($('escala-grade')), /Ministro|Pregação/);
+  assert.equal($('escala-sem-acesso').hidden, true);
+});
+
+test('sem nenhuma escala liberada mostra o aviso e esconde a grade', () => {
+  const { $, executar } = tela();
+  executar(`escala.dados.escalas = []; escala.dados.cultos[0].funcoes = {}; desenharEscala();`);
+  assert.equal($('escala-sem-acesso').hidden, false);
+  assert.equal($('escala-conteudo').hidden, true);
+  assert.deepEqual($('escala-abas').filhos, []);
 });
 
 test('página contém modal acessível com botão Fechar e script atualizado', () => {

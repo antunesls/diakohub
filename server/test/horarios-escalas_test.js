@@ -1,6 +1,6 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
-const { horariosParaEscalas, cultosDaEscala } = require('../web/horarios-escalas.js');
+const { TIPOS_ESCALA, horariosParaEscalas, cultosDaEscala } = require('../web/horarios-escalas.js');
 const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
@@ -16,6 +16,9 @@ test('cada aba mostra apenas os cultos que participam, mantendo compatibilidade'
   const cultos = [{ id: 'domingo' }, { id: 'quarta', escalaLouvor: false }, { id: 'sexta', escalaPastoral: false }];
   assert.deepEqual(cultosDaEscala(cultos, 'louvor').map((c) => c.id), ['domingo', 'sexta']);
   assert.deepEqual(cultosDaEscala(cultos, 'pastoral').map((c) => c.id), ['domingo', 'quarta']);
+  const comInfantil = [...cultos, { id: 'sabado', escalaInfantil: false }];
+  assert.deepEqual(cultosDaEscala(comInfantil, 'infantil').map((c) => c.id), ['domingo', 'quarta', 'sexta']);
+  assert.deepEqual(TIPOS_ESCALA.map((t) => t.id), ['pastoral', 'louvor', 'infantil', 'recepcao']);
 });
 
 test('admin permite desmarcar só louvor e salva as duas opções com os horários', () => {
@@ -33,7 +36,7 @@ test('admin permite desmarcar só louvor e salva as duas opções com os horári
   };
   $('siteCultos').value = 'Domingo — 19h\nQuarta — 20h';
   let salvo;
-  const contexto = vm.createContext({ $, horariosParaEscalas, document: {
+  const contexto = vm.createContext({ $, TIPOS_ESCALA, horariosParaEscalas, document: {
     createElement: elemento, createTextNode: (texto) => texto,
   }, salvar: (campos) => { salvo = campos; } });
   const js = fs.readFileSync(path.join(__dirname, '../web/admin.js'), 'utf8');
@@ -51,8 +54,8 @@ test('admin permite desmarcar só louvor e salva as duas opções com os horári
   vm.runInContext(js.slice(js.indexOf("$('form-inicio').addEventListener"), js.indexOf("$('muralBoasVindas').addEventListener")), contexto);
   $('form-inicio').eventos.submit({ preventDefault() {} });
   assert.deepEqual(JSON.parse(JSON.stringify(salvo.cultosEscalas)), {
-    '7@19:00': { pastoral: true, louvor: true },
-    '3@20:00': { pastoral: true, louvor: false },
+    '7@19:00': { pastoral: true, louvor: true, infantil: true, recepcao: true },
+    '3@20:00': { pastoral: true, louvor: false, infantil: true, recepcao: true },
   });
   assert.match(salvo.siteCultos, /Oração/);
 });

@@ -83,7 +83,7 @@ function preencherParticipacaoCultos() {
     const nome = document.createElement('strong');
     nome.textContent = rotulo;
     linha.append(nome);
-    for (const [tipo, titulo] of [['pastoral', 'Escala pastoral'], ['louvor', 'Escala de louvor']]) {
+    for (const { id: tipo, titulo } of TIPOS_ESCALA) {
       const label = document.createElement('label');
       label.className = 'marcar';
       const caixa = document.createElement('input');
@@ -204,10 +204,8 @@ $('form-inicio').addEventListener('submit', (e) => {
   for (const id of ['siteCultos', 'siteEndereco', 'sitePixChave', 'sitePixNome', 'sitePixCidade', 'siteInstagram', 'siteYoutube', 'siteWhatsapp']) {
     campos[id] = $(id).value.trim();
   }
-  campos.cultosEscalas = Object.fromEntries(horariosParaEscalas(campos.siteCultos).map(({ chave }) => [chave, {
-    pastoral: participacaoCultos[chave]?.pastoral !== false,
-    louvor: participacaoCultos[chave]?.louvor !== false,
-  }]));
+  campos.cultosEscalas = Object.fromEntries(horariosParaEscalas(campos.siteCultos).map(({ chave }) => [chave,
+    Object.fromEntries(TIPOS_ESCALA.map(({ id }) => [id, participacaoCultos[chave]?.[id] !== false]))]));
   salvar(campos, $('res-inicio'));
 });
 
