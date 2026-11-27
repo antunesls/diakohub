@@ -116,6 +116,13 @@
   .rodape-tela .botao { width: 100%; }
   .grade2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: 10px; }
   h2 { font-size: 18px; margin-top: 4px; }
+  /* Avisar o grupo do louvor (aviso-whatsapp.js): o ministro manda as músicas escolhidas. */
+  .avisar-grupo { display: grid; gap: 8px; padding: 12px; border-radius: 16px; background: var(--primaria-suave); color: var(--primaria-escura); }
+  .avisar-grupo p { margin: 0; font-weight: 600; }
+  .botao.whatsapp { background: var(--ok); border-color: var(--ok); color: #fff; width: 100%; }
+  .botao.whatsapp:hover { background: #236240; border-color: #236240; color: #fff; }
+  #avisar-texto { min-height: 240px; font-family: inherit; line-height: 1.45; }
+  #dlg-avisar .acoes-folha .botao { text-align: center; }
   /* Modo ensaio (ensaio-player.js): vídeos do culto em sequência, tom e 1ª nota em destaque, ordem do culto embaixo. */
   .botao.ensaiar { display: inline-flex; align-items: center; justify-content: center; gap: 8px; width: 100%; }
   .botao.ensaiar svg { width: 18px; height: 18px; flex: none; }
@@ -289,9 +296,23 @@
   <div class="lista-agenda" id="lista-agenda"></div>
   <button type="button" class="botao secundario" id="agenda-fechar" style="width:100%">Fechar</button>
 </dialog>
+<dialog id="dlg-avisar" class="folha" aria-labelledby="avisar-titulo">
+  <span class="puxador" aria-hidden="true"></span>
+  <h2 id="avisar-titulo">Avisar o grupo do louvor</h2>
+  <p class="dica" style="margin:0 0 10px">Revise e envie. O WhatsApp abre com o texto e você escolhe o grupo.</p>
+  <label for="avisar-texto" class="escondido">Texto do aviso</label>
+  <textarea id="avisar-texto"></textarea>
+  <p id="avisar-resultado" role="status"></p>
+  <div class="acoes-folha">
+    <button type="button" class="botao secundario" id="avisar-copiar">Copiar</button>
+    <a class="botao whatsapp" id="avisar-abrir" target="_blank" rel="noopener" href="https://wa.me/">Abrir no WhatsApp</a>
+  </div>
+  <button type="button" class="botao secundario" id="avisar-fechar" style="width:100%;margin-top:10px">Fechar</button>
+</dialog>
 <script src="/repertorio-busca.js?v=2"></script>
 <script src="/primeiro-acesso.js?v=1"></script>
 <script src="/ensaio-player.js?v=1"></script>
+<script src="/aviso-whatsapp.js?v=1"></script>
 <script>
   const $ = (id) => document.getElementById(id);
   // O QR é comum a todos; o servidor identifica o membro pela sessão autenticada.
@@ -407,6 +428,7 @@
       salvar.disabled = true;
       try {
         await chamar(`/api/minha-escala/cultos/${c.id}/musicas`, { musicas: escolhidas }, 'PUT');
+        recemSalvos.add(c.id);
         await carregar();
       } catch (err) {
         resultado.className = 'erro';
@@ -578,11 +600,47 @@
     if (musicas) corpo.append(criar('div', {}, criar('h2', { className: 'secao-titulo', textContent: 'Músicas' }), musicas));
     const ensaiar = EnsaioPlayer.botaoEnsaio(`${dataLonga(c)} · ${c.horaTexto}`, c.musicas || [], 'botao ensaiar');
     if (ensaiar) corpo.append(ensaiar);
+    if (c.podeEscolherMusicas && c.musicas.length) corpo.append(blocoAvisarGrupo(c));
     if (c.podeEscolherMusicas) corpo.append(editorMusicas(c));
     corpo.append(criar('div', { className: 'acoes' }, botaoAgenda(c, 'botao secundario pequeno'), botaoNaoVou(c, 'botao secundario pequeno')));
   }
   $('culto-voltar').addEventListener('click', () => $('dlg-culto').close());
-  $('dlg-culto').addEventListener('close', () => { cultoAberto = null; });
+
+  // ---------- Avisar o grupo do louvor (só o ministro do culto) ----------
+  // Sem links do YouTube: a mensagem leva o link da Minha Escala, onde cada um ouve no modo ensaio.
+  const recemSalvos = new Set();
+  function textoAvisarGrupo(c) {
+    return textoAvisoCulto({
+      culto: { titulo: `${dataLonga(c)} · ${c.horaTexto}`, nome: c.nome, ceia: c.ceia },
+      escala: 'Louvor',
+      musicas: c.musicas.map((m) => ({ titulo: m.titulo, tom: m.tom, primeiraNota: m.primeiraNota })),
+      link: location.origin + '/minha-escala',
+    });
+  }
+  function blocoAvisarGrupo(c) {
+    const salvo = recemSalvos.has(c.id);
+    return criar('div', { className: 'avisar-grupo' },
+      salvo ? criar('p', { textContent: '✓ Músicas salvas' }) : null,
+      botao('Avisar o grupo do louvor', () => abrirAvisar(c), 'botao whatsapp'));
+  }
+  function abrirAvisar(c) {
+    $('avisar-texto').value = textoAvisarGrupo(c);
+    $('avisar-abrir').href = linkWhatsappTexto($('avisar-texto').value);
+    $('avisar-resultado').textContent = '';
+    $('dlg-avisar').showModal();
+  }
+  $('avisar-texto').addEventListener('input', () => { $('avisar-abrir').href = linkWhatsappTexto($('avisar-texto').value); });
+  $('avisar-fechar').addEventListener('click', () => $('dlg-avisar').close());
+  $('avisar-copiar').addEventListener('click', async () => {
+    try {
+      await navigator.clipboard.writeText($('avisar-texto').value);
+      mensagem('Texto copiado.', true, 'avisar-resultado');
+    } catch {
+      $('avisar-texto').select();
+      mensagem('Texto selecionado: copie com o menu do celular.', true, 'avisar-resultado');
+    }
+  });
+  $('dlg-culto').addEventListener('close', () => { cultoAberto = null; recemSalvos.clear(); });
 
   function desenhar() {
     $('carregando').hidden = true;

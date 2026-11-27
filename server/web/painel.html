@@ -413,6 +413,11 @@
   .aviso-indisponibilidade .detalhes { flex: 1 1 250px; min-width: 0; overflow-wrap: anywhere; }
   .aviso-indisponibilidade .detalhes strong { display: block; }
   #dlg-formato-escala { width: min(580px, calc(100vw - 32px)); }
+  /* Avisar o grupo: texto da escala (mês ou um culto) para revisar e enviar no WhatsApp. */
+  #dlg-avisar-grupo { width: min(620px, calc(100vw - 32px)); }
+  #avisar-texto { min-height: 280px; font-family: inherit; line-height: 1.45; }
+  .botao.botao-whatsapp { background: var(--ok); border-color: var(--ok); color: #fff; }
+  .botao.botao-whatsapp:hover { background: #236240; border-color: #236240; color: #fff; }
   .formatos-escala { display: grid; gap: 10px; margin: 18px 0; }
   .formatos-escala button { width: 100%; padding: 16px; text-align: left; border: 1px solid var(--linha); border-radius: 12px; background: var(--superficie); cursor: pointer; }
   .formatos-escala button:hover, .formatos-escala button:focus-visible { border-color: var(--primaria); outline-color: var(--primaria); }
@@ -781,6 +786,7 @@
         <button type="button" class="botao secundario pequeno" id="escala-indisponivel" hidden>Indisponibilidade</button>
         <button type="button" class="botao secundario pequeno" id="escala-ver-indisponibilidades" hidden>Ver indisponibilidades</button>
         <button type="button" class="botao secundario pequeno" id="escala-imprimir">Gerar PDF</button>
+        <button type="button" class="botao pequeno botao-whatsapp" id="escala-avisar">Avisar o grupo</button>
         <button type="button" class="botao pequeno" id="escala-extra" hidden>+ Culto extra</button>
       </div>
       <p id="resultado-escala" role="status"></p>
@@ -795,22 +801,10 @@
       <div id="escala-conteudo">
         <div class="escala-resumo" id="escala-resumo"></div>
         <div class="cartao escala-grade-cartao"><div class="tabela-rolagem"><table class="escala-grade" id="escala-grade"></table></div></div>
-        <div class="duas">
-          <div class="cartao">
-            <h2 style="font-size:18px">Avisos do mês</h2>
-            <div id="escala-avisos" class="escala-avisos"></div>
-            <div id="escala-indisponiveis"></div>
-          </div>
-          <div class="cartao">
-            <h2 style="font-size:18px">Texto para o WhatsApp</h2>
-            <p class="dica">Revise e envie no grupo da equipe. O sistema não manda mensagens sozinho.</p>
-            <label for="escala-whatsapp" class="escondido">Texto da escala</label>
-            <textarea id="escala-whatsapp" style="min-height:240px;font-family:inherit"></textarea>
-            <div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:8px">
-              <button type="button" class="botao secundario pequeno" id="escala-copiar">Copiar</button>
-              <a class="botao pequeno" id="escala-abrir-whatsapp" target="_blank" rel="noopener" href="https://wa.me/">Abrir no WhatsApp</a>
-            </div>
-          </div>
+        <div class="cartao">
+          <h2 style="font-size:18px">Avisos do mês</h2>
+          <div id="escala-avisos" class="escala-avisos"></div>
+          <div id="escala-indisponiveis"></div>
         </div>
       </div>
     </section>
@@ -1213,6 +1207,19 @@
     <button type="button" id="escala-formato-retrato"><strong>Baixar PDF · cartões por culto (A4 retrato)</strong><span>Mais espaço para nomes, horários e músicas de cada culto.</span></button>
   </div>
   <div class="dialogo-acoes"><button type="button" class="botao secundario" id="escala-formato-fechar">Voltar</button></div>
+</dialog>
+
+<dialog id="dlg-avisar-grupo" aria-labelledby="titulo-avisar-grupo">
+  <h2 id="titulo-avisar-grupo">Avisar o grupo</h2>
+  <p class="dica">Revise e envie. O WhatsApp abre com o texto e você escolhe o grupo; o site não manda mensagens sozinho. A mensagem leva o link da Minha Escala, onde cada um ouve as músicas.</p>
+  <div class="campo"><label for="avisar-qual">O que mandar</label><select id="avisar-qual"></select></div>
+  <div class="campo"><label for="avisar-texto">Texto</label><textarea id="avisar-texto"></textarea></div>
+  <p id="avisar-resultado" role="status"></p>
+  <div class="dialogo-acoes">
+    <button type="button" class="botao secundario" id="avisar-fechar">Fechar</button>
+    <button type="button" class="botao secundario" id="avisar-copiar">Copiar</button>
+    <a class="botao botao-whatsapp" id="avisar-abrir" target="_blank" rel="noopener" href="https://wa.me/">Abrir no WhatsApp</a>
+  </div>
 </dialog>
 
 <dialog id="dlg-selecionar-musica" aria-labelledby="seletor-musica-titulo">
@@ -1644,6 +1651,7 @@
 <script src="/palavras-ensaio-tela.js?v=1"></script>
 <script src="/escala-impressao.js?v=3"></script>
 <script src="/horarios-escalas.js?v=2"></script>
-<script src="/escalas.js?v=16"></script>
+<script src="/aviso-whatsapp.js?v=1"></script>
+<script src="/escalas.js?v=17"></script>
 </body>
 </html>

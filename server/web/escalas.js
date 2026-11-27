@@ -123,7 +123,8 @@ function desenharEscala() {
       el('div', { style: 'font-weight:600' }, `${c.rotulo} · ${c.horaTexto}`),
       el('div', { class: 'sub' }, c.nome + (c.tema && tipo === 'pastoral' ? ' · ' + c.tema : '')),
       c.ceia ? el('span', { class: 'ceia' }, 'Santa Ceia') : null,
-      d.pode.cultos ? el('div', {}, el('button', { type: 'button', class: 'link', style: 'font-size:13px', onclick: () => abrirCulto(c) }, 'Editar culto')) : null),
+      d.pode.cultos ? el('div', {}, el('button', { type: 'button', class: 'link', style: 'font-size:13px', onclick: () => abrirCulto(c) }, 'Editar culto')) : null,
+      el('div', {}, el('button', { type: 'button', class: 'link', style: 'font-size:13px', onclick: () => abrirAvisarGrupo(c.id) }, 'Avisar o grupo'))),
     ...colunas.map((f) => el('td', {}, celulaEscala(c, tipo, f, podeTipo))),
     tipo === 'louvor' ? el('td', {}, celulaMusicas(c, d.pode.louvor)) : null));
   $('escala-grade').replaceChildren(el('thead', {}, cabecalho), el('tbody', {}, ...linhas));
@@ -140,9 +141,6 @@ function desenharEscala() {
         carregarEscalas();
       }) : null)),
   ] : []));
-
-  $('escala-whatsapp').value = d.whatsapp[tipo];
-  $('escala-abrir-whatsapp').href = 'https://wa.me/?text=' + encodeURIComponent(d.whatsapp[tipo]);
 }
 
 function elementosAvisosEscala(avisos) {
@@ -615,15 +613,56 @@ $('fechar-lista-indisponibilidades').addEventListener('click', () => $('dlg-list
 
 // ---------- WhatsApp e impressão ----------
 
-$('escala-whatsapp').addEventListener('input', () => {
-  $('escala-abrir-whatsapp').href = 'https://wa.me/?text=' + encodeURIComponent($('escala-whatsapp').value);
-});
-$('escala-copiar').addEventListener('click', async () => {
+// "Avisar o grupo": o mês inteiro (texto do servidor) ou um culto da aba aberta. Sem links do
+// YouTube: a mensagem leva só o link da Minha Escala, onde cada um ouve as músicas.
+const linkMinhaEscala = () => location.origin + '/minha-escala';
+
+/** Texto de um culto da aba aberta: equipe com nomes curtos e, no louvor, as músicas. */
+function textoAvisarCulto(c, tipo) {
+  const t = TIPOS_ESCALA.find((x) => x.id === tipo);
+  return textoAvisoCulto({
+    culto: { titulo: `${c.rotulo} · ${c.horaTexto}`, nome: c.nome, ceia: c.ceia, tema: tipo === 'pastoral' ? c.tema : '' },
+    escala: t ? t.titulo : '',
+    equipe: c.funcoes[tipo].map((f) => [f, (c[tipo][f] || []).map((p) => nomeCurtoAviso(p.nome))]),
+    musicas: tipo === 'louvor' ? (c.musicas || []).map((m) => ({ titulo: m.titulo, tom: m.tom, primeiraNota: m.primeiraNota })) : null,
+    link: linkMinhaEscala(),
+  });
+}
+
+function atualizarAvisarGrupo() {
+  const d = escala.dados;
+  const qual = $('avisar-qual').value;
+  const c = d.cultos.find((x) => x.id === qual);
+  $('avisar-texto').value = c ? textoAvisarCulto(c, escala.tipo) : textoAvisoMes(d.whatsapp[escala.tipo] || '', linkMinhaEscala());
+  $('avisar-abrir').href = linkWhatsappTexto($('avisar-texto').value);
+  $('avisar-resultado').textContent = '';
+}
+
+/** Abre a janela com o mês inteiro ou já no culto [cultoId]. */
+function abrirAvisarGrupo(cultoId = '') {
+  const d = escala.dados;
+  if (!d) return;
+  const nome = NOMES_ESCALA[escala.tipo] || '';
+  $('titulo-avisar-grupo').textContent = `Avisar o grupo · ${nome}`;
+  $('avisar-qual').replaceChildren(
+    el('option', { value: '' }, `Escala do mês inteiro (${d.titulo})`),
+    ...d.cultos.map((c) => el('option', { value: c.id }, `Só o culto de ${c.rotulo} · ${c.horaTexto}${c.nome && c.nome !== 'Culto' ? ' · ' + c.nome : ''}`)));
+  $('avisar-qual').value = cultoId;
+  atualizarAvisarGrupo();
+  $('dlg-avisar-grupo').showModal();
+}
+
+$('escala-avisar').addEventListener('click', () => abrirAvisarGrupo());
+$('avisar-qual').addEventListener('change', atualizarAvisarGrupo);
+$('avisar-texto').addEventListener('input', () => { $('avisar-abrir').href = linkWhatsappTexto($('avisar-texto').value); });
+$('avisar-fechar').addEventListener('click', () => $('dlg-avisar-grupo').close());
+$('avisar-copiar').addEventListener('click', async () => {
   try {
-    await navigator.clipboard.writeText($('escala-whatsapp').value);
-    mensagem($('resultado-escala'), 'Texto copiado.');
+    await navigator.clipboard.writeText($('avisar-texto').value);
+    mensagem($('avisar-resultado'), 'Texto copiado.');
   } catch {
-    $('escala-whatsapp').select();
+    $('avisar-texto').select();
+    mensagem($('avisar-resultado'), 'Texto selecionado: use Ctrl+C para copiar.');
   }
 });
 
