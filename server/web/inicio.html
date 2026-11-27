@@ -21,10 +21,20 @@
   .topo-site nav a.menu-escala:focus-visible { outline: 3px solid var(--primaria); outline-offset: 2px; }
   .topo-site nav a.menu-escala svg { width: 17px; height: 17px; flex: none; }
   .topo-site .espaco { flex: 1; }
-  .urgente { background: #fbefe2; color: #6b3d00; border-bottom: 1px solid #e9c9a3; }
-  .urgente .dentro { max-width: 1120px; margin: 0 auto; padding: 12px 20px; display: flex; gap: 12px; align-items: flex-start; }
-  .urgente svg { flex-shrink: 0; margin-top: 2px; }
-  .urgente p { margin: 0; }
+  /* Aviso urgente: faixa cheia em laranja escuro, com selo, para não passar despercebida. */
+  .urgente { background: #c2410c; color: #fff; }
+  .urgente + .urgente { border-top: 1px solid rgba(255, 255, 255, .35); }
+  .urgente .dentro { max-width: 1120px; margin: 0 auto; padding: 14px 20px; display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; }
+  .urgente .selo-urgente { display: inline-flex; align-items: center; gap: 6px; padding: 4px 11px 4px 8px; border-radius: 999px; background: #fff; color: #8a2d07;
+    font-size: 12px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; white-space: nowrap; }
+  .urgente .selo-urgente svg { width: 15px; height: 15px; flex-shrink: 0; }
+  .urgente p { flex: 1 1 260px; min-width: 0; margin: 0; font-size: 18px; line-height: 1.4; }
+  .urgente p strong { font-weight: 700; }
+  @media (max-width: 600px) { .urgente p { font-size: 16px; } }
+  @media (prefers-reduced-motion: no-preference) {
+    .urgente .selo-urgente { animation: piscar-urgente 2.4s ease-in-out infinite; }
+    @keyframes piscar-urgente { 50% { opacity: .6; } }
+  }
   .conteudo { max-width: 1120px; margin: 0 auto; padding: 28px 20px 48px; display: grid; gap: 28px; }
   .conteudo > .largura-toda { grid-column: 1 / -1; }
   .coluna { display: flex; flex-direction: column; gap: 28px; min-width: 0; }
@@ -399,8 +409,9 @@
     // Avisos urgentes: faixa no topo
     $('urgentes').replaceChildren(...s.urgentes.map((u) => el('div', { class: 'urgente', role: 'alert' },
       el('div', { class: 'dentro' },
-        svg('<path d="M12 3l9 16H3z"></path><path d="M12 10v4M12 17v.5"></path>'),
-        el('p', {}, el('strong', {}, u.titulo), u.texto ? ' ' + u.texto : '')))));
+        el('span', { class: 'selo-urgente' },
+          svg('<path d="M12 3l9 16H3z"></path><path d="M12 10v4M12 17v.5"></path>'), 'Aviso importante'),
+        el('p', {}, el('strong', {}, u.titulo.replace(/[.!?]?$/, '.')), u.texto ? ' ' + u.texto : '')))));
 
     montarCarrossel(s.galeria || []);
 
