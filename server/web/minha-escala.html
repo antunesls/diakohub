@@ -116,6 +116,71 @@
   .rodape-tela .botao { width: 100%; }
   .grade2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: 10px; }
   h2 { font-size: 18px; margin-top: 4px; }
+  /* Modo ensaio (ensaio-player.js): vídeos do culto em sequência, tom e 1ª nota em destaque, ordem do culto embaixo. */
+  .botao.ensaiar { display: inline-flex; align-items: center; justify-content: center; gap: 8px; width: 100%; }
+  .botao.ensaiar svg { width: 18px; height: 18px; flex: none; }
+  dialog.ensaio { --ens-ouro: #f5c26b; padding: 0; border: 0; width: 100%; max-width: 560px; height: 100dvh; max-height: 100dvh; margin: 0 auto; background: #121212; color: #fff; overflow: hidden; }
+  dialog.ensaio[open] { display: flex; flex-direction: column; }
+  dialog.ensaio::backdrop { background: rgb(0 0 0 / .7); }
+  @media (min-width: 600px) { dialog.ensaio { height: min(860px, 94dvh); margin: auto; border-radius: 20px; } }
+  .ensaio button { font: inherit; cursor: pointer; }
+  .ensaio button:focus-visible { outline: 3px solid var(--ens-ouro); outline-offset: 2px; }
+  .ens-barra { display: flex; align-items: center; gap: 10px; padding: calc(12px + env(safe-area-inset-top, 0px)) 16px 8px; }
+  .ens-culto { flex: 1; min-width: 0; }
+  .ens-culto small { display: block; font-size: 11.5px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: rgb(255 255 255 / .6); }
+  .ens-culto strong { font-size: 15px; }
+  .ens-fechar { border: 0; background: rgb(255 255 255 / .12); color: #fff; border-radius: 999px; padding: 8px 15px; font-weight: 600; font-size: 14px; }
+  .ens-palco { flex: none; display: flex; flex-direction: column; gap: 8px; padding: 0 16px; }
+  .ens-video { aspect-ratio: 16 / 9; max-width: 100%; border-radius: 12px; overflow: hidden; background: #000; }
+  .ens-video iframe, .ens-video > div { width: 100%; height: 100%; display: block; border: 0; }
+  .ens-erro { margin: 0; padding: 8px 12px; border-radius: 10px; background: #3a2410; color: #ffd9a8; font-size: 14px; }
+  .ens-titulo-linha { display: flex; align-items: flex-end; gap: 12px; }
+  .ens-titulo-linha > div:first-child { flex: 1; min-width: 0; display: grid; gap: 2px; }
+  .ens-pos { font-size: 13px; font-weight: 600; color: rgb(255 255 255 / .6); font-variant-numeric: tabular-nums; }
+  .ens-musica { margin: 0; font-size: 26px; line-height: 1.08; color: #fff; text-wrap: balance; overflow-wrap: anywhere; }
+  .ens-notas { display: flex; gap: 8px; flex: none; }
+  .ens-nota { min-width: 64px; padding: 6px 12px; border-radius: 12px; background: #1f1f1d; border: 1px solid #333; text-align: center; }
+  .ens-nota small { display: block; font-size: 10.5px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: rgb(255 255 255 / .55); }
+  .ens-nota b { font-family: var(--fonte-titulo); font-size: 28px; font-weight: 600; line-height: 1.1; color: var(--ens-ouro); }
+  .ens-controles { flex: none; display: grid; gap: 6px; padding: 10px 16px; }
+  .ens-progresso { height: 4px; border-radius: 2px; background: rgb(255 255 255 / .18); overflow: hidden; }
+  .ens-progresso div { height: 100%; width: 0; background: var(--ens-ouro); }
+  .ens-tempos { display: flex; justify-content: space-between; font-size: 12px; color: rgb(255 255 255 / .6); font-variant-numeric: tabular-nums; }
+  .ens-botoes { display: flex; justify-content: center; align-items: center; gap: 24px; }
+  .ens-botoes button { width: 44px; height: 44px; border: 0; border-radius: 50%; background: none; color: #fff; display: grid; place-items: center; }
+  .ens-botoes button:disabled { opacity: .35; cursor: default; }
+  .ens-botoes .ens-play { width: 54px; height: 54px; background: var(--ens-ouro); color: #2a1c00; }
+  .ens-botoes svg { width: 24px; height: 24px; }
+  .ens-opcoes { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; }
+  .ens-alterna { border: 1px solid #444; background: none; color: rgb(255 255 255 / .8); border-radius: 999px; padding: 6px 13px; font-size: 13.5px; font-weight: 600; }
+  .ens-alterna[aria-pressed="true"] { background: var(--ens-ouro); color: #2a1c00; border-color: var(--ens-ouro); }
+  .ens-fila { flex: 1; min-height: 0; overflow-y: auto; border-top: 1px solid #2a2a28; background: #181817; padding: 10px 12px calc(16px + env(safe-area-inset-bottom, 0px)); }
+  .ens-fila h3 { margin: 0 6px 6px; font-family: var(--fonte); font-size: 11.5px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: rgb(255 255 255 / .55); }
+  .ens-lista { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
+  .ens-faixa { width: 100%; display: flex; align-items: center; gap: 10px; padding: 8px; text-align: left; border: 1px solid transparent; border-radius: 12px; background: none; color: #fff; }
+  .ens-faixa:hover:not(:disabled) { background: #222220; }
+  .ens-faixa:disabled { opacity: .45; cursor: default; }
+  .ens-faixa .n { width: 24px; height: 24px; flex: none; border-radius: 50%; display: grid; place-items: center; font-size: 12px; font-weight: 700; background: #2a2a28; color: rgb(255 255 255 / .7); }
+  .ens-faixa .t { flex: 1; min-width: 0; font-weight: 600; overflow-wrap: anywhere; }
+  .ens-faixa .t small { display: block; font-size: 12.5px; font-weight: 400; color: rgb(255 255 255 / .55); }
+  .ens-faixa .t small:empty { display: none; }
+  .ens-faixa .tom { flex: none; min-width: 30px; text-align: center; font-family: var(--fonte-titulo); font-size: 20px; font-weight: 600; color: rgb(255 255 255 / .8); }
+  .ens-faixa.atual { background: rgb(245 194 107 / .12); border-color: rgb(245 194 107 / .5); }
+  .ens-faixa.atual .n { background: var(--ens-ouro); color: #2a1c00; }
+  .ens-faixa.atual .tom { color: var(--ens-ouro); }
+  .ens-faixa.tocada .t { color: rgb(255 255 255 / .5); }
+  .ens-eq { display: flex; gap: 3px; height: 16px; align-items: flex-end; color: var(--ens-ouro); }
+  .ens-eq i { width: 3px; height: 60%; border-radius: 2px; background: currentColor; }
+  @media (prefers-reduced-motion: no-preference) {
+    .ens-eq i { animation: ens-onda 1s ease-in-out infinite; }
+    .ens-eq i:nth-child(2) { animation-delay: .15s } .ens-eq i:nth-child(3) { animation-delay: .3s } .ens-eq i:nth-child(4) { animation-delay: .45s }
+    @keyframes ens-onda { 0%, 100% { height: 25%; } 50% { height: 100%; } }
+  }
+  .ens-pausa { position: absolute; inset: 0; background: rgb(18 18 18 / .95); display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 10px; padding: 24px; text-align: center; }
+  .ens-pausa[hidden] { display: none; }
+  .ens-pausa p { margin: 0; color: rgb(255 255 255 / .75); }
+  .ens-pausa strong { font-size: 22px; }
+  .ens-seg { font-family: var(--fonte-titulo); font-size: 72px; font-weight: 600; line-height: 1; color: var(--ens-ouro); font-variant-numeric: tabular-nums; }
 </style>
 </head>
 <body class="publico">
@@ -226,6 +291,7 @@
 </dialog>
 <script src="/repertorio-busca.js?v=2"></script>
 <script src="/primeiro-acesso.js?v=1"></script>
+<script src="/ensaio-player.js?v=1"></script>
 <script>
   const $ = (id) => document.getElementById(id);
   // O QR é comum a todos; o servidor identifica o membro pela sessão autenticada.
@@ -476,6 +542,7 @@
       criar('span', { className: 'data', textContent: `${dataLonga(c)} · ${c.horaTexto}` }),
       chipsDoCulto(c),
       listaMusicas(c),
+      EnsaioPlayer.botaoEnsaio(`${dataLonga(c)} · ${c.horaTexto}`, c.musicas || [], 'botao claro ensaiar'),
       criar('div', { className: 'acoes' },
         c.podeEscolherMusicas ? botao(c.musicas.length ? 'Alterar as músicas' : 'Escolher as músicas', () => abrirCulto(c, true), 'botao claro pequeno') : null,
         botaoAgenda(c, 'botao ' + (c.podeEscolherMusicas ? 'vidro' : 'claro') + ' pequeno'),
@@ -509,6 +576,8 @@
     corpo.replaceChildren(chipsDoCulto(c));
     const musicas = listaMusicas(c);
     if (musicas) corpo.append(criar('div', {}, criar('h2', { className: 'secao-titulo', textContent: 'Músicas' }), musicas));
+    const ensaiar = EnsaioPlayer.botaoEnsaio(`${dataLonga(c)} · ${c.horaTexto}`, c.musicas || [], 'botao ensaiar');
+    if (ensaiar) corpo.append(ensaiar);
     if (c.podeEscolherMusicas) corpo.append(editorMusicas(c));
     corpo.append(criar('div', { className: 'acoes' }, botaoAgenda(c, 'botao secundario pequeno'), botaoNaoVou(c, 'botao secundario pequeno')));
   }
