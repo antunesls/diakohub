@@ -633,7 +633,7 @@ function atualizarAvisarGrupo() {
   const d = escala.dados;
   const qual = $('avisar-qual').value;
   const c = d.cultos.find((x) => x.id === qual);
-  $('avisar-texto').value = c ? textoAvisarCulto(c, escala.tipo) : textoAvisoMes(d.whatsapp[escala.tipo] || '', linkMinhaEscala());
+  $('avisar-texto').value = c ? textoAvisarCulto(c, escala.tipo) : textoAvisoMes(d.whatsapp[escala.tipo] || '', linkMinhaEscala(), escala.tipo === 'louvor');
   $('avisar-abrir').href = linkWhatsappTexto($('avisar-texto').value);
   $('avisar-resultado').textContent = '';
 }

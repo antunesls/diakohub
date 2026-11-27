@@ -41,9 +41,10 @@ function textoAvisoCulto({ culto, escala = '', equipe = [], musicas = null, link
   return linhas.join('\n');
 }
 
-/** Texto do mês (montado pelo servidor) com o link da Minha Escala no fim. */
-function textoAvisoMes(texto, link) {
-  return link ? `${texto}\n\nVeja sua escala e ouça as músicas na Minha Escala: ${link}` : texto;
+/** Texto do mês (montado pelo servidor) com o link da Minha Escala no fim; [comMusicas] só no louvor. */
+function textoAvisoMes(texto, link, comMusicas = false) {
+  if (!link) return texto;
+  return `${texto}\n\n${comMusicas ? 'Veja sua escala e ouça as músicas' : 'Veja sua escala'} na Minha Escala: ${link}`;
 }
 
 /** Nome curto para o WhatsApp: primeiro e último nome ("Ana Maria Souza" → "Ana Souza"), como no texto do mês. */

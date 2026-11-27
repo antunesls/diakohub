@@ -46,7 +46,8 @@ test('culto sem músicas avisa que o ministro vai escolher; escala sem músicas 
 });
 
 test('texto do mês ganha o link, nomes ficam curtos e o link do WhatsApp leva o texto codificado', () => {
-  assert.equal(textoAvisoMes('*Louvor — Dezembro*', LINK), `*Louvor — Dezembro*\n\nVeja sua escala e ouça as músicas na Minha Escala: ${LINK}`);
+  assert.equal(textoAvisoMes('*Louvor — Dezembro*', LINK, true), `*Louvor — Dezembro*\n\nVeja sua escala e ouça as músicas na Minha Escala: ${LINK}`);
+  assert.equal(textoAvisoMes('*Pastoral — Dezembro*', LINK), `*Pastoral — Dezembro*\n\nVeja sua escala na Minha Escala: ${LINK}`);
   assert.equal(nomeCurtoAviso('Ana Maria de Souza'), 'Ana Souza');
   assert.equal(nomeCurtoAviso('Bruno Lima'), 'Bruno Lima');
   assert.equal(linkWhatsappTexto('*Oi* & tchau'), 'https://wa.me/?text=*Oi*%20%26%20tchau');
@@ -54,10 +55,10 @@ test('texto do mês ganha o link, nomes ficam curtos e o link do WhatsApp leva o
 
 test('painel e Minha Escala carregam o aviso e o painel não tem mais o cartão antigo', () => {
   const painel = fs.readFileSync(path.join(__dirname, '../web/painel.html'), 'utf8');
-  assert.match(painel, /<script src="\/aviso-whatsapp\.js\?v=1"><\/script>\r?\n<script src="\/escalas\.js/);
+  assert.match(painel, /<script src="\/aviso-whatsapp\.js\?v=2"><\/script>\r?\n<script src="\/escalas\.js/);
   assert.match(painel, /id="escala-avisar"/);
   assert.doesNotMatch(painel, /id="escala-whatsapp"/);
   const minha = fs.readFileSync(path.join(__dirname, '../web/minha-escala.html'), 'utf8');
-  assert.match(minha, /<script src="\/aviso-whatsapp\.js\?v=1"><\/script>/);
+  assert.match(minha, /<script src="\/aviso-whatsapp\.js\?v=2"><\/script>/);
   assert.match(minha, /Avisar o grupo do louvor/);
 });
