@@ -283,7 +283,9 @@ function fichaRepertorio() {
   d.primeiraNota = m?.primeiraNota || '';
   d.status = m ? statusParaFiltro(m) : 'OK';
   const erro = el('p', { class: 'erro', role: 'alert' });
-  const previa = el('div'), aviso = el('div');
+  const previa = el('div'), aviso = el('div'), dicaYoutube = el('p', { class: 'dica rep-largo', role: 'status' });
+  const controles = {};
+  let videoLido = videoYoutube(d.referencia); // a música aberta já tem o vídeo: não sugere de novo
 
   function atualizarPrevia() {
     previa.replaceChildren(el('div', { class: 'rep-previa' }, el('div', { class: 'rep-previa-cab' }, 'Como aparece no seletor da escala'),
@@ -304,8 +306,24 @@ function fichaRepertorio() {
   function campo(chave, rotulo, { largo = false, area = 0, max = 120, dica = '', numerico = false } = {}) {
     const controle = el(area ? 'textarea' : 'input', { id: 'rep-' + chave, maxlength: max, rows: area || null, inputmode: numerico ? 'numeric' : null });
     controle.value = d[chave];
+    controles[chave] = controle;
     controle.addEventListener('input', () => { d[chave] = controle.value; atualizarPrevia(); if (chave === 'titulo') verificarDuplicada(); });
     return el('div', { class: 'campo' + (largo ? ' rep-largo' : '') }, el('label', { for: 'rep-' + chave }, rotulo, dica ? el('span', { class: 'dica' }, ' ' + dica) : null), controle);
+  }
+  /** Link novo do YouTube: preenche título e cantor que estiverem vazios, como sugestão para conferir. */
+  async function sugerirDoYoutube() {
+    const id = videoYoutube(d.referencia);
+    if (!id || id === videoLido) return;
+    videoLido = id;
+    if (String(d.titulo).trim() && String(d.cantor).trim()) return;
+    let info;
+    try { info = await api('GET', '/api/repertorio/youtube?link=' + encodeURIComponent(d.referencia)); } catch (_) { return; } // a pessoa preenche à mão
+    if (videoYoutube(d.referencia) !== id) return; // trocou o link enquanto o YouTube respondia
+    const preenchidos = ['titulo', 'cantor'].filter((c) => info?.[c] && !String(d[c]).trim());
+    for (const c of preenchidos) { d[c] = info[c]; controles[c].value = info[c]; }
+    if (!preenchidos.length) return;
+    dicaYoutube.textContent = `Preenchido pelo vídeo "${info.tituloVideo}"${info.canal ? ` (canal ${info.canal})` : ''}. Confira antes de salvar.`;
+    atualizarPrevia(); verificarDuplicada();
   }
   const tom = el('select', { id: 'rep-tomSelecionado' }, ...TONS_REPERTORIO.map(([v, t]) => new Option(t, v)));
   tom.value = d.tomSelecionado;
@@ -338,9 +356,9 @@ function fichaRepertorio() {
     erro,
     el('div', { class: 'rep-pagina' },
       el('div', { class: 'rep-form' },
-        el('section', { class: 'rep-bloco' }, el('h2', {}, 'Versão de referência'), cartaoVideoRepertorio(d, atualizarPrevia)),
+        el('section', { class: 'rep-bloco' }, el('h2', {}, 'Versão de referência'), cartaoVideoRepertorio(d, () => { atualizarPrevia(); sugerirDoYoutube(); })),
         el('section', { class: 'rep-bloco' }, el('h2', {}, '1 · Qual música'),
-          el('div', { class: 'rep-grade' }, campo('titulo', 'Título', { largo: true }), el('div', { class: 'rep-largo' }, aviso),
+          el('div', { class: 'rep-grade' }, campo('titulo', 'Título', { largo: true }), el('div', { class: 'rep-largo' }, aviso), dicaYoutube,
             campo('cantor', 'Cantor / intérprete'), campo('compositor', 'Compositor', { max: 400 }))),
         el('section', { class: 'rep-bloco' }, el('h2', {}, '2 · Como a Diakonia toca'),
           el('div', { class: 'rep-grade3' }, el('div', { class: 'campo' }, el('label', { for: 'rep-tomSelecionado' }, 'Tom Diakonia'), tom),

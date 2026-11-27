@@ -159,6 +159,36 @@ test('ficha avisa música repetida enquanto digita o título', async () => {
   assert.match(a.tela().textContent, /Já existe: Bondade de Deus · Isaias Saad/);
 });
 
+test('link do YouTube na música nova preenche título e cantor vazios, sem apagar o que já foi digitado', async () => {
+  const a = ambiente({
+    musicas: MUSICAS,
+    responder: (metodo, url) => url.startsWith('/api/repertorio/youtube?')
+      ? { titulo: 'Ressuscita-me', cantor: 'Aline Barros', tituloVideo: 'Aline Barros - Ressuscita-me (Ao Vivo)', canal: 'Aline Barros' } : undefined,
+  });
+  await a.run('carregarRepertorio()');
+  a.botaoCom('+ Música').props.onclick();
+  const cantor = a.achar((n) => n.props.id === 'rep-cantor');
+  cantor.value = 'Aline Barros e Banda';
+  cantor.events.input();
+  const link = a.achar((n) => n.props['aria-label'] === 'Link do YouTube da versão de referência');
+  link.value = 'youtu.be/ZzYyXxWwVvU';
+  link.events.input();
+  await new Promise((r) => setImmediate(r));
+  assert.equal(a.chamadas.at(-1).url, '/api/repertorio/youtube?link=' + encodeURIComponent('https://youtu.be/ZzYyXxWwVvU'));
+  assert.equal(a.achar((n) => n.props.id === 'rep-titulo').value, 'Ressuscita-me');
+  assert.equal(a.achar((n) => n.props.id === 'rep-cantor').value, 'Aline Barros e Banda', 'o que a pessoa digitou fica');
+  assert.match(a.tela().textContent, /Preenchido pelo vídeo "Aline Barros - Ressuscita-me \(Ao Vivo\)"/);
+  await a.botaoCom('Salvar').events.click();
+  const post = a.chamadas.find((c) => c.metodo === 'POST');
+  assert.equal(post.corpo.titulo, 'Ressuscita-me');
+  assert.equal(post.corpo.referencia, 'https://youtu.be/ZzYyXxWwVvU');
+
+  const b = ambiente({ musicas: MUSICAS, responder: (m, url) => { if (url.startsWith('/api/repertorio/youtube')) throw new Error('fora do ar'); } });
+  await b.run('carregarRepertorio()');
+  b.botaoCom('Editar').props.onclick();
+  assert.equal(b.chamadas.filter((c) => c.url.startsWith('/api/repertorio/youtube')).length, 0, 'música que já tem vídeo não consulta o YouTube');
+});
+
 test('Completar cadastro percorre as OK com falta e grava só o que mudou', async () => {
   const a = ambiente({ musicas: MUSICAS });
   await a.run('carregarRepertorio()');

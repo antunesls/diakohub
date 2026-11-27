@@ -118,6 +118,9 @@ void main() {
         historico: Historico(config.pastaDados),
         cfg: cfg,
         relogio: () => agora,
+        clienteYoutube: MockClient((req) async => req.url.queryParameters['url']!.endsWith('PrivAdoXyz1')
+            ? http.Response('Unauthorized', 401)
+            : http.Response.bytes(utf8.encode(jsonEncode({'title': 'Isaias Saad - Bondade de Deus (Ao Vivo)', 'author_name': 'Isaias Saad'})), 200)),
       );
       handler = servidor.handler;
       final (_, l) = await chamar('POST', '/api/login', json: {'senha': 'senha-principal'});
@@ -126,6 +129,17 @@ void main() {
     tearDown(() async {
       await store.fechar();
       await tmp.delete(recursive: true);
+    });
+
+    test('ficha da música sugere título e cantor pelo link do YouTube, só para quem edita o louvor', () async {
+      final (st, info) = await chamar('GET', '/api/repertorio/youtube?link=${Uri.encodeQueryComponent('https://youtu.be/AbCdEfGhIjK')}', token: admin);
+      expect(st, 200);
+      expect(info, {'titulo': 'Bondade de Deus', 'cantor': 'Isaias Saad', 'tituloVideo': 'Isaias Saad - Bondade de Deus (Ao Vivo)', 'canal': 'Isaias Saad'});
+      expect((await chamar('GET', '/api/repertorio/youtube?link=https://example.com/x', token: admin)).$1, 400);
+      expect((await chamar('GET', '/api/repertorio/youtube?link=https://youtu.be/PrivAdoXyz1', token: admin)).$1, 404);
+      final secretaria = await criarUsuario('secretaria-yt', Perfil.secretaria);
+      expect((await chamar('GET', '/api/repertorio/youtube?link=https://youtu.be/AbCdEfGhIjK', token: secretaria)).$1, 403);
+      expect((await chamar('GET', '/api/repertorio/youtube?link=https://youtu.be/AbCdEfGhIjK')).$1, 401);
     });
 
     test('horários do site têm participação independente e reversível nas escalas', () async {

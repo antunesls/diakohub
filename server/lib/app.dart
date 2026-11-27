@@ -58,6 +58,7 @@ import 'usuarios.dart';
 import 'qr_oracao.dart';
 import 'store.dart';
 import 'tablets_locais.dart';
+import 'youtube_info.dart';
 
 /// Monta todas as rotas do servidor.
 class Servidor {
@@ -81,6 +82,7 @@ class Servidor {
     this.restauracao,
     this.agenda,
     this.clienteAgenda,
+    this.clienteYoutube,
     this.enviarAvisoMensagem,
     this.enviarAvisoCadastro,
     this.enviarAta,
@@ -198,6 +200,9 @@ class Servidor {
 
   /// Cliente HTTP do teste de endereço da agenda (substituível nos testes).
   final http.Client? clienteAgenda;
+
+  /// Cliente HTTP da leitura de título e canal no YouTube (substituível nos testes).
+  final http.Client? clienteYoutube;
   final Future<void> Function(Mensagem mensagem, String urlPainel)? enviarAvisoMensagem;
 
   /// Envia o aviso de ficha nova do cadastro público (substituível nos testes).
@@ -547,6 +552,7 @@ class Servidor {
       // Escalas dos pastores e do louvor (rotas fixas antes das com <id>)
       ..get('/api/repertorio', _listarRepertorio)
       ..get('/api/repertorio/uso', _listarUsoRepertorio)
+      ..get('/api/repertorio/youtube', _infoYoutubeRepertorio)
       ..post('/api/repertorio/importar/previa', _previaRepertorio)
       ..post('/api/repertorio/importar', _importarRepertorio)
       ..post('/api/repertorio', _criarMusicaRepertorio)
@@ -3921,6 +3927,16 @@ class Servidor {
   Response _listarUsoRepertorio(Request _) => _json({
         for (final e in _usoDoRepertorio().entries) e.key: {'ultima': e.value.ultima, 'vezes': e.value.vezes},
       });
+
+  /// GET /api/repertorio/youtube?link=… — título e cantor sugeridos pelo vídeo, para a ficha da música.
+  Future<Response> _infoYoutubeRepertorio(Request req) async {
+    if (!_podeEditarRepertorio(req)) return _semPermissaoEscala(TipoEscala.louvor);
+    final id = idVideoYoutube(req.url.queryParameters['link'] ?? '');
+    if (id == null) return _erro(400, 'Esse link não é de um vídeo do YouTube.');
+    final info = await buscarInfoYoutube(id, cliente: clienteYoutube);
+    if (info == null) return _erro(404, 'Não deu para ler os dados desse vídeo. Preencha o título e o cantor à mão.');
+    return _json(info.toJson());
+  }
 
   Map<String, dynamic> _statusEditadoRepertorio(Map<String, dynamic> corpo, {Map<String, dynamic>? anterior}) {
     if (!corpo.containsKey('status')) return corpo;
