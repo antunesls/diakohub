@@ -54,7 +54,7 @@ test('texto do mês ganha o link, nomes ficam curtos e o link do WhatsApp leva o
 
 test('painel e Minha Escala carregam o aviso e o painel não tem mais o cartão antigo', () => {
   const painel = fs.readFileSync(path.join(__dirname, '../web/painel.html'), 'utf8');
-  assert.match(painel, /<script src="\/aviso-whatsapp\.js\?v=1"><\/script>\n<script src="\/escalas\.js/);
+  assert.match(painel, /<script src="\/aviso-whatsapp\.js\?v=1"><\/script>\r?\n<script src="\/escalas\.js/);
   assert.match(painel, /id="escala-avisar"/);
   assert.doesNotMatch(painel, /id="escala-whatsapp"/);
   const minha = fs.readFileSync(path.join(__dirname, '../web/minha-escala.html'), 'utf8');
