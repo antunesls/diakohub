@@ -20,40 +20,49 @@ test('escala tem seletor independente com busca e Minha escala mostra link e tom
   const html = fs.readFileSync(path.join(__dirname, '../web/painel.html'), 'utf8');
   const script = fs.readFileSync(path.join(__dirname, '../web/escalas.js'), 'utf8');
   const minha = fs.readFileSync(path.join(__dirname, '../web/minha-escala.html'), 'utf8');
-  assert.ok(html.includes('<dialog id="dlg-selecionar-musica"'));
-  assert.match(html, /id="seletor-musica-busca"/);
-  assert.match(html, /id="seletor-musica-lista"/);
+  // Uma janela só: a busca do repertório e a ordem do culto ficam no mesmo diálogo.
+  assert.doesNotMatch(html, /id="dlg-selecionar-musica"/);
+  const dialogo = html.slice(html.indexOf('<dialog id="dlg-musicas"'), html.indexOf('</dialog>', html.indexOf('<dialog id="dlg-musicas"')));
+  for (const id of ['seletor-musica-busca', 'seletor-musica-lista', 'seletor-musica-previa', 'musicas-lista', 'musicas-salvar']) {
+    assert.ok(dialogo.includes(`id="${id}"`), id);
+  }
   assert.match(script, /buscarRepertorio\(/);
   assert.match(script, /miniaturaYoutube\(/);
   assert.match(script, /linkYoutube\(/);
   assert.match(minha, /m\.youtube/);
   assert.match(minha, /m\.tom/);
-  assert.ok(html.indexOf('/musica-youtube.js?v=1') < html.indexOf('/escalas.js?v=18'));
+  assert.ok(html.indexOf('/musica-youtube.js?v=1') < html.indexOf('/escalas.js?v=19'));
 });
 
-test('linha vazia de música não mostra texto null no resumo', () => {
+test('ordem do culto: adicionar vai para o fim no tom da Diakonia, sem repetir, e mover troca a posição', () => {
   const script = fs.readFileSync(path.join(__dirname, '../web/escalas.js'), 'utf8');
-  const trecho = script.slice(script.indexOf('function linhaMusica('), script.indexOf('function numerarMusicas()'));
-  const criados = [];
-  const el = (tag, props = {}, ...filhos) => {
-    const elemento = {
-      tag, props, dataset: {}, children: filhos,
-      append(...itens) { this.children.push(...itens); },
-      replaceChildren(...itens) { this.children = itens.map((i) => i == null ? String(i) : i); },
-      addEventListener() {},
-    };
-    criados.push(elemento);
-    return elemento;
+  const trecho = script.slice(script.indexOf('function posicaoNoCulto('), script.indexOf('function desenharSeletorMusica()'));
+  const ctx = {
+    ordemCulto: { editavel: true, mudou: false, movida: null, musicas: [{ titulo: 'Antiga', tom: 'D' }, { repertorioId: 'a', tom: 'G' }] },
+    tomDaMusica: (r) => r.tom, desenhos: 0,
   };
-  vm.runInNewContext(`${trecho}\nlinhaMusica(); linhaMusica({ titulo: 'Histórica', tom: 'G' }, false)`, {
-    el, repertorioMusicas: [], linkYoutube: () => null, textoPrimeiraNota: () => '',
-    botao: (texto) => el('button', {}, texto),
-  });
-  const resumos = criados.filter((e) => e.props.class === 'musica-resumo');
-  assert.ok(resumos[0].children.some((e) => e.tag === 'strong' && e.children.includes('Nenhuma música selecionada')));
-  for (const resumo of resumos) {
-    assert.ok(!resumo.children.includes('null'), 'replaceChildren recebeu null e o transformou em texto');
-  }
+  ctx.desenharOrdemCulto = ctx.desenharSeletorMusica = () => { ctx.desenhos++; };
+  vm.runInNewContext(`${trecho}
+    adicionarAoCulto({ id: 'b', tom: 'A' });
+    adicionarAoCulto({ id: 'a', tom: 'C' });
+    moverNoCulto(2, 0);
+    moverNoCulto(0, -1);`, ctx);
+  assert.deepEqual(JSON.parse(JSON.stringify(ctx.ordemCulto.musicas)), [
+    { repertorioId: 'b', tom: 'A' }, { titulo: 'Antiga', tom: 'D' }, { repertorioId: 'a', tom: 'G' },
+  ]);
+  assert.equal(ctx.ordemCulto.mudou, true);
+  ctx.ordemCulto.editavel = false;
+  vm.runInNewContext('adicionarAoCulto({ id: "c", tom: "E" })', ctx);
+  assert.equal(ctx.ordemCulto.musicas.length, 3, 'quem só vê não adiciona');
+});
+
+test('na ordem do culto dá para arrastar, subir e descer; Enter na busca adiciona e não salva a janela', () => {
+  const script = fs.readFileSync(path.join(__dirname, '../web/escalas.js'), 'utf8');
+  assert.match(script, /class: 'alca'/);
+  assert.match(script, /`Subir \$\{titulo\}`/);
+  assert.match(script, /`Descer \$\{titulo\}`/);
+  assert.match(script, /pointerdown/);
+  assert.match(script, /e\.key === 'Enter'\) \{\r?\n\s+e\.preventDefault\(\);/);
 });
 
 test('primeira nota acompanha o tom do culto e andamento sai do BPM', () => {
@@ -95,6 +104,6 @@ test('escolher música na escala preenche o tom com uma função que ainda exist
   const busca = fs.readFileSync(path.join(__dirname, '../web/repertorio-busca.js'), 'utf8');
   // tomPadraoRepertorio saiu do repertorio.js; a chamada que sobrou derrubava o "change" e a música não entrava na lista.
   assert.doesNotMatch(script, /tomPadraoRepertorio/);
-  assert.match(script, /primeiroVinculo \? escolha\.dataset\.tomAntigo : tomDaMusica\(r\)/);
+  assert.match(script, /\{ repertorioId: r\.id, tom: tomDaMusica\(r\) \}/);
   assert.match(busca, /function tomDaMusica\(/);
 });
