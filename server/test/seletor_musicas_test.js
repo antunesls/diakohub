@@ -2,8 +2,10 @@ const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
-const vm = require('node:vm');
 const { videoYoutube, miniaturaYoutube, linkYoutube } = require('../web/musica-youtube.js');
+const { posicao, adicionar, mover } = require('../web/musicas-culto.js');
+
+const ler = (arquivo) => fs.readFileSync(path.join(__dirname, '../web', arquivo), 'utf8');
 
 test('miniatura e link aceitam somente vídeos do YouTube', () => {
   assert.equal(videoYoutube('https://youtu.be/dQw4w9WgXcQ?t=20'), 'dQw4w9WgXcQ');
@@ -16,53 +18,46 @@ test('miniatura e link aceitam somente vídeos do YouTube', () => {
   }
 });
 
-test('escala tem seletor independente com busca e Minha escala mostra link e tom', () => {
-  const html = fs.readFileSync(path.join(__dirname, '../web/painel.html'), 'utf8');
-  const script = fs.readFileSync(path.join(__dirname, '../web/escalas.js'), 'utf8');
-  const minha = fs.readFileSync(path.join(__dirname, '../web/minha-escala.html'), 'utf8');
-  // Uma janela só: a busca do repertório e a ordem do culto ficam no mesmo diálogo.
-  assert.doesNotMatch(html, /id="dlg-selecionar-musica"/);
-  const dialogo = html.slice(html.indexOf('<dialog id="dlg-musicas"'), html.indexOf('</dialog>', html.indexOf('<dialog id="dlg-musicas"')));
-  for (const id of ['seletor-musica-busca', 'seletor-musica-lista', 'seletor-musica-previa', 'musicas-lista', 'musicas-salvar']) {
-    assert.ok(dialogo.includes(`id="${id}"`), id);
+test('ordem do culto: adicionar vai para o fim no tom padrão, sem repetir, e mover troca a posição', () => {
+  const musicas = [{ titulo: 'Antiga', tom: 'D' }, { repertorioId: 'a', titulo: 'A', tom: 'G' }];
+  assert.deepEqual(adicionar(musicas, { id: 'b', titulo: 'B', tom: 'A' }), { repertorioId: 'b', titulo: 'B', tom: 'A' });
+  assert.equal(adicionar(musicas, { id: 'a', titulo: 'A', tom: 'C' }), null, 'a mesma música não entra duas vezes');
+  assert.equal(posicao(musicas, 'b'), 3);
+  assert.equal(posicao(musicas, 'x'), 0);
+  assert.equal(mover(musicas, 2, 0).repertorioId, 'b');
+  assert.equal(mover(musicas, 0, -1), null);
+  assert.equal(mover(musicas, 1, 1), null);
+  assert.deepEqual(musicas.map((m) => m.repertorioId || m.titulo), ['b', 'Antiga', 'a']);
+});
+
+test('a janela de músicas tem busca, filtros, tabela ordenável, prévia e a ordem com arrastar, subir e descer', () => {
+  const js = ler('musicas-culto.js');
+  for (const trecho of ['buscarRepertorio(', 'andamentoBpm(', 'primeiraNotaNoTom(', 'miniaturaYoutube', "'aria-sort'", 'dblclick',
+    "class: 'alca'", '`Subir ${titulo}`', '`Descer ${titulo}`', '`Tirar ${titulo}`', 'pointerdown', 'Ordem do culto']) {
+    assert.ok(js.includes(trecho), trecho);
   }
-  assert.match(script, /buscarRepertorio\(/);
-  assert.match(script, /miniaturaYoutube\(/);
-  assert.match(script, /linkYoutube\(/);
+  // Enter na busca adiciona a música em foco e nunca envia (salva) a janela.
+  assert.match(js, /e\.key === 'Enter'\) \{\r?\n\s+e\.preventDefault\(\);/);
+});
+
+test('painel e Minha Escala usam a mesma janela de músicas', () => {
+  const painel = ler('painel.html');
+  const escalas = ler('escalas.js');
+  const minha = ler('minha-escala.html');
+  for (const html of [painel, minha]) {
+    assert.match(html, /<link rel="stylesheet" href="\/musicas-culto\.css\?v=1">/);
+    assert.ok(html.indexOf('/repertorio-busca.js?v=2') < html.indexOf('/musicas-culto.js?v=1'), 'busca e transposição antes da janela');
+    assert.ok(html.indexOf('/musica-youtube.js?v=1') < html.indexOf('/musicas-culto.js?v=1'), 'miniatura antes da janela');
+    assert.doesNotMatch(html, /<dialog id="dlg-(musicas|selecionar-musica|adicionar)"/, 'a janela antiga saiu');
+  }
+  assert.ok(painel.indexOf('/musicas-culto.js?v=1') < painel.indexOf('/escalas.js?v=19'));
+  assert.match(escalas, /MusicasCulto\.abrir\(/);
+  assert.match(escalas, /\/api\/repertorio\/uso/);
+  assert.match(escalas, /tom: tomDaMusica\(r\)/);
+  assert.match(minha, /MusicasCulto\.abrir\(/);
+  assert.match(minha, /\/api\/minha-escala\/cultos\/\$\{c\.id\}\/musicas/);
   assert.match(minha, /m\.youtube/);
-  assert.match(minha, /m\.tom/);
-  assert.ok(html.indexOf('/musica-youtube.js?v=1') < html.indexOf('/escalas.js?v=19'));
-});
-
-test('ordem do culto: adicionar vai para o fim no tom da Diakonia, sem repetir, e mover troca a posição', () => {
-  const script = fs.readFileSync(path.join(__dirname, '../web/escalas.js'), 'utf8');
-  const trecho = script.slice(script.indexOf('function posicaoNoCulto('), script.indexOf('function desenharSeletorMusica()'));
-  const ctx = {
-    ordemCulto: { editavel: true, mudou: false, movida: null, musicas: [{ titulo: 'Antiga', tom: 'D' }, { repertorioId: 'a', tom: 'G' }] },
-    tomDaMusica: (r) => r.tom, desenhos: 0,
-  };
-  ctx.desenharOrdemCulto = ctx.desenharSeletorMusica = () => { ctx.desenhos++; };
-  vm.runInNewContext(`${trecho}
-    adicionarAoCulto({ id: 'b', tom: 'A' });
-    adicionarAoCulto({ id: 'a', tom: 'C' });
-    moverNoCulto(2, 0);
-    moverNoCulto(0, -1);`, ctx);
-  assert.deepEqual(JSON.parse(JSON.stringify(ctx.ordemCulto.musicas)), [
-    { repertorioId: 'b', tom: 'A' }, { titulo: 'Antiga', tom: 'D' }, { repertorioId: 'a', tom: 'G' },
-  ]);
-  assert.equal(ctx.ordemCulto.mudou, true);
-  ctx.ordemCulto.editavel = false;
-  vm.runInNewContext('adicionarAoCulto({ id: "c", tom: "E" })', ctx);
-  assert.equal(ctx.ordemCulto.musicas.length, 3, 'quem só vê não adiciona');
-});
-
-test('na ordem do culto dá para arrastar, subir e descer; Enter na busca adiciona e não salva a janela', () => {
-  const script = fs.readFileSync(path.join(__dirname, '../web/escalas.js'), 'utf8');
-  assert.match(script, /class: 'alca'/);
-  assert.match(script, /`Subir \$\{titulo\}`/);
-  assert.match(script, /`Descer \$\{titulo\}`/);
-  assert.match(script, /pointerdown/);
-  assert.match(script, /e\.key === 'Enter'\) \{\r?\n\s+e\.preventDefault\(\);/);
+  assert.match(minha, /m\.primeiraNota/);
 });
 
 test('primeira nota acompanha o tom do culto e andamento sai do BPM', () => {
@@ -84,26 +79,10 @@ test('primeira nota acompanha o tom do culto e andamento sai do BPM', () => {
   assert.deepEqual(['84', '85', '120', '121', 'x'].map(andamentoBpm), ['Lenta', 'Média', 'Média', 'Rápida', '']);
 });
 
-test('seletor do painel tem tabela ordenável com prévia e Minha escala tem a busca de músicas', () => {
-  const html = fs.readFileSync(path.join(__dirname, '../web/painel.html'), 'utf8');
-  const script = fs.readFileSync(path.join(__dirname, '../web/escalas.js'), 'utf8');
-  const minha = fs.readFileSync(path.join(__dirname, '../web/minha-escala.html'), 'utf8');
-  for (const id of ['seletor-musica-tabela', 'seletor-musica-cabecalho', 'seletor-musica-previa', 'seletor-musica-tons', 'seletor-musica-andamento']) {
-    assert.ok(html.includes(`id="${id}"`), id);
-  }
-  assert.match(script, /\/api\/repertorio\/uso/);
-  assert.match(script, /dblclick/);
-  assert.ok(minha.includes('<dialog id="dlg-adicionar"'));
-  assert.ok(minha.indexOf('/repertorio-busca.js?v=2') < minha.indexOf('<script>'), 'busca e transposição antes do script da página');
-  assert.match(minha, /Você tocou recentemente/);
-  assert.match(minha, /m\.primeiraNota/);
-});
-
-test('escolher música na escala preenche o tom com uma função que ainda existe nos scripts do painel', () => {
-  const script = fs.readFileSync(path.join(__dirname, '../web/escalas.js'), 'utf8');
-  const busca = fs.readFileSync(path.join(__dirname, '../web/repertorio-busca.js'), 'utf8');
-  // tomPadraoRepertorio saiu do repertorio.js; a chamada que sobrou derrubava o "change" e a música não entrava na lista.
-  assert.doesNotMatch(script, /tomPadraoRepertorio/);
-  assert.match(script, /\{ repertorioId: r\.id, tom: tomDaMusica\(r\) \}/);
+test('tom padrão vem de uma função que ainda existe nos scripts', () => {
+  const busca = ler('repertorio-busca.js');
+  // tomPadraoRepertorio saiu do repertorio.js; uma chamada que sobrasse derrubava a escolha da música.
+  assert.doesNotMatch(ler('escalas.js'), /tomPadraoRepertorio/);
+  assert.doesNotMatch(ler('musicas-culto.js'), /tomPadraoRepertorio/);
   assert.match(busca, /function tomDaMusica\(/);
 });

@@ -247,227 +247,8 @@ $('escalar-todos').addEventListener('change', () => escalarAtual && desenharEsca
 
 // ---------- Músicas ----------
 
-// Uma janela só: à esquerda o repertório (busca, filtros de tom e andamento, tabela ordenável e
-// prévia da música em foco); à direita a ordem do culto, onde se muda posição, tom e se tira música.
+// A janela é a mesma da Minha Escala (musicas-culto.js): repertório ao lado da ordem do culto.
 let usoRepertorio = {}; // GET /api/repertorio/uso → {id: {ultima, vezes}}
-const seletor = { foco: null, chave: null, crescente: true, tom: '', andamento: '' };
-// Músicas do culto aberto: {repertorioId, tom} ou, para as antigas sem vínculo, {titulo, tom}.
-const ordemCulto = { culto: null, musicas: [], editavel: false, mudou: false, movida: null };
-
-const COLUNAS_SELETOR = [
-  ['titulo', 'Música'], ['tom', 'Tom'], ['bpm', 'BPM', 'num'], ['ultima', 'Última vez', 'col-uso'], ['vezes', '12 meses', 'num col-uso'],
-];
-const valorSeletor = {
-  titulo: (r) => r.titulo,
-  tom: (r) => tomDaMusica(r),
-  bpm: (r) => numeroBpm(r.bpm) ?? -1,
-  ultima: (r) => usoRepertorio[r.id]?.ultima || '',
-  vezes: (r) => usoRepertorio[r.id]?.vezes || 0,
-};
-const ddmmaa = (iso) => `${iso.slice(8, 10)}/${iso.slice(5, 7)}/${iso.slice(2, 4)}`;
-
-function musicasDoSeletor() {
-  const musicas = buscarRepertorio(repertorioMusicas.filter((r) => r.ativo), {
-    busca: $('seletor-musica-busca').value, tom: seletor.tom,
-  }).filter((r) => !seletor.andamento || andamentoBpm(r.bpm) === seletor.andamento);
-  // Sem coluna escolhida vale a ordem da busca (mais parecida primeiro, depois título).
-  if (!seletor.chave) return musicas;
-  const valor = valorSeletor[seletor.chave];
-  return musicas.sort((a, b) => {
-    const x = valor(a), y = valor(b);
-    const c = typeof x === 'number' ? x - y : String(x).localeCompare(String(y), 'pt-BR');
-    return (seletor.crescente ? c : -c) || a.titulo.localeCompare(b.titulo, 'pt-BR');
-  });
-}
-
-function filtroChips(caixa, nome, opcoes, atual, mudar) {
-  caixa.replaceChildren(...opcoes.map(([valor, texto]) => {
-    const radio = el('input', { type: 'radio', name: nome, value: valor });
-    radio.checked = valor === atual;
-    radio.addEventListener('change', () => mudar(valor));
-    return el('label', {}, radio, texto);
-  }));
-}
-
-/** Posição (1, 2…) da música do repertório na ordem do culto; 0 se não está. */
-function posicaoNoCulto(id) {
-  return ordemCulto.musicas.findIndex((m) => m.repertorioId === id) + 1;
-}
-
-function ordemMudou(movida = null) {
-  ordemCulto.mudou = true;
-  ordemCulto.movida = movida;
-  desenharOrdemCulto();
-  desenharSeletorMusica();
-}
-
-/** Põe a música no fim da ordem, no tom da Diakonia; a janela continua aberta para escolher a próxima. */
-function adicionarAoCulto(r) {
-  if (!ordemCulto.editavel || posicaoNoCulto(r.id)) return;
-  const m = { repertorioId: r.id, tom: tomDaMusica(r) };
-  ordemCulto.musicas.push(m);
-  ordemMudou(m);
-}
-
-function moverNoCulto(de, para) {
-  const l = ordemCulto.musicas;
-  if (para < 0 || para >= l.length || de === para) return;
-  const [m] = l.splice(de, 1);
-  l.splice(para, 0, m);
-  ordemMudou(m);
-}
-
-function desenharSeletorMusica() {
-  const ativas = repertorioMusicas.filter((r) => r.ativo);
-  const tons = [...new Set(ativas.map(tomDaMusica).filter(Boolean))]
-    .sort((a, b) => (semitomDaNota(a) - semitomDaNota(b)) || a.localeCompare(b));
-  filtroChips($('seletor-musica-tons'), 'seletor-tom', [['', 'Todos'], ...tons.map((t) => [t, t])], seletor.tom,
-    (v) => { seletor.tom = v; desenharSeletorMusica(); });
-  filtroChips($('seletor-musica-andamento'), 'seletor-andamento',
-    [['', 'Todos'], ['Lenta', 'Lenta'], ['Média', 'Média'], ['Rápida', 'Rápida']], seletor.andamento,
-    (v) => { seletor.andamento = v; desenharSeletorMusica(); });
-
-  $('seletor-musica-cabecalho').replaceChildren(el('tr', {}, ...COLUNAS_SELETOR.map(([chave, nome, classe]) => {
-    const ativa = seletor.chave === chave;
-    return el('th', { class: classe || null, 'aria-sort': ativa ? (seletor.crescente ? 'ascending' : 'descending') : 'none' },
-      el('button', { type: 'button', onclick: () => {
-        // Última vez e 12 meses abrem do maior para o menor; as outras em ordem alfabética.
-        seletor.crescente = ativa ? !seletor.crescente : !['ultima', 'vezes'].includes(chave);
-        seletor.chave = chave;
-        desenharSeletorMusica();
-      } }, nome + (ativa ? (seletor.crescente ? ' ↑' : ' ↓') : '')));
-  }), el('th', { class: 'acao' }, el('span', { class: 'invisivel' }, 'Adicionar'))));
-
-  const musicas = musicasDoSeletor();
-  if (!musicas.some((r) => r.id === seletor.foco)) seletor.foco = musicas[0]?.id ?? null;
-  $('seletor-musica-contagem').textContent = `${musicas.length} de ${ativas.length} ${ativas.length === 1 ? 'música disponível' : 'músicas disponíveis'}.`;
-  const tabela = $('seletor-musica-tabela');
-  const rolagem = tabela.scrollTop;
-  $('seletor-musica-lista').replaceChildren(...(musicas.length ? musicas.map((r) => {
-    const uso = usoRepertorio[r.id];
-    const pos = posicaoNoCulto(r.id);
-    const linha = el('tr', { 'aria-selected': String(r.id === seletor.foco), 'data-id': r.id },
-      el('td', {}, el('strong', {}, r.titulo, pos ? el('span', { class: 'no-culto' }, `${pos}ª no culto`) : null), el('small', {}, r.cantor)),
-      el('td', {}, tomDaMusica(r) ? el('span', { class: 'tom-musica' }, tomDaMusica(r)) : '—'),
-      el('td', { class: 'num' }, numeroBpm(r.bpm) ?? '—'),
-      el('td', { class: 'col-uso' }, uso ? ddmmaa(uso.ultima) : 'Nunca'),
-      el('td', { class: 'num col-uso' }, uso?.vezes || 0),
-      el('td', { class: 'acao' }, pos ? el('span', { class: 'ja', 'aria-label': 'Já está no culto' }, '✓')
-        : el('button', { type: 'button', class: 'adicionar', 'aria-label': `Adicionar ${r.titulo} ao culto`,
-          onclick: (e) => { e.stopPropagation(); seletor.foco = r.id; adicionarAoCulto(r); } }, '+')));
-    linha.addEventListener('click', () => { seletor.foco = r.id; desenharSeletorMusica(); });
-    linha.addEventListener('dblclick', () => adicionarAoCulto(r));
-    return linha;
-  }) : [el('tr', {}, el('td', { colspan: '6', class: 'dica' }, 'Nenhuma música disponível com essa busca ou filtro. Confira o status no Repertório.'))]));
-  // Mantém a rolagem e só rola a tabela (scrollIntoView rolaria a janela inteira junto).
-  tabela.scrollTop = rolagem;
-  const sel = $('seletor-musica-lista').querySelector('[aria-selected="true"]');
-  if (sel) {
-    const topo = $('seletor-musica-cabecalho').offsetHeight;
-    if (sel.offsetTop - topo < tabela.scrollTop) tabela.scrollTop = sel.offsetTop - topo;
-    else if (sel.offsetTop + sel.offsetHeight > tabela.scrollTop + tabela.clientHeight) tabela.scrollTop = sel.offsetTop + sel.offsetHeight - tabela.clientHeight;
-  }
-  desenharPreviaMusica(musicas.find((r) => r.id === seletor.foco));
-}
-
-function desenharPreviaMusica(r) {
-  if (!r) {
-    $('seletor-musica-previa').replaceChildren(el('p', { class: 'dica' }, 'Escolha uma música na lista para ver os detalhes.'));
-    return;
-  }
-  const thumb = miniaturaYoutube(r.referencia);
-  const link = linkYoutube(r.referencia);
-  const uso = usoRepertorio[r.id];
-  const tom = tomDaMusica(r);
-  const pos = posicaoNoCulto(r.id);
-  const dados = [
-    ['Tom', tom || 'Não definido'],
-    ['1ª nota', r.primeiraNota || '—'],
-    ['Andamento', numeroBpm(r.bpm) ? `${numeroBpm(r.bpm)} BPM · ${andamentoBpm(r.bpm)}` : 'Sem BPM'],
-    ['Última vez', uso ? ddmmaa(uso.ultima) : 'Nunca'],
-  ];
-  $('seletor-musica-previa').replaceChildren(...[
-    thumb ? el('img', { src: thumb, alt: '', loading: 'lazy', referrerpolicy: 'no-referrer' }) : null,
-    el('div', { class: 'previa-texto' },
-      el('strong', { class: 'titulo' }, r.titulo),
-      el('span', { class: 'dica' }, [r.cantor, r.compositor].filter(Boolean).join(' · ')),
-      el('span', { class: 'previa-dados' }, ...dados.map(([rotulo, valor]) => el('span', {}, rotulo + ' ', el('b', {}, valor)))),
-      link ? el('a', { href: link, target: '_blank', rel: 'noopener noreferrer' }, 'Ouvir no YouTube ↗') : null),
-    !ordemCulto.editavel ? null
-      : pos ? el('span', { class: 'ja' }, `✓ ${pos}ª no culto`)
-        : botao(tom ? `+ Adicionar · tom ${tom}` : '+ Adicionar ao culto', () => adicionarAoCulto(r), 'pequeno'),
-  ].filter(Boolean));
-}
-
-/** Seletor de tom da linha; um tom gravado fora da lista (ex.: "G/B") continua como opção. */
-function seletorTomCulto(valor, rotulo, mudar) {
-  const tons = TONS_REPERTORIO.map(([t]) => t).filter(Boolean);
-  const opcoes = valor && !tons.includes(valor) ? [valor, ...tons] : tons;
-  const s = el('select', { class: 'tom', 'aria-label': rotulo, onchange: () => mudar(s.value) },
-    el('option', { value: '' }, 'Tom'), ...opcoes.map((t) => el('option', { value: t }, t)));
-  s.value = valor || '';
-  return s;
-}
-
-function desenharOrdemCulto() {
-  const { musicas, editavel } = ordemCulto;
-  $('musicas-contagem').textContent = String(musicas.length);
-  $('musicas-status').hidden = !ordemCulto.mudou;
-  const linhas = musicas.map((m, i) => {
-    const r = repertorioMusicas.find((x) => x.id === m.repertorioId);
-    const titulo = r?.titulo || m.titulo || 'Música';
-    const situacao = !m.repertorioId ? 'antiga, sem vínculo com o repertório' : !r ? 'fora do repertório' : !r.ativo ? 'inativa' : '';
-    const nota = textoPrimeiraNota(r, m.tom);
-    // Música antiga (sem vínculo) mantém o tom gravado: o servidor só aceita ela como estava.
-    const tom = editavel && m.repertorioId
-      ? seletorTomCulto(m.tom, `Tom de ${titulo}`, (v) => { m.tom = v; ordemMudou(); })
-      : el('span', { class: 'tom-musica' }, m.tom || '—');
-    return el('li', { class: 'item-culto' + (ordemCulto.movida === m ? ' movida' : '') },
-      editavel ? el('span', { class: 'alca', title: 'Arraste para mudar a posição', 'aria-hidden': 'true' }, '⠿') : null,
-      el('span', { class: 'ordem' }, String(i + 1)),
-      el('div', { class: 'txt', onclick: r ? () => { seletor.foco = r.id; desenharSeletorMusica(); } : null },
-        el('strong', {}, titulo),
-        situacao ? el('small', {}, situacao) : r ? el('small', {}, r.cantor) : null,
-        nota ? el('small', { class: 'primeira-nota' }, nota) : null),
-      el('div', { class: 'controles' }, tom,
-        editavel ? el('button', { type: 'button', class: 'icone', disabled: i === 0, 'aria-label': `Subir ${titulo}`, onclick: () => moverNoCulto(i, i - 1) }, '↑') : null,
-        editavel ? el('button', { type: 'button', class: 'icone', disabled: i === musicas.length - 1, 'aria-label': `Descer ${titulo}`, onclick: () => moverNoCulto(i, i + 1) }, '↓') : null,
-        editavel ? el('button', { type: 'button', class: 'icone tirar', 'aria-label': `Tirar ${titulo}`, onclick: () => { musicas.splice(i, 1); ordemMudou(); } }, '×') : null));
-  });
-  $('musicas-lista').replaceChildren(...(linhas.length ? linhas : [el('li', { class: 'vazio' },
-    editavel ? 'Nenhuma música ainda. Toque em + numa música do repertório.' : 'Nenhuma música escolhida.')]));
-  ordemCulto.movida = null;
-}
-
-// Arrastar pela alça ⠿, com mouse ou dedo: a linha segue o ponteiro e a ordem muda ao soltar.
-$('musicas-lista').addEventListener('pointerdown', (e) => {
-  const alca = e.target.closest('.alca');
-  if (!alca || !ordemCulto.editavel) return;
-  e.preventDefault();
-  const lista = $('musicas-lista');
-  const item = alca.closest('li');
-  const de = [...lista.children].indexOf(item);
-  item.classList.add('arrastando');
-  // Escuta no document: mover a linha no DOM solta o pointer capture da alça.
-  const mover = (ev) => {
-    if (ev.pointerId !== e.pointerId) return;
-    const outros = [...lista.children].filter((li) => li !== item);
-    const depois = outros.find((li) => { const b = li.getBoundingClientRect(); return ev.clientY < b.top + b.height / 2; });
-    if (item.nextElementSibling !== (depois || null)) lista.insertBefore(item, depois || null);
-  };
-  const soltar = (ev) => {
-    if (ev.pointerId !== e.pointerId) return;
-    document.removeEventListener('pointermove', mover);
-    document.removeEventListener('pointerup', soltar);
-    document.removeEventListener('pointercancel', soltar);
-    item.classList.remove('arrastando');
-    const para = [...lista.children].indexOf(item);
-    if (para === de) desenharOrdemCulto(); else moverNoCulto(de, para);
-  };
-  document.addEventListener('pointermove', mover);
-  document.addEventListener('pointerup', soltar);
-  document.addEventListener('pointercancel', soltar);
-});
 
 async function abrirMusicas(c, editavel) {
   try {
@@ -476,56 +257,23 @@ async function abrirMusicas(c, editavel) {
     mensagem($('resultado-escala'), err.message, false);
     return;
   }
-  Object.assign(ordemCulto, {
-    culto: c, editavel, mudou: false, movida: null,
-    musicas: (c.musicas || []).map((m) => (m.repertorioId ? { repertorioId: m.repertorioId, tom: m.tom || '' } : { titulo: m.titulo, tom: m.tom || '' })),
-  });
-  $('musicas-culto').textContent = `${c.rotulo} · ${c.horaTexto} · ${c.nome}`;
-  $('dlg-musicas').classList.toggle('so-leitura', !editavel);
-  $('musicas-ordem').dataset.recolhida = 'false';
-  $('musicas-salvar').hidden = !editavel;
-  $('musicas-cancelar').textContent = editavel ? 'Cancelar' : 'Fechar';
   // Abre o controle do DiakoPlayer já na aba Culto deste culto (lá alguém carrega a fila e dá o play).
   const player = escala.dados?.diakoPlayerUrl;
-  $('musicas-player').hidden = !player || !ordemCulto.musicas.length;
-  if (player) $('musicas-player').href = `${player}/#culto=${encodeURIComponent(c.id)}`;
-  $('seletor-musica-busca').value = '';
-  Object.assign(seletor, { foco: null, tom: '', andamento: '' });
-  desenharOrdemCulto();
-  desenharSeletorMusica();
-  abrirDialogo($('dlg-musicas'), $('erro-musicas'), async () => {
-    await api('PUT', '/api/escalas/' + c.id, { musicas: ordemCulto.musicas.map((m) => ({ ...m, tom: m.tom.trim() })) });
-    await carregarEscalas();
+  MusicasCulto.abrir({
+    titulo: `${c.rotulo} · ${c.horaTexto} · ${c.nome}`,
+    musicas: c.musicas || [],
+    repertorio: repertorioMusicas.map((r) => ({
+      id: r.id, titulo: r.titulo, cantor: r.cantor, compositor: r.compositor || '', tom: tomDaMusica(r),
+      primeiraNota: r.primeiraNota || '', bpm: r.bpm, ativo: !!r.ativo,
+      ultima: usoRepertorio[r.id]?.ultima || '', vezes: usoRepertorio[r.id]?.vezes || 0, youtube: linkYoutube(r.referencia) || '',
+    })),
+    editavel,
+    playerUrl: player && (c.musicas || []).length ? `${player}/#culto=${encodeURIComponent(c.id)}` : '',
+    salvar: async (musicas) => {
+      await api('PUT', '/api/escalas/' + c.id, { musicas });
+      await carregarEscalas();
+    },
   });
-  $('seletor-musica-tabela').scrollTop = 0;
-  if (editavel) $('seletor-musica-busca').focus();
-}
-$('seletor-musica-busca').addEventListener('input', desenharSeletorMusica);
-// Setas andam pela tabela mesmo com o foco na busca; Enter adiciona a música em foco (nunca salva a janela).
-function teclasSeletor(e) {
-  const musicas = musicasDoSeletor();
-  const i = musicas.findIndex((r) => r.id === seletor.foco);
-  if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
-    e.preventDefault();
-    const proxima = musicas[Math.min(musicas.length - 1, Math.max(0, i + (e.key === 'ArrowDown' ? 1 : -1)))];
-    if (proxima) { seletor.foco = proxima.id; desenharSeletorMusica(); }
-  } else if (e.key === 'Enter') {
-    e.preventDefault();
-    if (musicas[i]) adicionarAoCulto(musicas[i]);
-  }
-}
-$('seletor-musica-busca').addEventListener('keydown', teclasSeletor);
-$('seletor-musica-tabela').addEventListener('keydown', teclasSeletor);
-$('musicas-recolher').addEventListener('click', () => {
-  const ordem = $('musicas-ordem');
-  ordem.dataset.recolhida = String(ordem.dataset.recolhida !== 'true');
-  $('musicas-recolher').textContent = ordem.dataset.recolhida === 'true' ? 'Mostrar ▾' : 'Recolher ▴';
-});
-
-/** "1ª nota D" da música [r] cantada no [tom] (vazio se ninguém cadastrou a nota). */
-function textoPrimeiraNota(r, tom) {
-  const nota = r?.primeiraNota ? primeiraNotaNoTom(r.primeiraNota, tomDaMusica(r), tom) : '';
-  return nota ? `1ª nota ${nota}` : '';
 }
 
 // ---------- Cultos: gerar, repetir, extra, editar ----------

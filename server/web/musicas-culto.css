@@ -1,0 +1,105 @@
+/* Músicas do culto (musicas-culto.js): repertório à esquerda, ordem do culto à direita.
+   No celular a janela ocupa a tela, a ordem fica em cima e pode ser recolhida. */
+dialog.musicas-culto { border: 0; border-radius: 16px; padding: 20px 22px 16px; width: min(1120px, calc(100vw - 32px)); max-width: none; max-height: 94dvh; overflow-y: auto; background: var(--superficie); color: var(--texto); }
+dialog.musicas-culto::backdrop { background: rgba(0, 0, 0, .45); }
+.musicas-culto .musicas-topo { display: flex; justify-content: space-between; gap: 12px; align-items: flex-start; }
+.musicas-culto h2 { font-size: 21px; margin: 0; }
+.musicas-culto .musicas-sub { margin: 2px 0 12px; }
+.musicas-culto .fechar { border: 0; background: none; font-size: 24px; line-height: 1; cursor: pointer; color: var(--suave); padding: 2px 6px; border-radius: 8px; }
+.musicas-culto .campo { margin-bottom: 10px; }
+.musicas-culto .corpo { display: grid; grid-template-columns: minmax(0, 1fr) 390px; gap: 16px; align-items: start; }
+.musicas-culto .repertorio { min-width: 0; display: flex; flex-direction: column; gap: 6px; }
+.musicas-culto .repertorio > .dica { margin: 0; }
+.musicas-culto .filtros { display: flex; flex-wrap: wrap; gap: 8px 22px; align-items: center; margin-bottom: 4px; }
+.musicas-culto .filtros > div { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.musicas-culto .filtros .rotulo { font-size: 13px; color: var(--suave); margin-right: 2px; }
+.musicas-culto .filtros .chips { gap: 6px; }
+.musicas-culto .filtros .chips label { min-height: 32px; padding: 0 11px; font-size: 13px; }
+
+.musicas-culto .tabela { max-height: min(48dvh, 440px); overflow-y: auto; overflow-x: hidden; border: 1px solid var(--linha); border-radius: 12px; }
+.musicas-culto .tabela:focus-visible { outline: 3px solid var(--primaria-suave); }
+.musicas-culto table { width: 100%; border-collapse: collapse; font-size: 14px; font-variant-numeric: tabular-nums; }
+.musicas-culto th { position: sticky; top: 0; z-index: 1; background: var(--neutro); text-align: left; padding: 0; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: .04em; color: var(--suave); }
+.musicas-culto th button { all: unset; display: block; padding: 8px 10px; cursor: pointer; }
+.musicas-culto th button:focus-visible { outline: 2px solid var(--primaria); }
+.musicas-culto td { padding: 6px 10px; border-top: 1px solid var(--linha); vertical-align: middle; }
+.musicas-culto td small { display: block; color: var(--suave); font-size: 12.5px; }
+.musicas-culto .num { text-align: right; }
+.musicas-culto tbody tr { cursor: pointer; }
+.musicas-culto tbody tr:hover { background: var(--campo); }
+.musicas-culto tbody tr[aria-selected="true"] { background: var(--primaria-suave); }
+.musicas-culto td.acao, .musicas-culto th.acao { width: 1%; white-space: nowrap; text-align: right; }
+.musicas-culto .adicionar { border: 1px solid var(--primaria); background: var(--superficie); color: var(--primaria); border-radius: 8px; font-weight: 700; font-size: 15px; padding: 2px 11px; cursor: pointer; }
+.musicas-culto .adicionar:hover { background: var(--primaria); color: var(--primaria-texto); }
+.musicas-culto .no-culto { margin-left: 8px; font-size: 11px; font-weight: 700; color: var(--primaria-texto); background: var(--primaria); border-radius: 999px; padding: 1px 7px; vertical-align: 2px; white-space: nowrap; }
+.musicas-culto .ja { color: var(--ok); font-weight: 600; font-size: 13px; }
+.musicas-culto .tom-musica { display: inline-block; min-width: 30px; text-align: center; padding: 1px 6px; border-radius: 6px; background: var(--primaria-suave); color: var(--primaria-escura); font-size: 12.5px; font-weight: 700; }
+.musicas-culto tr[aria-selected="true"] .tom-musica { background: var(--superficie); }
+.musicas-culto .invisivel { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+.musicas-culto .previa { border: 1px solid var(--linha); border-radius: 12px; padding: 10px; display: grid; grid-template-columns: 120px minmax(0, 1fr) auto; gap: 12px; align-items: center; min-width: 0; }
+.musicas-culto .previa:not(:has(img)) { grid-template-columns: minmax(0, 1fr) auto; }
+.musicas-culto .previa img { width: 100%; aspect-ratio: 16 / 9; object-fit: cover; border-radius: 8px; }
+.musicas-culto .previa-texto { min-width: 0; display: flex; flex-direction: column; overflow-wrap: anywhere; }
+.musicas-culto .previa .titulo { font-size: 16px; }
+.musicas-culto .previa-dados { display: flex; flex-wrap: wrap; gap: 2px 14px; font-size: 13px; color: var(--suave); }
+.musicas-culto .previa-dados b { color: var(--texto); }
+.musicas-culto .previa a { font-size: 13px; font-weight: 600; }
+.musicas-culto .previa > .dica { margin: 0; grid-column: 1 / -1; }
+
+.musicas-culto .ordem { border: 1.5px solid var(--primaria); border-radius: 14px; background: var(--campo); position: sticky; top: 0; min-width: 0; }
+.musicas-culto .ordem-topo { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; padding: 12px 14px 8px; border-bottom: 1px solid var(--linha); }
+.musicas-culto .ordem-topo h3 { margin: 0; font-size: 17px; }
+.musicas-culto .recolher { display: none; border: 0; background: none; color: var(--primaria); font-weight: 600; font-size: 13px; cursor: pointer; padding: 0; }
+.musicas-culto .ordem-lista { list-style: none; margin: 0; padding: 6px; display: flex; flex-direction: column; gap: 4px; max-height: min(56dvh, 480px); overflow-y: auto; }
+.musicas-culto .item { display: grid; grid-template-columns: auto 26px minmax(0, 1fr) auto; gap: 8px; align-items: center; padding: 8px 6px; border-radius: 10px; background: var(--superficie); border: 1px solid var(--linha); }
+.musicas-culto.so-leitura .item { grid-template-columns: 26px minmax(0, 1fr) auto; }
+.musicas-culto .item.arrastando { background: var(--primaria-suave); box-shadow: 0 8px 20px rgba(0, 0, 0, .12); }
+.musicas-culto .item.movida { animation: musica-movida 900ms ease-out; }
+@keyframes musica-movida { from { background: var(--primaria-suave); } to { background: var(--superficie); } }
+@media (prefers-reduced-motion: reduce) { .musicas-culto .item.movida { animation: none; } }
+.musicas-culto .alca { cursor: grab; color: var(--suave); font-size: 18px; touch-action: none; user-select: none; padding: 4px 2px; }
+.musicas-culto .numero { width: 26px; height: 26px; border-radius: 50%; background: var(--primaria); color: var(--primaria-texto); font-size: 12.5px; font-weight: 700; display: grid; place-items: center; font-variant-numeric: tabular-nums; }
+.musicas-culto .item .txt { min-width: 0; display: flex; flex-direction: column; overflow-wrap: anywhere; cursor: pointer; }
+.musicas-culto .item .txt strong { font-size: 14.5px; line-height: 1.3; }
+.musicas-culto .item .txt small { font-size: 12.5px; color: var(--suave); }
+.musicas-culto .item .primeira-nota { color: var(--primaria-escura); font-weight: 600; }
+.musicas-culto .controles { display: flex; gap: 3px; align-items: center; }
+.musicas-culto select.tom { width: 62px; padding: 4px; font-weight: 600; font-size: 13px; min-height: 30px; }
+.musicas-culto .icone { width: 30px; height: 30px; border-radius: 8px; border: 1px solid var(--linha); background: var(--campo); cursor: pointer; color: var(--suave); display: grid; place-items: center; padding: 0; font-size: 15px; }
+.musicas-culto .icone:hover:not(:disabled) { border-color: var(--primaria); color: var(--primaria); }
+.musicas-culto .icone:disabled { opacity: .3; cursor: default; }
+.musicas-culto .icone.tirar:hover { border-color: var(--perigo); color: var(--perigo); }
+.musicas-culto .ordem-lista .vazio { padding: 22px 12px; text-align: center; color: var(--suave); border: 1.5px dashed var(--borda); border-radius: 12px; font-size: 14px; }
+.musicas-culto .ordem-dica { margin: 0; padding: 8px 14px 12px; border-top: 1px solid var(--linha); }
+
+.musicas-culto .erro:not([hidden]) { margin: 10px 0 0; }
+.musicas-culto .acoes { display: flex; flex-wrap: wrap; justify-content: flex-end; align-items: center; gap: 8px; margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--linha); }
+.musicas-culto .atalhos { margin-right: auto; }
+.musicas-culto .status { font-size: 13px; color: var(--primaria); font-weight: 600; }
+.musicas-culto kbd { font: 600 11px var(--fonte); border: 1px solid var(--borda); border-bottom-width: 2px; border-radius: 5px; padding: 1px 5px; background: var(--neutro); }
+
+.musicas-culto.so-leitura .corpo { grid-template-columns: minmax(0, 1fr); }
+.musicas-culto.so-leitura .repertorio, .musicas-culto.so-leitura .ordem-dica, .musicas-culto.so-leitura .atalhos { display: none; }
+.musicas-culto.so-leitura { width: min(560px, calc(100vw - 32px)); }
+
+@media (max-width: 760px) {
+  dialog.musicas-culto { width: 100%; max-width: 100%; height: 100dvh; max-height: 100dvh; margin: 0; border-radius: 0; padding: 14px 14px calc(12px + env(safe-area-inset-bottom, 0px)); }
+  .musicas-culto.so-leitura { width: 100%; }
+  .musicas-culto .corpo { grid-template-columns: minmax(0, 1fr); }
+  .musicas-culto .ordem { order: -1; position: static; }
+  .musicas-culto .recolher { display: inline; }
+  .musicas-culto .ordem[data-recolhida="true"] .ordem-lista, .musicas-culto .ordem[data-recolhida="true"] .ordem-dica { display: none; }
+  .musicas-culto .ordem[data-recolhida="true"] .ordem-topo { border-bottom: 0; }
+  .musicas-culto .ordem-lista { max-height: 38dvh; }
+  .musicas-culto .tabela { max-height: 46dvh; }
+  .musicas-culto .previa, .musicas-culto .previa:not(:has(img)) { grid-template-columns: minmax(0, 1fr) auto; }
+  .musicas-culto .previa img, .musicas-culto .col-uso, .musicas-culto .atalhos { display: none; }
+  .musicas-culto .acoes { position: sticky; bottom: calc(-12px - env(safe-area-inset-bottom, 0px)); background: var(--superficie); padding-bottom: 4px; }
+  .musicas-culto .acoes .botao { flex: 1; }
+}
+@media (max-width: 560px) {
+  .musicas-culto .item { grid-template-columns: auto 26px minmax(0, 1fr); }
+  .musicas-culto.so-leitura .item { grid-template-columns: 26px minmax(0, 1fr) auto; }
+  .musicas-culto:not(.so-leitura) .controles { grid-column: 1 / -1; justify-content: flex-end; }
+}

@@ -8,6 +8,7 @@
 <link rel="stylesheet" href="/estilo.css?v=5">
 <link rel="stylesheet" href="/casais.css?v=8">
 <link rel="stylesheet" href="/repertorio.css?v=1">
+<link rel="stylesheet" href="/musicas-culto.css?v=1">
 <style>
   .topo {
     display: flex; flex-wrap: wrap; align-items: center; gap: 16px;
@@ -368,77 +369,6 @@
   .escalar-lista .situacao { display: block; font-size: 13px; color: var(--suave); }
   .escalar-lista .situacao.conflito { color: #8a3b12; font-weight: 500; }
   .escalar-lista .situacao.indisponivel { color: var(--perigo); font-weight: 500; }
-  /* Músicas do culto: repertório à esquerda, ordem do culto à direita (no celular, a ordem fica em cima). */
-  #dlg-musicas { width: min(1120px, calc(100vw - 32px)); max-height: 94dvh; overflow-y: auto; }
-  #dlg-musicas h2 { font-size: 21px; margin: 0; }
-  #musicas-culto { margin: 2px 0 12px; }
-  #dlg-musicas .campo { margin-bottom: 10px; }
-  .musicas-corpo { display: grid; grid-template-columns: minmax(0, 1fr) 390px; gap: 16px; align-items: start; }
-  .musicas-repertorio { min-width: 0; display: flex; flex-direction: column; gap: 6px; }
-  #dlg-musicas.so-leitura .musicas-corpo { grid-template-columns: minmax(0, 1fr); }
-  #dlg-musicas.so-leitura .musicas-repertorio, #dlg-musicas.so-leitura .ordem-dica, #dlg-musicas.so-leitura .atalhos { display: none; }
-  .musicas-ordem { border: 1.5px solid var(--primaria); border-radius: 14px; background: var(--campo); position: sticky; top: 0; min-width: 0; }
-  .ordem-topo { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; padding: 12px 14px 8px; border-bottom: 1px solid var(--linha); }
-  .ordem-topo h3 { margin: 0; font-size: 17px; }
-  .link-recolher { display: none; border: 0; background: none; color: var(--primaria); font-weight: 600; font-size: 13px; cursor: pointer; padding: 0; }
-  .musicas-lista { list-style: none; margin: 0; padding: 6px; display: flex; flex-direction: column; gap: 4px; max-height: min(56dvh, 480px); overflow-y: auto; }
-  .musicas-lista .item-culto { display: grid; grid-template-columns: auto 26px minmax(0, 1fr) auto; gap: 8px; align-items: center; padding: 8px 6px; border-radius: 10px; background: var(--superficie); border: 1px solid var(--linha); }
-  #dlg-musicas.so-leitura .item-culto { grid-template-columns: 26px minmax(0, 1fr) auto; }
-  .item-culto.arrastando { background: var(--primaria-suave); box-shadow: 0 8px 20px rgba(0, 0, 0, .12); }
-  .item-culto.movida { animation: musica-movida 900ms ease-out; }
-  @keyframes musica-movida { from { background: var(--primaria-suave); } to { background: var(--superficie); } }
-  @media (prefers-reduced-motion: reduce) { .item-culto.movida { animation: none; } }
-  .item-culto .alca { cursor: grab; color: var(--suave); font-size: 17px; touch-action: none; user-select: none; padding: 0 2px; }
-  .item-culto .ordem { width: 26px; height: 26px; border-radius: 50%; background: var(--primaria); color: var(--primaria-texto); font-size: 12.5px; font-weight: 700; display: grid; place-items: center; font-variant-numeric: tabular-nums; }
-  .item-culto .txt { min-width: 0; display: flex; flex-direction: column; overflow-wrap: anywhere; cursor: pointer; }
-  .item-culto .txt strong { font-size: 14.5px; }
-  .item-culto .txt small { font-size: 12.5px; color: var(--suave); }
-  .item-culto .txt .primeira-nota { color: var(--primaria-escura); font-weight: 600; }
-  .item-culto .controles { display: flex; gap: 3px; align-items: center; }
-  .item-culto select.tom { width: 62px; padding: 4px; font-weight: 600; font-size: 13px; min-height: 30px; }
-  .item-culto .icone { width: 30px; height: 30px; border-radius: 8px; border: 1px solid var(--linha); background: var(--campo); cursor: pointer; color: var(--suave); display: grid; place-items: center; padding: 0; }
-  .item-culto .icone:hover:not(:disabled) { border-color: var(--primaria); color: var(--primaria); }
-  .item-culto .icone:disabled { opacity: .3; cursor: default; }
-  .item-culto .icone.tirar:hover { border-color: var(--perigo); color: var(--perigo); }
-  .musicas-lista .vazio { padding: 22px 12px; text-align: center; color: var(--suave); border: 1.5px dashed var(--borda); border-radius: 12px; font-size: 14px; }
-  .ordem-dica { margin: 0; padding: 8px 14px 12px; border-top: 1px solid var(--linha); }
-  .musicas-status { font-size: 13px; color: var(--primaria); font-weight: 600; align-self: center; }
-  .seletor-filtros { display: flex; flex-wrap: wrap; gap: 8px 22px; align-items: center; margin-bottom: 4px; }
-  .seletor-filtros > div { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
-  .seletor-filtros .rotulo { font-size: 13px; color: var(--suave); margin-right: 2px; }
-  .seletor-filtros .chips { gap: 6px; }
-  .seletor-filtros .chips label { min-height: 32px; padding: 0 11px; font-size: 13px; }
-  .seletor-tabela { max-height: min(52dvh, 440px); overflow-y: auto; border: 1px solid var(--linha); border-radius: 12px; }
-  .seletor-tabela:focus-visible { outline: 3px solid var(--primaria-suave); }
-  .seletor-tabela table { width: 100%; border-collapse: collapse; font-size: 14px; font-variant-numeric: tabular-nums; }
-  .seletor-tabela th { position: sticky; top: 0; z-index: 1; background: var(--neutro); text-align: left; padding: 0; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: .04em; color: var(--suave); }
-  .seletor-tabela th button { all: unset; display: block; padding: 8px 10px; cursor: pointer; }
-  .seletor-tabela th button:focus-visible { outline: 2px solid var(--primaria); }
-  .seletor-tabela td { padding: 6px 10px; border-top: 1px solid var(--linha); vertical-align: middle; }
-  .seletor-tabela td small { display: block; color: var(--suave); font-size: 12.5px; }
-  .seletor-tabela .num { text-align: right; }
-  .seletor-tabela tbody tr { cursor: pointer; }
-  .seletor-tabela tbody tr:hover { background: var(--campo); }
-  .seletor-tabela tbody tr[aria-selected="true"] { background: var(--primaria-suave); }
-  .seletor-tabela td.acao, .seletor-tabela th.acao { width: 1%; white-space: nowrap; text-align: right; }
-  .seletor-tabela .adicionar { border: 1px solid var(--primaria); background: var(--superficie); color: var(--primaria); border-radius: 8px; font-weight: 700; padding: 2px 10px; cursor: pointer; }
-  .seletor-tabela .adicionar:hover { background: var(--primaria); color: var(--primaria-texto); }
-  .seletor-tabela .no-culto { margin-left: 8px; font-size: 11px; font-weight: 700; color: var(--primaria-texto); background: var(--primaria); border-radius: 999px; padding: 1px 7px; vertical-align: 2px; white-space: nowrap; }
-  .ja { color: var(--ok); font-weight: 600; font-size: 13px; }
-  .invisivel { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
-  .tom-musica { display: inline-block; min-width: 30px; text-align: center; padding: 1px 6px; border-radius: 6px; background: var(--primaria-suave); color: var(--primaria-escura); font-size: 12.5px; font-weight: 700; }
-  tr[aria-selected="true"] .tom-musica { background: var(--superficie); }
-  .seletor-previa { border: 1px solid var(--linha); border-radius: 12px; padding: 10px; display: grid; grid-template-columns: 120px minmax(0, 1fr) auto; gap: 12px; align-items: center; min-width: 0; }
-  .seletor-previa:not(:has(img)) { grid-template-columns: minmax(0, 1fr) auto; }
-  .seletor-previa img { width: 100%; aspect-ratio: 16 / 9; object-fit: cover; border-radius: 8px; }
-  .seletor-previa .previa-texto { min-width: 0; display: flex; flex-direction: column; overflow-wrap: anywhere; }
-  .seletor-previa .titulo { font-size: 16px; }
-  .seletor-previa .previa-dados { display: flex; flex-wrap: wrap; gap: 2px 14px; font-size: 13px; color: var(--suave); }
-  .seletor-previa .previa-dados b { color: var(--texto); }
-  .seletor-previa a { font-size: 13px; font-weight: 600; }
-  .seletor-previa > .dica { margin: 0; grid-column: 1 / -1; }
-  #dlg-musicas .atalhos { margin-right: auto; align-self: center; }
-  #dlg-musicas kbd { font: 600 11px var(--fonte); border: 1px solid var(--borda); border-bottom-width: 2px; border-radius: 5px; padding: 1px 5px; background: var(--neutro); }
   #dlg-lista-indisponibilidades { width: min(740px, calc(100vw - 32px)); max-height: 90dvh; overflow-y: auto; }
   #lista-indisponibilidades { display: flex; flex-direction: column; gap: 10px; margin: 14px 0; }
   .aviso-indisponibilidade { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; padding: 14px; border: 1px solid var(--linha); border-radius: 12px; }
@@ -455,21 +385,6 @@
   .formatos-escala button:hover, .formatos-escala button:focus-visible { border-color: var(--primaria); outline-color: var(--primaria); }
   .formatos-escala strong { display: block; font-size: 17px; }
   .formatos-escala span { display: block; margin-top: 4px; color: var(--suave); font-size: 14px; }
-  @media (max-width: 560px) {
-    .musicas-lista .item-culto { grid-template-columns: auto 26px minmax(0, 1fr); }
-    .item-culto .controles { grid-column: 1 / -1; justify-content: flex-end; }
-  }
-  @media (max-width: 760px) {
-    .musicas-corpo { grid-template-columns: minmax(0, 1fr); }
-    .musicas-ordem { order: -1; position: static; }
-    .link-recolher { display: inline; }
-    .musicas-ordem[data-recolhida="true"] .musicas-lista, .musicas-ordem[data-recolhida="true"] .ordem-dica { display: none; }
-    .musicas-ordem[data-recolhida="true"] .ordem-topo { border-bottom: 0; }
-    .musicas-lista { max-height: 40dvh; }
-    .seletor-previa, .seletor-previa:not(:has(img)) { grid-template-columns: minmax(0, 1fr) auto; }
-    .seletor-previa img, .seletor-tabela .col-uso { display: none; }
-    #dlg-musicas .atalhos { display: none; }
-  }
   @media print {
     body { background: #fff; }
     body > *:not(#impressao-membros) { display: none !important; }
@@ -1220,44 +1135,6 @@
   </form>
 </dialog>
 
-<!-- Músicas do culto: repertório (busca, filtros, tabela, prévia) e, ao lado, a ordem do culto editável. -->
-<dialog id="dlg-musicas" aria-labelledby="musicas-titulo">
-  <form method="dialog">
-    <h2 id="musicas-titulo">Músicas do culto</h2>
-    <p class="dica" id="musicas-culto"></p>
-    <div class="musicas-corpo">
-      <div class="musicas-repertorio">
-        <div class="campo"><label for="seletor-musica-busca">Pesquisar no repertório por título, cantor ou compositor</label><input id="seletor-musica-busca" type="search" autocomplete="off" placeholder="Ex.: santo, intérprete ou compositor"></div>
-        <div class="seletor-filtros">
-          <div><span class="rotulo" id="seletor-musica-tons-rotulo">Tom</span><div class="chips" id="seletor-musica-tons" role="radiogroup" aria-labelledby="seletor-musica-tons-rotulo"></div></div>
-          <div><span class="rotulo" id="seletor-musica-andamento-rotulo">Andamento</span><div class="chips" id="seletor-musica-andamento" role="radiogroup" aria-labelledby="seletor-musica-andamento-rotulo"></div></div>
-        </div>
-        <p class="dica" id="seletor-musica-contagem" role="status"></p>
-        <div class="seletor-tabela" id="seletor-musica-tabela" tabindex="0" aria-label="Músicas do repertório. Setas para navegar, Enter adiciona ao culto.">
-          <table><thead id="seletor-musica-cabecalho"></thead><tbody id="seletor-musica-lista"></tbody></table>
-        </div>
-        <div class="seletor-previa" id="seletor-musica-previa" aria-live="polite"></div>
-      </div>
-      <section class="musicas-ordem" id="musicas-ordem" aria-labelledby="musicas-ordem-titulo" data-recolhida="false">
-        <div class="ordem-topo">
-          <h3 id="musicas-ordem-titulo">Ordem do culto · <span id="musicas-contagem">0</span></h3>
-          <button type="button" class="link-recolher" id="musicas-recolher">Recolher ▴</button>
-        </div>
-        <ol id="musicas-lista" class="musicas-lista"></ol>
-        <p class="dica ordem-dica">Arraste ⠿ ou use ↑ ↓ para mudar a posição. O tom muda a 1ª nota junto.</p>
-      </section>
-    </div>
-    <p class="erro" id="erro-musicas" hidden></p>
-    <div class="dialogo-acoes">
-      <span class="dica atalhos"><kbd>↑</kbd> <kbd>↓</kbd> navegar · <kbd>Enter</kbd> ou duplo clique adiciona · <kbd>Esc</kbd> fecha</span>
-      <span class="musicas-status" id="musicas-status" hidden>Alterações ainda não salvas</span>
-      <a class="botao secundario" id="musicas-player" target="diakoplayer" rel="noopener" hidden>Abrir no DiakoPlayer</a>
-      <button class="botao secundario" value="cancelar" id="musicas-cancelar" formnovalidate>Cancelar</button>
-      <button class="botao" value="salvar" id="musicas-salvar">Salvar</button>
-    </div>
-  </form>
-</dialog>
-
 <dialog id="dlg-formato-escala" aria-labelledby="titulo-formato-escala">
   <h2 id="titulo-formato-escala">Como deseja gerar o PDF da escala?</h2>
   <p class="dica">Escolha o formato para a aba e o mês exibidos. O arquivo é baixado direto pelo navegador; só entram cultos com pessoas escaladas.</p>
@@ -1686,6 +1563,7 @@
 <script src="/ministerios.js?v=1"></script>
 <script src="/repertorio-busca.js?v=2"></script>
 <script src="/musica-youtube.js?v=1"></script>
+<script src="/musicas-culto.js?v=1"></script>
 <script src="/repertorio.js?v=6"></script>
 <script src="/roteiros.js?v=1"></script>
 <script src="/palavras-pdf.js?v=1"></script>

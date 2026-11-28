@@ -7,6 +7,7 @@
 <meta name="robots" content="noindex">
 <title>Minha escala</title>
 <link rel="stylesheet" href="/estilo.css?v=5">
+<link rel="stylesheet" href="/musicas-culto.css?v=1">
 <style>
   /* Opção A: próximo culto em destaque, os outros em lista curta, ações fixas no rodapé. */
   .cabeca-me { display: flex; align-items: flex-start; gap: 12px; margin-bottom: 16px; text-align: left; }
@@ -77,23 +78,6 @@
   .lista-agenda a .txt { flex: 1; min-width: 0; display: grid; }
   .lista-agenda a .txt span { font-size: 13.5px; color: var(--suave); }
   .lista-agenda a b { color: var(--primaria); font-size: 14px; white-space: nowrap; }
-  .editor-musicas { margin-top: 12px; border-top: 1px solid var(--linha); padding-top: 10px; }
-  .editor-musicas summary { cursor: pointer; font-weight: 600; color: var(--primaria); min-height: 32px; }
-  .escolhidas { display: flex; flex-direction: column; gap: 6px; margin: 8px 0 10px; }
-  .escolhida { display: flex; align-items: center; gap: 8px; padding: 8px; border: 1px solid var(--linha); border-radius: 12px; background: var(--campo); }
-  .escolhida .ordem { width: 22px; height: 22px; flex: none; border-radius: 50%; background: var(--primaria); color: var(--primaria-texto); font-size: 12px; font-weight: 700; display: grid; place-items: center; }
-  .escolhida .txt, .item-adicionar .txt { flex: 1; min-width: 0; overflow-wrap: anywhere; }
-  .escolhida .txt strong, .item-adicionar .txt strong { display: block; line-height: 1.25; }
-  .escolhida small, .item-adicionar small { display: block; font-size: 12.5px; color: var(--suave); }
-  small.nota { color: var(--primaria-escura); font-weight: 600; }
-  small.nota:empty { display: none; }
-  select.tom { width: auto; flex: none; padding: 6px 8px; border-radius: 10px; font-weight: 600; }
-  .tom-fixo { flex: none; font-weight: 600; padding: 0 6px; }
-  .escolhida .mover { display: flex; flex: none; }
-  .escolhida .mover button { width: 32px; height: 36px; border: 0; background: none; font-size: 16px; cursor: pointer; border-radius: 8px; color: var(--suave); }
-  .escolhida .mover button:hover:not(:disabled) { background: var(--neutro); color: var(--texto); }
-  .escolhida .mover button:disabled { opacity: .3; cursor: default; }
-  .acoes-editor { display: flex; flex-wrap: wrap; gap: 8px; }
   dialog.tela-cheia { padding: 0; border: 0; width: 100%; max-width: 560px; height: 100dvh; max-height: 100dvh; margin: 0 auto; background: var(--fundo); color: var(--texto); }
   dialog.tela-cheia[open] { display: flex; flex-direction: column; }
   dialog.tela-cheia::backdrop { background: rgb(30 29 26 / .5); }
@@ -102,18 +86,7 @@
   .topo-tela .voltar { width: 40px; height: 40px; border: 0; background: none; font-size: 22px; cursor: pointer; border-radius: 10px; }
   .topo-tela strong { display: block; font-size: 17px; }
   .topo-tela small { display: block; color: var(--suave); font-size: 13px; }
-  .busca-tela { padding: 0 16px 8px; display: flex; flex-direction: column; gap: 8px; }
-  .busca-tela .chips { gap: 6px; }
-  .busca-tela .chips label { min-height: 34px; padding: 0 12px; font-size: 14px; }
-  .lista-tela { flex: 1; min-height: 0; overflow-y: auto; padding: 0 16px 12px; }
-  .lista-tela h3.grupo { margin: 14px 0 2px; font-family: var(--fonte); font-size: 12px; font-weight: 700; letter-spacing: .07em; text-transform: uppercase; color: var(--suave); }
-  .lista-tela .vazio { text-align: center; padding: 24px 8px; }
-  .item-adicionar { display: flex; align-items: center; gap: 8px; padding: 10px 0; border-bottom: 1px solid var(--linha); min-height: 60px; }
-  .item-adicionar .ja { flex: none; font-size: 13px; font-weight: 600; color: var(--ok); }
-  .item-adicionar .marcar { width: 40px; height: 40px; flex: none; border-radius: 50%; border: 1.5px solid var(--borda); background: var(--superficie); color: var(--primaria); font-size: 20px; font-weight: 700; cursor: pointer; }
-  .item-adicionar .marcar.on { background: var(--primaria); border-color: var(--primaria); color: var(--primaria-texto); font-size: 16px; }
-  .rodape-tela { padding: 10px 16px calc(12px + env(safe-area-inset-bottom, 0px)); border-top: 1px solid var(--linha); background: var(--superficie); }
-  .rodape-tela .botao { width: 100%; }
+  .escolher-musicas { width: 100%; }
   .grade2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: 10px; }
   h2 { font-size: 18px; margin-top: 4px; }
   /* Avisar o grupo do louvor (aviso-whatsapp.js): o ministro manda as músicas escolhidas. */
@@ -237,18 +210,6 @@
     </div>
   </section>
 </main>
-<dialog id="dlg-adicionar" class="tela-cheia" aria-labelledby="adicionar-titulo">
-  <div class="topo-tela">
-    <button type="button" class="voltar" id="adicionar-voltar" aria-label="Voltar sem adicionar">←</button>
-    <div><strong id="adicionar-titulo">Adicionar músicas</strong><small id="adicionar-culto"></small></div>
-  </div>
-  <div class="busca-tela">
-    <input id="adicionar-busca" type="search" autocomplete="off" placeholder="Nome da música ou do cantor" aria-label="Buscar música ou cantor">
-    <div class="chips" id="adicionar-andamento" role="radiogroup" aria-label="Andamento"></div>
-  </div>
-  <div class="lista-tela" id="adicionar-lista"></div>
-  <div class="rodape-tela"><button type="button" class="botao" id="adicionar-confirmar" disabled>Toque em + para escolher</button></div>
-</dialog>
 <dialog id="dlg-nao-vou" class="folha" aria-labelledby="nao-vou-titulo">
   <span class="puxador" aria-hidden="true"></span>
   <form id="form" novalidate>
@@ -310,6 +271,8 @@
   <button type="button" class="botao secundario" id="avisar-fechar" style="width:100%;margin-top:10px">Fechar</button>
 </dialog>
 <script src="/repertorio-busca.js?v=2"></script>
+<script src="/musica-youtube.js?v=1"></script>
+<script src="/musicas-culto.js?v=1"></script>
 <script src="/primeiro-acesso.js?v=1"></script>
 <script src="/ensaio-player.js?v=1"></script>
 <script src="/aviso-whatsapp.js?v=2"></script>
@@ -358,171 +321,25 @@
   }
   const botao = (texto, acao, classe = 'botao secundario pequeno') => criar('button', { type: 'button', className: classe, textContent: texto, onclick: acao });
   const catalogo = () => dados.repertorio || [];
-  // Tons do seletor: os 12 maiores e os 12 menores, como no Repertório.
-  const TONS = TONS_REPERTORIO.map(([valor]) => valor).filter(Boolean);
-
-  /** Select de tom com o valor atual, mesmo que seja uma anotação antiga fora da lista ("Bb", "E/G#"). */
-  function seletorTom(valor, rotulo, mudar) {
-    const opcoes = valor && !TONS.includes(valor) ? [valor, ...TONS] : TONS;
-    const s = criar('select', { className: 'tom', aria: { label: rotulo }, onchange: () => mudar(s.value) },
-      criar('option', { value: '', textContent: 'Tom' }), opcoes.map((t) => criar('option', { value: t, textContent: t })));
-    s.value = valor || '';
-    return s;
-  }
-
-  /** "1ª nota D" da música do repertório cantada no [tom]; vazio se ninguém cadastrou. */
-  function textoNota(r, tom) {
-    const nota = r?.primeiraNota ? primeiraNotaNoTom(r.primeiraNota, r.tom, tom) : '';
-    return nota ? `1ª nota ${nota}` : '';
-  }
-
   /** "Santo Pra Sempre · tom G · 1ª nota D" como o louvor lê na escala. */
   const detalheMusica = (m) => [m.tom && `tom ${m.tom}`, m.primeiraNota && `1ª nota ${m.primeiraNota}`].filter(Boolean).join(' · ');
 
-  // Editores que estavam abertos continuam abertos depois de salvar e recarregar.
-  const editoresAbertos = new Set();
-
-  function editorMusicas(c) {
-    const editor = criar('details', { className: 'editor-musicas', open: editoresAbertos.has(c.id),
-      ontoggle: () => (editor.open ? editoresAbertos.add(c.id) : editoresAbertos.delete(c.id)) },
-      criar('summary', { textContent: c.musicas.length ? 'Alterar as músicas deste culto' : 'Escolher músicas deste culto' }));
-    const linhas = criar('div', { className: 'escolhidas' });
-    const resultado = criar('p', { className: 'dica' });
-    resultado.setAttribute('role', 'status');
-    const escolhidas = c.musicas.map((m) => ({ repertorioId: m.repertorioId || '', titulo: m.titulo, tom: m.tom || '' }));
-    let pendente = false;
-    const mudou = () => {
-      pendente = true;
-      resultado.className = 'dica';
-      resultado.textContent = 'Alterações ainda não salvas.';
-      desenharLinhas();
-    };
-    function desenharLinhas() {
-      linhas.replaceChildren(...(escolhidas.length ? escolhidas.map((m, i) => {
-        const r = catalogo().find((x) => x.id === m.repertorioId);
-        const situacao = !m.repertorioId ? ' (antiga)' : r ? '' : ' (inativa)';
-        const nota = criar('small', { className: 'nota', textContent: textoNota(r, m.tom) });
-        // Música antiga (sem vínculo) mantém o tom gravado: o servidor só aceita ela como estava.
-        const tom = m.repertorioId
-          ? seletorTom(m.tom, `Tom de ${m.titulo}`, (v) => { m.tom = v; nota.textContent = textoNota(r, v); mudou(); })
-          : criar('span', { className: 'tom-fixo', textContent: m.tom || '—' });
-        return criar('div', { className: 'escolhida' },
-          criar('span', { className: 'ordem', textContent: `${i + 1}` }),
-          criar('div', { className: 'txt' }, criar('strong', { textContent: m.titulo + situacao }), r && criar('small', { textContent: r.cantor }), nota),
-          tom,
-          criar('div', { className: 'mover' },
-            criar('button', { type: 'button', textContent: '↑', disabled: i === 0, aria: { label: `Subir ${m.titulo}` },
-              onclick: () => { [escolhidas[i - 1], escolhidas[i]] = [escolhidas[i], escolhidas[i - 1]]; mudou(); } }),
-            criar('button', { type: 'button', textContent: '↓', disabled: i === escolhidas.length - 1, aria: { label: `Descer ${m.titulo}` },
-              onclick: () => { [escolhidas[i + 1], escolhidas[i]] = [escolhidas[i], escolhidas[i + 1]]; mudou(); } }),
-            criar('button', { type: 'button', textContent: '×', aria: { label: `Tirar ${m.titulo}` },
-              onclick: () => { escolhidas.splice(i, 1); mudou(); } })));
-      }) : [criar('p', { className: 'dica', textContent: 'Nenhuma música ainda. Toque em “Adicionar músicas”.' })]));
-      salvar.disabled = !pendente;
-    }
-    const botaoAdicionar = botao('+ Adicionar músicas', () => abrirAdicionar(c, escolhidas, (novas) => {
-      escolhidas.push(...novas);
-      mudou();
-    }));
-    const salvar = botao('Salvar músicas', async () => {
-      salvar.disabled = true;
-      try {
-        await chamar(`/api/minha-escala/cultos/${c.id}/musicas`, { musicas: escolhidas }, 'PUT');
+  // ---------- Escolher as músicas (ministro): a mesma janela do painel (musicas-culto.js) ----------
+  function abrirEscolherMusicas(c) {
+    MusicasCulto.abrir({
+      titulo: `${dataLonga(c)} · ${c.horaTexto} · ${c.nome}`,
+      musicas: c.musicas,
+      repertorio: catalogo(),
+      editavel: true,
+      salvar: async (musicas) => {
+        await chamar(`/api/minha-escala/cultos/${c.id}/musicas`, { musicas }, 'PUT');
         recemSalvos.add(c.id);
         await carregar();
-      } catch (err) {
-        resultado.className = 'erro';
-        resultado.textContent = err.message;
-        salvar.disabled = false;
-      }
-    }, 'botao pequeno');
-    desenharLinhas();
-    editor.append(linhas, criar('div', { className: 'acoes-editor' }, botaoAdicionar, salvar), resultado);
-    return editor;
-  }
-
-  // ---------- Adicionar músicas: busca em destaque com atalhos ----------
-  const adicionar = { culto: null, jaNoCulto: new Set(), marcadas: new Map(), andamento: '', aoConfirmar: null };
-
-  function abrirAdicionar(c, escolhidas, aoConfirmar) {
-    Object.assign(adicionar, {
-      culto: c, aoConfirmar, andamento: '', marcadas: new Map(),
-      jaNoCulto: new Set(escolhidas.map((m) => m.repertorioId).filter(Boolean)),
+        // Abre o culto com "✓ Músicas salvas" e o botão para avisar o grupo do louvor.
+        abrirCulto(dados.cultos.find((x) => x.id === c.id) || c);
+      },
     });
-    $('adicionar-culto').textContent = `${c.rotulo} · ${c.horaTexto} · ${c.nome}`;
-    $('adicionar-busca').value = '';
-    desenharAdicionar();
-    $('dlg-adicionar').showModal();
-    $('adicionar-lista').scrollTop = 0;
   }
-
-  function itemAdicionar(r) {
-    const ja = adicionar.jaNoCulto.has(r.id);
-    const marcada = adicionar.marcadas.has(r.id);
-    const tom = adicionar.marcadas.get(r.id) ?? r.tom;
-    const nota = criar('small', { className: 'nota', textContent: textoNota(r, tom) });
-    const bpm = numeroBpm(r.bpm);
-    return criar('div', { className: 'item-adicionar' + (marcada ? ' marcada' : '') },
-      criar('div', { className: 'txt' },
-        criar('strong', { textContent: r.titulo }),
-        criar('small', { textContent: [r.cantor, bpm && `${bpm} BPM`].filter(Boolean).join(' · ') }),
-        nota),
-      ja ? criar('span', { className: 'ja', textContent: '✓ no culto' }) : [
-        // Mudar o tom já marca a música: é sinal de que a pessoa quer cantar ela.
-        seletorTom(tom, `Tom de ${r.titulo}`, (v) => { adicionar.marcadas.set(r.id, v); desenharAdicionar(); }),
-        criar('button', { type: 'button', className: 'marcar' + (marcada ? ' on' : ''), textContent: marcada ? '✓' : '+',
-          aria: { label: marcada ? `Tirar ${r.titulo}` : `Adicionar ${r.titulo}`, pressed: String(marcada) },
-          onclick: () => {
-            marcada ? adicionar.marcadas.delete(r.id) : adicionar.marcadas.set(r.id, tom);
-            desenharAdicionar();
-          } }),
-      ]);
-  }
-
-  function desenharAdicionar() {
-    const caixa = $('adicionar-andamento');
-    caixa.replaceChildren(...['', 'Lenta', 'Média', 'Rápida'].map((v) => {
-      const radio = criar('input', { type: 'radio', name: 'adicionar-andamento', value: v, checked: adicionar.andamento === v,
-        onchange: () => { adicionar.andamento = v; desenharAdicionar(); } });
-      return criar('label', {}, radio, v || 'Todas');
-    }));
-    const busca = $('adicionar-busca').value.trim();
-    const todas = catalogo().map((r) => ({ compositor: '', ...r }))
-      .filter((r) => !adicionar.andamento || andamentoBpm(r.bpm) === adicionar.andamento);
-    const grupo = (titulo, musicas) => musicas.length
-      ? [criar('h3', { className: 'grupo', textContent: titulo }), ...musicas.map(itemAdicionar)] : [];
-    let conteudo;
-    if (busca) {
-      const achadas = buscarRepertorio(todas, { busca });
-      conteudo = achadas.length ? grupo(`${achadas.length} ${achadas.length === 1 ? 'resultado' : 'resultados'}`, achadas)
-        : [criar('p', { className: 'dica vazio', textContent: 'Nenhuma música encontrada. Se faltar alguma, peça para incluir no Repertório.' })];
-    } else {
-      const minhas = todas.filter((r) => r.minhaUltima).sort((a, b) => b.minhaUltima.localeCompare(a.minhaUltima)).slice(0, 5);
-      const mais = todas.filter((r) => r.vezes > 0 && !minhas.includes(r)).sort((a, b) => b.vezes - a.vezes).slice(0, 6);
-      conteudo = [
-        ...grupo('Você tocou recentemente', minhas),
-        ...grupo('Mais tocadas na igreja', mais),
-        ...grupo('Todas de A a Z', todas.filter((r) => !minhas.includes(r) && !mais.includes(r))
-          .sort((a, b) => a.titulo.localeCompare(b.titulo, 'pt-BR'))),
-      ];
-      if (!conteudo.length) conteudo = [criar('p', { className: 'dica vazio', textContent: 'Nenhuma música com esse andamento.' })];
-    }
-    $('adicionar-lista').replaceChildren(...conteudo);
-    const n = adicionar.marcadas.size;
-    $('adicionar-confirmar').disabled = !n;
-    $('adicionar-confirmar').textContent = n ? `Adicionar ${n} ${n === 1 ? 'música' : 'músicas'} ao culto` : 'Toque em + para escolher';
-  }
-
-  $('adicionar-busca').addEventListener('input', desenharAdicionar);
-  $('adicionar-voltar').addEventListener('click', () => $('dlg-adicionar').close());
-  $('adicionar-confirmar').addEventListener('click', () => {
-    const novas = [...adicionar.marcadas].map(([id, tom]) => {
-      const r = catalogo().find((x) => x.id === id);
-      return { repertorioId: id, titulo: r.titulo, tom };
-    });
-    $('dlg-adicionar').close();
-    adicionar.aoConfirmar?.(novas);
-  });
 
   const ehAndroid = () => /Android/i.test(navigator.userAgent || '');
   const hojeIso = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
@@ -566,7 +383,7 @@
       listaMusicas(c),
       EnsaioPlayer.botaoEnsaio(`${dataLonga(c)} · ${c.horaTexto}`, c.musicas || [], 'botao claro ensaiar'),
       criar('div', { className: 'acoes' },
-        c.podeEscolherMusicas ? botao(c.musicas.length ? 'Alterar as músicas' : 'Escolher as músicas', () => abrirCulto(c, true), 'botao claro pequeno') : null,
+        c.podeEscolherMusicas ? botao(c.musicas.length ? 'Alterar as músicas' : 'Escolher as músicas', () => abrirEscolherMusicas(c), 'botao claro pequeno') : null,
         botaoAgenda(c, 'botao ' + (c.podeEscolherMusicas ? 'vidro' : 'claro') + ' pequeno'),
         botaoNaoVou(c, 'botao vidro pequeno')));
   }
@@ -585,9 +402,8 @@
 
   // ---------- Culto aberto: tudo de um culto, e o editor do ministro ----------
   let cultoAberto = null;
-  function abrirCulto(c, editar = false) {
+  function abrirCulto(c) {
     cultoAberto = c.id;
-    if (editar) editoresAbertos.add(c.id);
     desenharCulto(c);
     if (!$('dlg-culto').open) $('dlg-culto').showModal();
   }
@@ -601,7 +417,9 @@
     const ensaiar = EnsaioPlayer.botaoEnsaio(`${dataLonga(c)} · ${c.horaTexto}`, c.musicas || [], 'botao ensaiar');
     if (ensaiar) corpo.append(ensaiar);
     if (c.podeEscolherMusicas && c.musicas.length) corpo.append(blocoAvisarGrupo(c));
-    if (c.podeEscolherMusicas) corpo.append(editorMusicas(c));
+    if (c.podeEscolherMusicas) {
+      corpo.append(botao(c.musicas.length ? 'Alterar as músicas' : 'Escolher as músicas', () => abrirEscolherMusicas(c), 'botao escolher-musicas'));
+    }
     corpo.append(criar('div', { className: 'acoes' }, botaoAgenda(c, 'botao secundario pequeno'), botaoNaoVou(c, 'botao secundario pequeno')));
   }
   $('culto-voltar').addEventListener('click', () => $('dlg-culto').close());
